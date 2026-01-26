@@ -3,9 +3,20 @@ from django.shortcuts import render
 
 @login_required
 def home(request):
-    context = {
-        "total_indicators": 0,
-        "feed_count": 0,
-        "new_last_24h": 0,
-    }
-    return render(request, 'dashboard/home.html', context)
+    return render(request, 'dashboard/home.html')
+
+@login_required
+def indicators(request):
+    return render(request, 'dashboard/indicators.html')
+
+@login_required
+def threat_feeds(request):
+    return render(request, 'dashboard/threat_feeds.html')
+
+@login_required
+def analytics(request):
+    return render(request, 'dashboard/analytics.html')
+
+@login_required
+def settings(request):
+    return render(request, 'dashboard/settings.html')
