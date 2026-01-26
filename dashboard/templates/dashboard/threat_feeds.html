@@ -1,0 +1,64 @@
+<!-- This code is just a placeholder -->
+<!-- PLEASE CHANGE THIS ONCE WE HAVE THE TEMPLATE -->
+
+{% extends "dashboard/base.html" %}
+{% block title %}Threat Feeds{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h2 class="fw-bold">Threat Feeds</h2>
+        <a href="#" class="btn btn-primary">+ Add Feed</a>
+    </div>
+
+    <!-- Feeds Table -->
+    <div class="card shadow-sm p-4 mb-4">
+        <h5 class="fw-bold mb-3">Active Feeds</h5>
+
+        <table class="table table-hover align-middle">
+            <thead>
+                <tr>
+                    <th>Name</th>
+                    <th>Source</th>
+                    <th>Status</th>
+                    <th>Last Run</th>
+                    <th>Indicators Pulled</th>
+                    <th></th>
+                </tr>
+            </thead>
+            <tbody>
+                <!-- Example row -->
+                <tr>
+                    <td>AlienVault OTX</td>
+                    <td>https://otx.alienvault.com</td>
+                    <td>
+                        <span class="badge bg-success">Active</span>
+                    </td>
+                    <td>2026-01-26 14:32</td>
+                    <td>124</td>
+                    <td>
+                        <a href="#" class="btn btn-sm btn-outline-secondary">Run Now</a>
+                    </td>
+                </tr>
+
+                <tr>
+                    <td colspan="6" class="text-center text-muted">
+                        More feeds coming soon.
+                    </td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+
+    <!-- Ingestion Logs -->
+    <div class="card shadow-sm p-4">
+        <h5 class="fw-bold mb-3">Ingestion Logs</h5>
+
+        <div class="bg-light rounded p-3 text-muted" style="height: 200px; overflow-y: auto;">
+            No logs yet.
+        </div>
+    </div>
+
+</div>
+{% endblock %}

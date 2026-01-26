@@ -1,0 +1,72 @@
+{% extends "dashboard/base.html" %}
+{% block title %}Settings{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+
+    <h2 class="fw-bold mb-4">Settings</h2>
+
+    <div class="row g-4">
+
+        <!-- User Settings -->
+        <div class="col-md-6">
+            <div class="card shadow-sm p-4">
+                <h5 class="fw-bold mb-3">User Settings</h5>
+
+                <form>
+                    <div class="mb-3">
+                        <label class="form-label">Display Name</label>
+                        <input type="text" class="form-control" placeholder="Your name">
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label">Email Address</label>
+                        <input type="email" class="form-control" placeholder="you@example.com">
+                    </div>
+
+                    <button class="btn btn-dark">Save Changes</button>
+                </form>
+            </div>
+        </div>
+
+        <!-- System Settings -->
+        <div class="col-md-6">
+            <div class="card shadow-sm p-4">
+                <h5 class="fw-bold mb-3">System Settings</h5>
+
+                <form>
+                    <div class="mb-3">
+                        <label class="form-label">Default Confidence Threshold</label>
+                        <input type="number" class="form-control" value="50">
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label">Enable Auto-Ingestion</label>
+                        <select class="form-select">
+                            <option>Enabled</option>
+                            <option>Disabled</option>
+                        </select>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label">Theme</label>
+                        <div>
+                            <a href="{% url 'toggle-theme' %}" class="btn btn-dark">
+                                {% if request.COOKIES.theme == 'dark' %}
+                                    Disable Dark Mode
+                                {% else %}
+                                    Enable Dark Mode
+                                {% endif %}
+                            </a>
+                        </div>
+                    </div>
+
+                    <button class="btn btn-dark">Update Settings</button>
+                </form>
+            </div>
+        </div>
+
+    </div>
+
+</div>
+{% endblock %}

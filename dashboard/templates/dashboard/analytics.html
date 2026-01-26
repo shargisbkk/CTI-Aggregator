@@ -1,0 +1,62 @@
+<!-- This code is just a placeholder -->
+<!-- PLEASE CHANGE THIS ONCE WE HAVE THE TEMPLATE -->
+
+{% extends "dashboard/base.html" %}
+{% block title %}Analytics{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+
+    <h2 class="fw-bold mb-4">Analytics</h2>
+
+    <!-- Stats Row -->
+    <div class="row g-4 mb-4">
+        <div class="col-md-3">
+            <div class="card shadow-sm p-3">
+                <h6 class="text-muted">Total Indicators</h6>
+                <h2 class="fw-bold">0</h2>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card shadow-sm p-3">
+                <h6 class="text-muted">High Confidence</h6>
+                <h2 class="fw-bold">0</h2>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card shadow-sm p-3">
+                <h6 class="text-muted">New This Week</h6>
+                <h2 class="fw-bold">0</h2>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card shadow-sm p-3">
+                <h6 class="text-muted">Active Feeds</h6>
+                <h2 class="fw-bold">0</h2>
+            </div>
+        </div>
+    </div>
+
+    <!-- Charts -->
+    <div class="row g-4">
+        <div class="col-md-6">
+            <div class="card shadow-sm p-3">
+                <h5 class="fw-bold mb-3">Indicator Volume Over Time</h5>
+                <div style="height: 300px;" class="bg-light rounded d-flex align-items-center justify-content-center text-muted">
+                    Chart placeholder
+                </div>
+            </div>
+        </div>
+
+        <div class="col-md-6">
+            <div class="card shadow-sm p-3">
+                <h5 class="fw-bold mb-3">Top Sources</h5>
+                <div style="height: 300px;" class="bg-light rounded d-flex align-items-center justify-content-center text-muted">
+                    Chart placeholder
+                </div>
+            </div>
+        </div>
+    </div>
+
+</div>
+{% endblock %}
