@@ -1,0 +1,70 @@
+# ============================
+# Python
+# ============================
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.pdb
+*.pkl
+*.egg-info/
+*.egg
+*.log
+
+# Virtual environments
+venv/
+env/
+.venv/
+
+# Jupyter (if you ever use it)
+.ipynb_checkpoints/
+
+# ============================
+# Django
+# ============================
+# SQLite (if used for local dev)
+db.sqlite3
+db.sqlite3-journal
+
+# Django static + media (generated)
+staticfiles/
+media/
+
+# Django secret key (if externalized)
+.env
+*.env
+.env.*
+
+# Local settings override
+settings_local.py
+
+# ============================
+# Node / Frontend Tools (optional)
+# Only include these if you use npm for bundling assets
+# ============================
+node_modules/
+npm-debug.log
+yarn-debug.log
+yarn-error.log
+dist/
+build/
+
+# ============================
+# PostgreSQL
+# ============================
+# Local dumps or exports
+*.sql
+*.psql
+*.dump
+
+# ============================
+# OS / Editor Files
+# ============================
+.DS_Store
+Thumbs.db
+
+# VSCode
+.vscode/
+
+# PyCharm
+.idea/
