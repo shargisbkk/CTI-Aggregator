@@ -20,6 +20,7 @@ def login_view(request):
     return render(request, "accounts/login.html", {"form": form})
 
 def signup_view(request):
+    redirect("dashboard-home")
     if request.user.is_authenticated:
         return redirect("dashboard-home")
     
