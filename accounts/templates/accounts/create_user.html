@@ -14,15 +14,70 @@
         <form id="user-Creation-Form" method="POST">
             {% csrf_token %}
 
-            <!-- Django AuthenticationForm renders fields with labels -->
+            <!-- Username field -->
             <div class="mb-3"> 
-                {{ form.username.label_tag }} <!-- Stand in fields until we retrive the actual fields-->
+                {{ form.username.label_tag }}
                 {{ form.username }}
+                {% if form.username.errors %}
+                    <div class="text-danger small mt-1">
+                        {% for error in form.username.errors %}{{ error }}<br>{% endfor %}
+                    </div>
+                {% endif %}
             </div>
 
+            <!-- First Name field -->
             <div class="mb-3">
-                {{ form.password.label_tag }}
-                {{ form.password }}
+                {{ form.first_name.label_tag }}
+                {{ form.first_name }}
+                {% if form.first_name.errors %}
+                    <div class="text-danger small mt-1">
+                        {% for error in form.first_name.errors %}{{ error }}<br>{% endfor %}
+                    </div>
+                {% endif %}
+            </div>
+
+            <!-- Last Name field -->
+            <div class="mb-3">
+                {{ form.last_name.label_tag }}
+                {{ form.last_name }}
+                {% if form.last_name.errors %}
+                    <div class="text-danger small mt-1">
+                        {% for error in form.last_name.errors %}{{ error }}<br>{% endfor %}
+                    </div>
+                {% endif %}
+            </div>
+
+            <!-- Email field -->
+            <div class="mb-3">
+                {{ form.email.label_tag }}
+                {{ form.email }}
+                {% if form.email.errors %}
+                    <div class="text-danger small mt-1">
+                        {% for error in form.email.errors %}{{ error }}<br>{% endfor %}
+                    </div>
+                {% endif %}
+            </div>
+
+            <!-- Password field -->
+            <div class="mb-3">
+                {{ form.password1.label_tag }}
+                {{ form.password1 }}
+                {% if form.password1.errors %}
+                    <div class="text-danger small mt-1">
+                        {% for error in form.password1.errors %}{{ error }}<br>{% endfor %}
+                    </div>
+                {% endif %}
+            </div>
+
+            <!-- Password Confirmation field -->
+            <div class="mb-3">
+                {{ form.password2.label_tag }}
+                {{ form.password2 }}
+                {% if form.password2.errors %}
+                    <div class="text-danger small mt-1">
+                        {% for error in form.password2.errors %}{{ error }}<br>{% endfor %}
+                    </div>
+                {% endif %}
             </div>
 
             <button type="submit" class="btn btn-primary w-100 py-2 mt-2">
