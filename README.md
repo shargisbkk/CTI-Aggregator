@@ -3,6 +3,7 @@ Cyber threat intelligence aggregator used to pull data from different sources, n
 
 # Setting up PostgreSQL
 Install PostgreSQL using the download for your OS https://www.enterprisedb.com/downloads/postgres-postgresql-downloads
+You cannot complete the install without having administrative-level permissions on your device
 During installation you will set up a password for your PostgreSQL server/database
 Once the installation is complete, open up pgAdmin4 and use the password to login
 Rightclick on Databases and create a new database named cti_db
