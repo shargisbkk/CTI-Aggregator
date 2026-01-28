@@ -4,7 +4,7 @@ from django.contrib.auth.forms import AuthenticationForm
 from django.contrib.auth.forms import UserCreationForm
 from django.contrib import messages
 def login_view(request):
-    messages.success(request, "This is a debug message for testing purposes, accounts-view.py")
+    messages.add_message(request, "This is a debug message for testing purposes, accounts-view.py")
     if request.user.is_authenticated:
         return redirect("dashboard-home")
 
@@ -16,25 +16,26 @@ def login_view(request):
             user = form.get_user()
             login(request, user)
             return redirect("dashboard-home")
+    if request.method == "CREATE":
+        return redirect("accounts-create_user")
 
     #return render(request, "accounts/debug.html", {})
     return render(request, "accounts/login.html", {"form": form})
 
 def signup_view(request):
-    
     if request.user.is_authenticated:
         return redirect("dashboard-home")
     
     form = UserCreationForm()
 
     if request.method == "CREATE":
-        form = UserCreationForm(data=request.POST)
+        form = UserCreationForm(data=request.CREATE)
         if form.is_valid():
             form.save()
             messages.success(request, "Account created. Please sign in.")
             return redirect("accounts-login")
         else:
-            form = UserCreationForm(request.POST)
+            form = UserCreationForm(request.CREATE)
     #return render(request, "accounts/debug.html", {})
     return render(request, "accounts/create_user.html", {"form": form})
 
