@@ -11,7 +11,24 @@
             <h2 class="fw-bold">CTI Aggregator</h2>
             <p class="text-muted">Follow the steps to join the platform.</p> <!-- SHOULD REWORK THE WORDING WITHIN THIS PAGE -->
         </div>
+        <form id="user-Creation-Form" method="POST">
+            {% csrf_token %}
 
+            <!-- Django AuthenticationForm renders fields with labels -->
+            <div class="mb-3"> 
+                {{ form.username.label_tag }} <!-- Stand in fields until we retrive the actual fields-->
+                {{ form.username }}
+            </div>
+
+            <div class="mb-3">
+                {{ form.password.label_tag }}
+                {{ form.password }}
+            </div>
+
+            <button type="submit" class="btn btn-primary w-100 py-2 mt-2">
+                Create User
+            </button>
+        </form>
         
     </div>
 </div>
