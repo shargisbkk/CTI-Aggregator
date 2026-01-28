@@ -11,8 +11,11 @@ In the project folder open up the cti folder and settings.py file
 There are lines refering to the database around line 83-92
 The name of the database, user, and password are set up by you, the admin
 The default port is 5432 and can be changed in pgAdmin
+<<<<<<< HEAD
     This database is completely local
     Any changes or issues with the database will not affect other, unless they are connected to your database
+=======
+>>>>>>> 66e961b01abe3976dc03c87e782694a3b0840d40
 
 # Setting up Python
 Install Python version of your choosing from https://www.python.org/downloads/
