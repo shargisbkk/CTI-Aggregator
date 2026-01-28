@@ -25,7 +25,7 @@ def signup_view(request):
     
     form = UserCreationForm()
 
-    if request.method == "POST":
+    if request.method == "CREATE":
         form = UserCreationForm(data=request.POST)
         if form.is_valid():
             form.save()
