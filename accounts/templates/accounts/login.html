@@ -9,14 +9,14 @@
         
         <div class="text-center mb-4">
             <h2 class="fw-bold">CTI Aggregator</h2>
-            <p class="text-muted">Sign in to your workspace</p>
+            <p class="text-muted">Sign in to your workspace</p> <!-- SHOULD REWORK THE WORDING WITHIN THIS PAGE -->
         </div>
 
-        <form method="POST" novalidate>
+        <form id="user-login-form" method="POST" novalidate>
             {% csrf_token %}
 
             <!-- Django AuthenticationForm renders fields with labels -->
-            <div class="mb-3">
+            <div class="mb-3"> 
                 {{ form.username.label_tag }}
                 {{ form.username }}
             </div>
@@ -29,12 +29,23 @@
             <button type="submit" class="btn btn-primary w-100 py-2 mt-2">
                 Login
             </button>
+            
         </form>
 
-        <div class="text-center mt-3">
+        <div class="text-center mt-3"> <!-- this will eventually have a link to recoveryour password ideally -->
             <small class="text-muted">Forgot your password? Contact your admin.</small>
         </div>
-
+        <br>
+        <form id="form-create-account" method="POST" action="{% url 'create_user' %}" novalidate>
+            {% csrf_token %}
+            <div class="text-center account-creation">
+            <label>Don't have an account?</label> <!-- This form will lead to a secondary html page where the user can fill in their info, which will be sent to the DB -->
+            <button type="submit" class="btn btn-primary w-75 py-2 mt-2">
+                Create Account
+            </button>
+            </div>
+            
+        </form>
     </div>
 </div>
 
