@@ -3,6 +3,7 @@ from django.shortcuts import render, redirect
 from django.contrib.auth.forms import AuthenticationForm
 from django.contrib import messages
 from .forms import CustomUserCreationForm
+
 def login_view(request):
     if request.user.is_authenticated:
         return redirect("dashboard-home")
