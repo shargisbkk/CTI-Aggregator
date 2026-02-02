@@ -38,23 +38,23 @@ You will have to go into the project folder from the terminal and activate your 
 You can then use the command "python manage.py runserver" to run your server for testing.
 
 # Implementing Stix file ingestion
-In your venv, run pip install requests stix2
-then run python manage.py shell
+In your venv, run pip install requests stix2 <br>
+then run python manage.py shell <br>
 copy paste this into the ensuing window:
 
-from ingestion.models import TaxiiSource
+from ingestion.models import TaxiiSource<br>
 
-TaxiiSource.objects.update_or_create(
-    name="mitre-attack",
-    defaults={
-        "discovery_url": "https://attack-taxii.mitre.org/api/v21/",
-        "username": "",
-        "password": "",
-        "added_after": ""
-    }
-)
+TaxiiSource.objects.update_or_create(<br>
+    name="mitre-attack",<br>
+    defaults={<br>
+        "discovery_url": "https://attack-taxii.mitre.org/api/v21/",<br>
+        "username": "",<br>
+        "password": "",<br>
+        "added_after": ""<br>
+    }<br>
+)<br>
 
-then press ctrl+z, then press enter, which will exit the shell
-then run python manage.py ingest_taxii
+then press ctrl+z, then press enter, which will exit the shell<br>
+then run python manage.py ingest_taxii<br>
 If all goes well, the data should populate in your database under ingestion_stixobject.
 # GOOD LUCK HAVE FUN BREAK THINGS
