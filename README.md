@@ -39,6 +39,8 @@ You can then use the command "python manage.py runserver" to run your server for
 
 # Implementing Stix file ingestion
 In your venv, run pip install requests stix2 <br>
+then do python manage.py makemigrations <br>
+then python manage.py migrate <br>
 then run python manage.py shell <br>
 copy paste this into the ensuing window:
 
