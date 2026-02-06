@@ -12,11 +12,8 @@ In the project folder open up the cti folder and settings.py file
 There are lines refering to the database around line 83-92
 The name of the database, user, and password are set up by you, the admin
 The default port is 5432 and can be changed in pgAdmin
-<<<<<<< HEAD
-    This database is completely local
-    Any changes or issues with the database will not affect other, unless they are connected to your database
-=======
->>>>>>> 66e961b01abe3976dc03c87e782694a3b0840d40
+This database is completely local
+Any changes or issues with the database will not affect other, unless they are connected to your database
 
 # Setting up Python
 Install Python version of your choosing from https://www.python.org/downloads/
@@ -40,4 +37,26 @@ Make sure you are connected to your server in pgAdmin
 You will have to go into the project folder from the terminal and activate your virtual environment
 You can then use the command "python manage.py runserver" to run your server for testing.
 
+# Implementing Stix file ingestion
+In your venv, run pip install requests stix2 <br>
+then do python manage.py makemigrations <br>
+then python manage.py migrate <br>
+then run python manage.py shell <br>
+copy paste this into the ensuing window:
+
+from ingestion.models import TaxiiSource<br>
+
+TaxiiSource.objects.update_or_create(<br>
+    name="mitre-attack",<br>
+    defaults={<br>
+        "discovery_url": "https://attack-taxii.mitre.org/api/v21/",<br>
+        "username": "",<br>
+        "password": "",<br>
+        "added_after": ""<br>
+    }<br>
+)<br>
+
+then press ctrl+z, then press enter, which will exit the shell<br>
+then run python manage.py ingest_taxii<br>
+If all goes well, the data should populate in your database under ingestion_stixobject.
 # GOOD LUCK HAVE FUN BREAK THINGS
