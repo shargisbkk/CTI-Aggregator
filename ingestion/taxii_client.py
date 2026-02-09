@@ -1,53 +1,90 @@
 import requests
 from datetime import datetime, timezone
+from typing import Generator, Optional
 
 TAXII_HEADERS = {"Accept": "application/taxii+json; version=2.1"}
+
 
 def _now_rfc3339() -> str:
     return datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
 
-def discover_api_roots(discovery_url: str, auth: tuple[str, str] | None):
+
+def discover_api_roots(discovery_url: str, auth: Optional[tuple[str, str]]):
     r = requests.get(discovery_url, headers=TAXII_HEADERS, auth=auth, timeout=60)
     r.raise_for_status()
     data = r.json()
     return data.get("api_roots", [])
 
-def list_collections(api_root_url: str, auth: tuple[str, str] | None):
-    url = api_root_url.rstrip("/") + "/collections/"
+
+def list_collections(api_root_url: str, auth: Optional[tuple[str, str]]):
+    url = api_root_url.rstrip("/") + "/collections"
     r = requests.get(url, headers=TAXII_HEADERS, auth=auth, timeout=60)
     r.raise_for_status()
     return r.json().get("collections", [])
 
-def get_objects(api_root_url: str, collection_id: str, auth: tuple[str, str] | None, added_after: str | None):
+
+def get_objects(
+    api_root_url: str,
+    collection_id: str,
+    auth: Optional[tuple[str, str]],
+    added_after: Optional[str],
+    limit: int = 2000,
+) -> Generator[dict, None, None]:
     """
-    Returns a generator of envelopes:
-      { "objects": [...], "more": bool, "next": "token" }
+    TAXII 2.1 Objects pagination:
+
+    - Request:  GET .../collections/{id}/objects?added_after=<token>&limit=<n>
+    - Response: { "objects": [...], "more": true/false, "next": "<token>" }
+
+    To get the next page, set added_after = response["next"].
     """
-    url = api_root_url.rstrip("/") + f"/collections/{collection_id}/objects/"
-    params = {}
-    if added_after:
-        params["added_after"] = added_after
+    url = api_root_url.rstrip("/") + f"/collections/{collection_id}/objects"
+
+    # Keep a moving cursor. First request uses the source's stored added_after.
+    cursor = added_after
 
     while True:
+        params = {"limit": limit}
+        if cursor:
+            params["added_after"] = cursor
+
         r = requests.get(url, headers=TAXII_HEADERS, auth=auth, params=params, timeout=60)
         r.raise_for_status()
         env = r.json()
 
+        # Yield the full envelope so callers can capture "next"/"more" as checkpoint.
         yield env
 
         if env.get("more") and env.get("next"):
-            # When paging, TAXII expects `next` token; don't keep `added_after` here
-            params = {"next": env["next"]}
+            cursor = env["next"]
             continue
+
         break
 
-def fetch_all_objects(discovery_url: str, username: str = "", password: str = "", added_after: str | None = None):
-    auth = (username, password) if username and password else None
+
+def fetch_all_objects(
+    discovery_url: str,
+    username: str = "",
+    password: str = "",
+    added_after: Optional[str] = None,
+    checkpoints: Optional[dict] = None,
+    fallback_added_after: Optional[str] = None,
+ ):
+    checkpoints = checkpoints or {}
+    if fallback_added_after is None:
+        fallback_added_after = added_after
+    # IMPORTANT:
+    # OTX works with username=API_KEY and password="" (blank).
+    # So if username exists, always send auth (even if password is blank).
+    auth = (username, password) if username else None
+
+    url_norm = discovery_url.rstrip("/")
 
     # If the URL already IS an API root, don't do discovery.
     # MITRE ATT&CK TAXII 2.1 API root is /api/v21/
-    if "/api/v21/" in discovery_url.rstrip("/") + "/":
-        api_roots = [discovery_url.rstrip("/")]
+    # OTX API root is /taxii/root
+    if "/api/v21" in url_norm or "/taxii/root" in url_norm:
+        api_roots = [url_norm]
     else:
         api_roots = discover_api_roots(discovery_url, auth)
 
@@ -57,15 +94,24 @@ def fetch_all_objects(discovery_url: str, username: str = "", password: str = ""
             col_id = col.get("id", "")
             col_title = col.get("title", col_id)
 
-            for env in get_objects(api_root_url, col_id, auth, added_after):
+            col_added_after = checkpoints.get(col_id) or fallback_added_after
+            # Stream envelopes so caller can persist checkpoint from env["next"]
+            for env in get_objects(api_root_url, col_id, auth, col_added_after):
                 yield {
                     "api_root_url": api_root_url,
                     "collection_id": col_id,
                     "collection_title": col_title,
                     "objects": env.get("objects", []),
+                    "more": env.get("more", False),
+                    "next": env.get("next"),
                 }
 
 
 def next_checkpoint_timestamp() -> str:
-    # simplest “checkpoint”: current time after a successful run
+    """
+    Deprecated for TAXII pagination.
+
+    TAXII checkpoints should come from server-provided 'next' tokens, not wall-clock time.
+    Kept for compatibility, but you should stop using this for TAXII sources.
+    """
     return _now_rfc3339()

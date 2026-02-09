@@ -7,6 +7,7 @@ class TaxiiSource(models.Model):
     password = models.CharField(max_length=200, blank=True, default="")
     # RFC3339 timestamp; used for incremental pulls
     added_after = models.CharField(max_length=64, blank=True, default="")
+    checkpoints = models.JSONField(default=dict, blank=True)
 
     def __str__(self):
         return self.name

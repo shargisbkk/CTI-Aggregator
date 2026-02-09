@@ -5,7 +5,8 @@ def upsert_stix_objects(items: list[dict], source_name: str, collection_id: str)
     saved = 0
     for it in items:
         created_dt = parse_datetime(it["created"]) if it.get("created") else None # marks when it was created
-        modified_dt = parse_datetime(it["modified"]) if it.get("modified") else None
+        modified_raw = it.get("modified") or it.get("created")
+        modified_dt = parse_datetime(modified_raw) if modified_raw else None
 
         # Create-or-ignore pattern using unique_together
         obj, created = StixObject.objects.get_or_create(
