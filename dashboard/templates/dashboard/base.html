@@ -84,12 +84,13 @@
     <!-- Navigation sidebar for the dashboard -->
     <!-- Each link corresponds to a view in the dashboard app -->
     <div class="sidebar">
-        <a href="{% url 'dashboard-home' %}" class="{% if request.path == '/' %}active{% endif %}">Home</a>
-        <a href="{% url 'dashboard-indicators' %}" class="{% if '/indicators' in request.path %}active{% endif %}">Indicators</a>
-        <a href="{% url 'dashboard-threat-feeds' %}" class="{% if '/feeds' in request.path %}active{% endif %}">Threat Feeds</a>
-        <a href="{% url 'dashboard-analytics' %}" class="{% if '/analytics' in request.path %}active{% endif %}">Analytics</a>
-        <a href="{% url 'dashboard-settings' %}" class="{% if '/settings' in request.path %}active{% endif %}">Settings</a>
+        <a href="{% url 'dashboard:dashboard-home' %}" class="{% if request.path == '/' %}active{% endif %}">Home</a>
+        <a href="{% url 'dashboard:dashboard-indicators' %}" class="{% if '/indicators' in request.path %}active{% endif %}">Indicators</a>
+        <a href="{% url 'dashboard:dashboard-threat-feeds' %}" class="{% if '/feeds' in request.path %}active{% endif %}">Threat Feeds</a>
+        <a href="{% url 'dashboard:dashboard-analytics' %}" class="{% if '/analytics' in request.path %}active{% endif %}">Analytics</a>
+        <a href="{% url 'dashboard:dashboard-settings' %}" class="{% if '/settings' in request.path %}active{% endif %}">Settings</a>
     </div>
+
 
     <!-- Main Content -->
     <!-- The content block is used to render the specific content for each page -->

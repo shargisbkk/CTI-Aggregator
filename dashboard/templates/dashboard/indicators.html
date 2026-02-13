@@ -1,50 +1,101 @@
-<!-- This code is just a placeholder -->
-<!-- PLEASE CHANGE THIS ONCE WE HAVE THE TEMPLATE -->
-
 {% extends "dashboard/base.html" %}
-{% block title %}Indicators{% endblock %}
+
+{% block title %}
+    Indicators
+{% endblock %}
+
 
 {% block content %}
+
+<!-- ======================================================
+     PAGE CONTAINER
+     Main wrapper for the Indicators dashboard page
+====================================================== -->
+
 <div class="container-fluid">
+
+    <!-- ==================================================
+         PAGE HEADER
+         Title and future action buttons
+    =================================================== -->
 
     <div class="d-flex justify-content-between align-items-center mb-4">
         <h2 class="fw-bold">Indicators</h2>
-        <a href="#" class="btn btn-primary">+ Add Indicator</a>
     </div>
 
-    <!-- Filters -->
+
+    <!-- ==================================================
+         FILTER PANEL
+         Search + filtering form (GET request)
+         Controls what indicators are displayed
+    =================================================== -->
+
     <div class="card shadow-sm p-3 mb-4">
-        <form class="row g-3">
+
+        <form method="get" class="row g-3">
+
+            <!-- Search input -->
             <div class="col-md-4">
-                <input type="text" class="form-control" placeholder="Search indicators...">
+                <input
+                    type="text"
+                    name="q"
+                    value="{{ request.GET.q }}"
+                    class="form-control"
+                    placeholder="Search indicators..."
+                >
             </div>
+
+            <!-- Indicator type dropdown -->
             <div class="col-md-3">
-                <select class="form-select">
-                    <option value="">Type</option>
-                    <option>IP Address</option>
-                    <option>Domain</option>
-                    <option>URL</option>
-                    <option>File Hash</option>
+                <select name="type" class="form-select">
+
+                    <option value="">All Types</option>
+
+                    {% for value, label in indicator_types %}
+                        <option value="{{ value }}"
+                            {% if request.GET.type == value %}
+                                selected
+                            {% endif %}
+                        >
+                            {{ label }}
+                        </option>
+                    {% endfor %}
+
                 </select>
             </div>
+
+            <!-- Confidence level filter -->
             <div class="col-md-3">
-                <select class="form-select">
-                    <option value="">Confidence</option>
-                    <option>High</option>
-                    <option>Medium</option>
-                    <option>Low</option>
+                <select name="confidence" class="form-select">
+                    <option value="">All Confidence</option>
+                    <option value="high">High</option>
+                    <option value="medium">Medium</option>
+                    <option value="low">Low</option>
                 </select>
             </div>
+
+            <!-- Filter submit button -->
             <div class="col-md-2">
-                <button class="btn btn-dark w-100">Filter</button>
+                <button class="btn btn-dark w-100">
+                    Filter
+                </button>
             </div>
+
         </form>
+
     </div>
 
-    <!-- Table -->
-    
+
+    <!-- ==================================================
+         INDICATORS TABLE
+         Displays paginated indicator results
+    =================================================== -->
+
     <div class="card shadow-sm p-3">
+
         <table class="table table-hover align-middle">
+
+            <!-- Table header -->
             <thead>
                 <tr>
                     <th>Type</th>
@@ -55,21 +106,75 @@
                     <th>Last Seen</th>
                 </tr>
             </thead>
+
+            <!-- Table body -->
             <tbody>
-                <tr>
-                    <td>IP Address</td>
-                    <td>192.168.1.10</td>
-                    <td>AlienVault</td>
-                    <td>85%</td>
-                    <td>2026-01-20</td>
-                    <td>2026-01-25</td>
-                </tr>
-                <tr>
-                    <td colspan="6" class="text-center text-muted">More indicators coming soon.</td>
-                </tr>
+
+                {% for indicator in page_obj %}
+
+                    <tr>
+                        <td>{{ indicator.get_type_display }}</td>
+                        <td>{{ indicator.value }}</td>
+                        <td>{{ indicator.source_feed.name }}</td>
+                        <td>{{ indicator.confidence }}%</td>
+                        <td>{{ indicator.first_seen }}</td>
+                        <td>{{ indicator.last_seen }}</td>
+                    </tr>
+
+                {% empty %}
+
+                    <!-- Display when no indicators match filters -->
+                    <tr>
+                        <td colspan="6" class="text-center text-muted">
+                            No indicators found.
+                        </tr>
+
+                {% endfor %}
+
             </tbody>
+
         </table>
+
+
+        <!-- ==============================================
+             PAGINATION CONTROLS
+             Navigate between result pages
+        =============================================== -->
+
+        <nav>
+            <ul class="pagination justify-content-center">
+
+                {% if page_obj.has_previous %}
+                    <li class="page-item">
+                        <a class="page-link"
+                           href="?page={{ page_obj.previous_page_number }}">
+                            Previous
+                        </a>
+                    </li>
+                {% endif %}
+
+                <li class="page-item disabled">
+                    <span class="page-link">
+                        Page {{ page_obj.number }}
+                        of
+                        {{ page_obj.paginator.num_pages }}
+                    </span>
+                </li>
+
+                {% if page_obj.has_next %}
+                    <li class="page-item">
+                        <a class="page-link"
+                           href="?page={{ page_obj.next_page_number }}">
+                            Next
+                        </a>
+                    </li>
+                {% endif %}
+
+            </ul>
+        </nav>
+
     </div>
 
 </div>
+
 {% endblock %}
