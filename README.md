@@ -27,9 +27,13 @@ then use ".\activate" again
 
 # Setting up Django
 from the project folder, inside of the virtual environment use the following commands
-pip install django psycopg2-binary
+```
+pip install django
+pip install psycopg[binary]
+pip install requests stix2 pandas taxii2client
 python manage.py migrate
 python manage.py createsuperuser
+```
 You can make the superuser whatever name, email, and password you want
 
 # Running the server
@@ -37,26 +41,75 @@ Make sure you are connected to your server in pgAdmin
 You will have to go into the project folder from the terminal and activate your virtual environment
 You can then use the command "python manage.py runserver" to run your server for testing.
 
-# Implementing Stix file ingestion
-In your venv, run pip install requests stix2 <br>
-then do python manage.py makemigrations <br>
-then python manage.py migrate <br>
-then run python manage.py shell <br>
-copy paste this into the ensuing window:
+# Ingesting threat intelligence
 
-from ingestion.models import TaxiiSource<br>
+## OTX (AlienVault)
+You will need a free OTX API key:
+1. Sign up at https://otx.alienvault.com
+2. After logging in, go to your profile settings page
+3. Copy the API key shown under "OTX Key"
 
-TaxiiSource.objects.update_or_create(<br>
-    name="mitre-attack",<br>
-    defaults={<br>
-        "discovery_url": "https://attack-taxii.mitre.org/api/v21/",<br>
-        "username": "",<br>
-        "password": "",<br>
-        "added_after": ""<br>
-    }<br>
-)<br>
+Run ingestion with:
+```
+python -B manage.py ingest_otx YOUR_API_KEY
+```
 
-then press ctrl+z, then press enter, which will exit the shell<br>
-then run python manage.py ingest_taxii<br>
-If all goes well, the data should populate in your database under ingestion_stixobject.
+By default this fetches both the public activity feed and your subscribed feed, deduplicates, normalizes, and saves to the database.
+
+### Options
+```
+--pages N            Limit to N pages per feed (default 0 = all pages). Start with --pages 3 for a quick test.
+--feed activity      Fetch only the public activity feed
+--feed subscribed    Fetch only pulses from users you follow
+--source NAME        Tag all saved records with a custom source name (default: otx)
+```
+
+Examples:
+```
+python -B manage.py ingest_otx YOUR_KEY --pages 3
+python -B manage.py ingest_otx YOUR_KEY --feed activity --pages 5
+python -B manage.py ingest_otx YOUR_KEY --feed subscribed --source otx-subscribed
+```
+
+## ThreatFox (abuse.ch)
+You will need a free ThreatFox API key:
+1. Sign up at https://auth.abuse.ch/
+2. After logging in, go to https://threatfox.abuse.ch/api/ and copy your API key
+
+Run ingestion with:
+```
+python -B manage.py ingest_threatfox YOUR_API_KEY
+```
+
+### Options
+```
+--days N      How many days back to fetch IOCs (default: 1). Use --days 7 for a week.
+--source NAME Tag all saved records with a custom source name (default: threatfox)
+```
+
+Examples:
+```
+python -B manage.py ingest_threatfox YOUR_KEY --days 3
+python -B manage.py ingest_threatfox YOUR_KEY --days 7 --source threatfox-week
+```
+
+## STIX files (local folder)
+Place your .json STIX bundle files in a folder and run:
+```
+python -B manage.py ingest_stix_folder /path/to/folder --source my-source
+```
+
+Sample STIX files are included in the `sample_stix/` folder for testing:
+```
+python -B manage.py ingest_stix_folder sample_stix --source sample
+```
+
+## TAXII server
+To pull from a TAXII 2.1 server:
+```
+python -B manage.py ingest_taxii https://your-taxii-server/taxii/ --source taxii-source
+```
+
+Data from all sources is saved to the `indicators_of_compromise` table in your database.
+
 # GOOD LUCK HAVE FUN BREAK THINGS

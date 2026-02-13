@@ -1,0 +1,32 @@
+from django.db import migrations, models
+
+
+class Migration(migrations.Migration):
+
+    dependencies = [
+        ('ingestion', '0002_auto_20260210_2135'),
+    ]
+
+    operations = [
+        # Drop the unique_together constraint referencing stix_id before renaming
+        migrations.AlterUniqueTogether(
+            name='indicatorofcompromise',
+            unique_together=set(),
+        ),
+        # Rename stix_id → source_id
+        migrations.RenameField(
+            model_name='indicatorofcompromise',
+            old_name='stix_id',
+            new_name='source_id',
+        ),
+        # Remove description column
+        migrations.RemoveField(
+            model_name='indicatorofcompromise',
+            name='description',
+        ),
+        # Restore unique_together with the new column name
+        migrations.AlterUniqueTogether(
+            name='indicatorofcompromise',
+            unique_together={('source_id', 'source')},
+        ),
+    ]
