@@ -23,7 +23,6 @@ def normalize(indicators: list[dict], source_name: str = "") -> list[dict]:
         ioc_value = raw_value if ioc_type in _CASE_SENSITIVE_TYPES else raw_value.lower()
 
         out.append({
-            "source_id":    ind.get("source_id", "").strip().lower(),
             "ioc_type":     ioc_type,
             "ioc_value":    ioc_value,
             "confidence":   _safe_confidence(ind.get("confidence")),
@@ -31,24 +30,23 @@ def normalize(indicators: list[dict], source_name: str = "") -> list[dict]:
             "created":      (ind.get("created") or "").strip() or None,
             "modified":     (ind.get("modified") or "").strip() or None,
             "source":       source_name,
-            "pattern_type": (ind.get("pattern_type") or "").strip().lower(),
         })
     return out
 
 
 def make_dataframe(records: list[dict]) -> pd.DataFrame:
     """
-    Drops duplicates and sorts by most recently modified.
-    Deduplicates on (source_id, source) so re-imports don't create copies.
+    Deduplicates on (ioc_type, ioc_value) so the same indicator only
+    appears once per batch. Keeps the most recently modified version.
     """
     columns = [
-        "source_id", "ioc_type", "ioc_value",
-        "confidence", "labels", "created", "modified", "source", "pattern_type",
+        "ioc_type", "ioc_value",
+        "confidence", "labels", "created", "modified", "source",
     ]
     df = pd.DataFrame(records, columns=columns)
 
     for col in ("created", "modified"):
         df[col] = pd.to_datetime(df[col], utc=True, errors="coerce")
     df = df.sort_values("modified", ascending=False)
-    df = df.drop_duplicates(subset=["source_id", "source"], keep="first")
+    df = df.drop_duplicates(subset=["ioc_type", "ioc_value"], keep="first")
     return df.reset_index(drop=True)

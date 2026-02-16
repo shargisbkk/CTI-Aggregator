@@ -70,22 +70,17 @@ def extract_indicators(raw_objects: list[dict]) -> list[dict]:
         try:
             obj = parse(o, allow_custom=True)
 
-            source_id    = getattr(obj, "id",           o.get("id", ""))
-            pattern      = getattr(obj, "pattern",      o.get("pattern", ""))
-            pattern_type = getattr(obj, "pattern_type", o.get("pattern_type", "stix"))
-            labels       = list(getattr(obj, "labels",  o.get("labels") or []))
-            confidence   = o.get("confidence")
-            created      = o.get("valid_from") or o.get("created")
-            modified     = o.get("modified")
+            pattern    = getattr(obj, "pattern",  o.get("pattern", ""))
+            labels     = list(getattr(obj, "labels",  o.get("labels") or []))
+            confidence = o.get("confidence")
+            created    = o.get("valid_from") or o.get("created")
+            modified   = o.get("modified")
 
             observables = _parse_pattern(pattern)
-            for i, (ioc_type, ioc_value) in enumerate(observables):
-                sid = source_id if len(observables) == 1 else f"{source_id}#{i}"
+            for ioc_type, ioc_value in observables:
                 out.append({
-                    "source_id":    sid,
                     "ioc_type":     ioc_type,
                     "ioc_value":    ioc_value,
-                    "pattern_type": pattern_type,
                     "labels":       labels,
                     "confidence":   confidence,
                     "created":      created,

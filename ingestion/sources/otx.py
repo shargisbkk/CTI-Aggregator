@@ -68,7 +68,6 @@ def fetch_otx_indicators(api_key: str, max_pages: int = 0, feed: str = "activity
                 ioc_value = ind.get("indicator", "")
 
                 all_indicators.append({
-                    "source_id":    f"otx-{ind.get('id', '')}",
                     "ioc_type":     ioc_type,
                     "ioc_value":    ioc_value,
                     "labels":       pulse_tags,
@@ -76,7 +75,6 @@ def fetch_otx_indicators(api_key: str, max_pages: int = 0, feed: str = "activity
                     # Fall back to pulse timestamps if the indicator doesn't have its own
                     "created":      ind.get("created", "") or pulse_created,
                     "modified":     ind.get("modified", "") or pulse_modified,
-                    "pattern_type": "otx",
                 })
 
         # OTX gives us the next page URL, or nothing when we're done

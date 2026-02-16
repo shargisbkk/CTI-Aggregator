@@ -50,14 +50,12 @@ def fetch_threatfox_indicators(api_key: str, days: int = 1) -> list[dict]:
         labels.extend(ioc.get("tags") or [])
 
         all_indicators.append({
-            "source_id":    f"threatfox-{ioc.get('id', '')}",
             "ioc_type":     ioc_type,
             "ioc_value":    ioc_value,
             "labels":       labels,
             "confidence":   ioc.get("confidence_level"),
             "created":      _parse_ts(ioc.get("first_seen")),
             "modified":     _parse_ts(ioc.get("last_seen")) or _parse_ts(ioc.get("first_seen")),
-            "pattern_type": "threatfox",
         })
 
     return all_indicators
