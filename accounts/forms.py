@@ -2,7 +2,7 @@ from django import forms
 from django.contrib.auth.models import User
 from django.contrib.auth.forms import UserCreationForm
 
-# custom form created for the purposes of interfacing with the Database
+# Extends Django's built-in form to also capture first/last name and email
 class CustomUserCreationForm(UserCreationForm):
     first_name = forms.CharField(
         max_length=30,
