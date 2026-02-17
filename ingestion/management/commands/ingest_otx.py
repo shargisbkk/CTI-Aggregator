@@ -3,7 +3,7 @@ from ingestion.sources.otx import fetch_otx_indicators
 from ingestion.loaders.load_to_db import save_indicators
 from processors.normalize import normalize, make_dataframe
 
-
+# This command fetches indicators from AlienVault OTX into the database using the provided API key and optional feed/page parameters.
 class Command(BaseCommand):
     help = "Fetch indicators from AlienVault OTX into the DB."
 

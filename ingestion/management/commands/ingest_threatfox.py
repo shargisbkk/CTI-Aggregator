@@ -3,7 +3,7 @@ from ingestion.sources.threatfox import fetch_threatfox_indicators
 from ingestion.loaders.load_to_db import save_indicators
 from processors.normalize import normalize, make_dataframe
 
-
+# This command fetches indicators from ThreatFox (abuse.ch) using the provided API key and saves them to the database.
 class Command(BaseCommand):
     help = "Fetch indicators from ThreatFox (abuse.ch) into the DB."
 

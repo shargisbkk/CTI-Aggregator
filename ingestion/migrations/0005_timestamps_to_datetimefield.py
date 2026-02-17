@@ -8,7 +8,7 @@ class Migration(migrations.Migration):
     ]
 
     operations = [
-        # PostgreSQL cannot implicitly cast VARCHAR to TIMESTAMP, so we use
+        #  PostgreSQL cannot implicitly cast VARCHAR to TIMESTAMP, so we use
         # RunSQL with a USING clause to convert existing string values.
         # Empty strings and NULL both become NULL (DateTimeField null=True).
         migrations.RunSQL(

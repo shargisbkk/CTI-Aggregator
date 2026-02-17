@@ -1,6 +1,6 @@
 import pandas as pd
 
-# Don't lowercase these - casing matters for URLs and file paths
+#  Don't lowercase these - casing matters for URLs and file paths
 _CASE_SENSITIVE_TYPES = {"url", "filepath"}
 
 

@@ -1,12 +1,12 @@
 import pandas as pd
 from ingestion.models import IndicatorOfCompromise
 
-
+# This module provides the save_indicators function to persist normalized IOC records to the database, handling merging logic for existing records based on type and value.
 def _clean_ts(value):
     """Pandas timestamps can be NaT - convert those to None for Django."""
     return None if pd.isnull(value) else value
 
-
+# Saves normalized IOC records to the DB. Returns count of new records.
 def save_indicators(normalized_records: list[dict]) -> int:
     """
     Saves normalized IOC records to the DB. Returns count of new records.

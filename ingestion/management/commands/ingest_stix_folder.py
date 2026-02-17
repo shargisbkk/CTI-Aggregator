@@ -5,7 +5,7 @@ from ingestion.sources.stix import extract_indicators
 from ingestion.loaders.load_to_db import save_indicators
 from processors.normalize import normalize, make_dataframe
 
-
+# This command ingests STIX JSON files from a specified folder, extracts indicators, normalizes them, and saves them to the database.
 class Command(BaseCommand):
     help = "Ingest STIX JSON files from a folder into the DB."
 

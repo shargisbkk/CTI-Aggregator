@@ -3,7 +3,7 @@ from ingestion.sources.taxii import fetch_taxii_indicators
 from ingestion.loaders.load_to_db import save_indicators
 from processors.normalize import normalize, make_dataframe
 
-
+# This command fetches indicators from a TAXII 2.1 server using the provided discovery URL and optional credentials, then saves them to the database.
 class Command(BaseCommand):
     help = "Fetch indicators from a TAXII 2.1 server into the DB."
 
