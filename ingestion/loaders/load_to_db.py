@@ -1,27 +1,77 @@
-from django.utils.dateparse import parse_datetime
-from ingestion.models import StixObject
+import pandas as pd
+from ingestion.models import IndicatorOfCompromise
 
-def upsert_stix_objects(items: list[dict], source_name: str, collection_id: str):
+
+def _clean_ts(value):
+    """Pandas timestamps can be NaT - convert those to None for Django."""
+    return None if pd.isnull(value) else value
+
+
+def save_indicators(normalized_records: list[dict]) -> int:
+    """
+    Saves normalized IOC records to the DB. Returns count of new records.
+
+    Merge logic for existing records:
+    - created:    keep the earlier timestamp (true first-seen)
+    - modified:   take the newer timestamp (last-seen / still active)
+    - sources:    union -- append new source if not already listed
+    - labels:     union -- merge without duplicates
+    - confidence: take the highest reported score
+    """
     saved = 0
-    for it in items:
-        created_dt = parse_datetime(it["created"]) if it.get("created") else None # marks when it was created
-        modified_raw = it.get("modified") or it.get("created")
-        modified_dt = parse_datetime(modified_raw) if modified_raw else None
+    for r in normalized_records:
+        incoming_created  = _clean_ts(r["created"])
+        incoming_modified = _clean_ts(r["modified"])
+        incoming_source   = r.get("source", "")
+        incoming_conf     = r["confidence"]
+        incoming_labels   = r["labels"]
 
-        # Create-or-ignore pattern using unique_together
-        obj, created = StixObject.objects.get_or_create(
-            stix_id=it["stix_id"],
-            modified=modified_dt,
-            source_name=source_name,
-            collection_id=collection_id,
-            defaults={
-                "stix_type": it["stix_type"],
-                "spec_version": it.get("spec_version", ""),
-                "created": created_dt,
-                "raw": it["raw"],
-            }
-        )
-        if created:
+        try:
+            existing = IndicatorOfCompromise.objects.get(
+                ioc_type=r["ioc_type"],
+                ioc_value=r["ioc_value"],
+            )
+
+            # Keep the earlier created timestamp
+            if incoming_created and existing.created:
+                existing.created = min(existing.created, incoming_created)
+            elif incoming_created:
+                existing.created = incoming_created
+
+            # Take the newer modified timestamp
+            if incoming_modified and existing.modified:
+                existing.modified = max(existing.modified, incoming_modified)
+            elif incoming_modified:
+                existing.modified = incoming_modified
+
+            # Append source if not already tracked
+            if incoming_source and incoming_source not in existing.sources:
+                existing.sources = existing.sources + [incoming_source]
+
+            # Union labels without duplicates
+            merged_labels = list(existing.labels)
+            for lbl in incoming_labels:
+                if lbl not in merged_labels:
+                    merged_labels.append(lbl)
+            existing.labels = merged_labels
+
+            # Take the highest confidence score
+            if incoming_conf is not None:
+                if existing.confidence is None or incoming_conf > existing.confidence:
+                    existing.confidence = incoming_conf
+
+            existing.save()
+
+        except IndicatorOfCompromise.DoesNotExist:
+            IndicatorOfCompromise.objects.create(
+                ioc_type=r["ioc_type"],
+                ioc_value=r["ioc_value"],
+                confidence=incoming_conf,
+                labels=incoming_labels,
+                sources=[incoming_source] if incoming_source else [],
+                created=incoming_created,
+                modified=incoming_modified,
+            )
             saved += 1
+
     return saved
-    

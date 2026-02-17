@@ -1,13 +1,28 @@
 from django.core.management.base import BaseCommand
-from ingestion.fetch_feeds import ingest_all_sources
+from ingestion.sources.taxii import fetch_taxii_indicators
+from ingestion.loaders.load_to_db import save_indicators
+from processors.normalize import normalize, make_dataframe
 
+# This command fetches indicators from a TAXII 2.1 server using the provided discovery URL and optional credentials, then saves them to the database.
 class Command(BaseCommand):
-    help = "Ingest TAXII 2.1 feeds from configured TaxiiSource rows."
+    help = "Fetch indicators from a TAXII 2.1 server into the DB."
 
-    def handle(self, *args, **options):
-        results = ingest_all_sources()
-        for r in results:
-            self.stdout.write(
-                f"[{r['source']}] raw={r['raw_objects']} saved_new={r['saved_new']} checkpoint={r['new_checkpoint']}"
-            )
-# run this in console: python manage.py ingest_taxii, it will handle the rest.
+    def add_arguments(self, parser):
+        parser.add_argument("url", type=str, help="TAXII 2.1 discovery or API root URL")
+        parser.add_argument("--source",   type=str, default="taxii")
+        parser.add_argument("--username", type=str, default="")
+        parser.add_argument("--password", type=str, default="")
+
+    def handle(self, *args, **opts):
+        indicators = fetch_taxii_indicators(
+            discovery_url=opts["url"],
+            username=opts["username"],
+            password=opts["password"],
+        )
+
+        if not indicators:
+            return
+
+        normalized = normalize(indicators, source_name=opts["source"])
+        df         = make_dataframe(normalized)
+        save_indicators(df.to_dict("records"))
