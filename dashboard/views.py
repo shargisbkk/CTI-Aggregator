@@ -1,5 +1,9 @@
 from django.contrib.auth.decorators import login_required
-from django.shortcuts import render, redirect
+from django.shortcuts import render
+from django.shortcuts import redirect
+
+# Each view corresponds to a different section of the dashboard
+# All views require the user to be logged in
 
 @login_required
 def home(request):
