@@ -2,7 +2,7 @@
 
 from django.db import migrations, models
 
-
+# This migration adds a 'checkpoints' JSONField to the TaxiiSource model to track collection checkpoints.
 class Migration(migrations.Migration):
 
     dependencies = [
