@@ -4,25 +4,26 @@ from typing import Generator, Optional
 
 TAXII_HEADERS = {"Accept": "application/taxii+json; version=2.1"}
 
-
+# gives the current time as a timestamp in RFC3339 format
 def _now_rfc3339() -> str:
     return datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
 
-
+# takes a discovery URL and optional auth, returns list of API root URLs
 def discover_api_roots(discovery_url: str, auth: Optional[tuple[str, str]]):
     r = requests.get(discovery_url, headers=TAXII_HEADERS, auth=auth, timeout=60)
     r.raise_for_status()
     data = r.json()
     return data.get("api_roots", [])
 
-
+# takes an API root URL, headers, optional auth, returns list of collections
 def list_collections(api_root_url: str, auth: Optional[tuple[str, str]]):
     url = api_root_url.rstrip("/") + "/collections"
     r = requests.get(url, headers=TAXII_HEADERS, auth=auth, timeout=60)
     r.raise_for_status()
     return r.json().get("collections", [])
 
-
+# takes API root URL, collection ID, headers, optional auth, added_after, limit
+# kind of magic that is getting information. potentially putting info into a dict in the generator array
 def get_objects(
     api_root_url: str,
     collection_id: str,
@@ -61,7 +62,7 @@ def get_objects(
 
         break
 
-
+# 
 def fetch_all_objects(
     discovery_url: str,
     username: str = "",
@@ -70,7 +71,9 @@ def fetch_all_objects(
     checkpoints: Optional[dict] = None,
     fallback_added_after: Optional[str] = None,
  ):
+    # makes a checkpoint dict for each collection, but if not provided, it will use the fallback_added_after or added_after for all collections.
     checkpoints = checkpoints or {}
+    # If no checkpoints and no fallback, use the provided added_after for all collections. This allows legacy support for sources that only had one added_after timestamp instead of per-collection checkpoints.
     if fallback_added_after is None:
         fallback_added_after = added_after
     # IMPORTANT:
@@ -88,6 +91,7 @@ def fetch_all_objects(
     else:
         api_roots = discover_api_roots(discovery_url, auth)
 
+    # For each API root, list collections, then fetch objects from each collection, yielding results as we go.
     for api_root_url in api_roots:
         collections = list_collections(api_root_url, auth)
         for col in collections:
@@ -106,7 +110,7 @@ def fetch_all_objects(
                     "next": env.get("next"),
                 }
 
-
+# makes next timestamp for checkpointing, but this is deprecated for TAXII sources. You should use server-provided 'next' tokens instead of wall-clock time for TAXII pagination.
 def next_checkpoint_timestamp() -> str:
     """
     Deprecated for TAXII pagination.

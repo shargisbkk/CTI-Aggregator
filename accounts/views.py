@@ -6,7 +6,7 @@ from .forms import CustomUserCreationForm
 
 def login_view(request):
     if request.user.is_authenticated:
-        return redirect("dashboard-home")
+        return redirect("dashboard:dashboard-home")
 
     form = AuthenticationForm()
 
@@ -15,7 +15,7 @@ def login_view(request):
         if form.is_valid():
             user = form.get_user()
             login(request, user)
-            return redirect("dashboard-home")
+            return redirect("dashboard:dashboard-home")
     
 
     #return render(request, "accounts/debug.html", {})
@@ -23,7 +23,7 @@ def login_view(request):
 
 def signup_view(request):
     if request.user.is_authenticated:
-        return redirect("dashboard-home")
+        return redirect("dashboard:dashboard-home")
     
     form = CustomUserCreationForm()
 
