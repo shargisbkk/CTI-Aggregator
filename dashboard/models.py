@@ -8,8 +8,7 @@ class ThreatFeed(models.Model):
     active = models.BooleanField(default=True)
 
     last_run = models.DateTimeField(null=True, blank=True)
-    last_count = models.IntegerField(default=0)
-
+    
     def __str__(self):
         return self.name
 
