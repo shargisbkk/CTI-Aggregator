@@ -17,11 +17,15 @@ def fetch_threatfox_indicators(api_key: str, days: int = 1) -> list[dict]:
 
     all_indicators = []
     for ioc in data.get("data") or []:
-        # Build labels from threat type and tags
+        # Use structured fields only: threat_type (attack category) and
+        # malware (family name) — both are controlled by abuse.ch, not community tags.
         labels = []
-        if ioc.get("threat_type"):
-            labels.append(ioc["threat_type"])
-        labels.extend(ioc.get("tags") or [])
+        threat_type = (ioc.get("threat_type") or "").strip().lower()
+        if threat_type and "unknown" not in threat_type:
+            labels.append(threat_type)
+        malware = (ioc.get("malware") or "").strip().lower()
+        if malware and "unknown" not in malware and malware not in labels:
+            labels.append(malware)
 
         all_indicators.append({
             "ioc_type":     ioc.get("ioc_type", ""),

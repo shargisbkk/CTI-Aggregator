@@ -34,6 +34,20 @@ TYPE_MAP = {
     "x509-certificate": "ssl_cert",
     "windows-registry-key": "registry-key",
 
+    # MISP raw types
+    "ip-dst":           "ip",
+    "ip-src":           "ip",
+    "ip-dst|port":      "ip:port",
+    "ip-src|port":      "ip:port",
+    "md5":              "hash:md5",
+    "sha1":             "hash:sha1",
+    "sha256":           "hash:sha256",
+    "sha512":           "hash:sha512",
+    "email-src":        "email",
+    "email-dst":        "email",
+    "vulnerability":    "cve",
+    "as":               "asn",
+
     # Pass-through (already standard across multiple sources)
     "domain":           "domain",
     "url":              "url",
@@ -58,6 +72,29 @@ def _safe_confidence(val) -> int | None:
     return int(val)
 
 
+def _clean_labels(raw_labels: list, ioc_type: str) -> list:
+    """
+    General label cleaning applied to all sources:
+    - Lowercase and strip whitespace
+    - Strip surrounding quotes from taxonomy values (e.g. misp:threat-level="low-risk")
+    - Drop empty labels
+    - Drop labels that just repeat the IOC type (redundant)
+    """
+    seen = set()
+    out = []
+    for lbl in (raw_labels or []):
+        lbl = lbl.strip().lower().replace('"', "")
+        if not lbl:
+            continue
+        if lbl == ioc_type:
+            continue
+        if lbl in seen:
+            continue
+        seen.add(lbl)
+        out.append(lbl)
+    return out
+
+
 def normalize(indicators: list[dict]) -> list[dict]:
     """
     Takes raw indicator dicts from any source, maps types through the
@@ -74,7 +111,7 @@ def normalize(indicators: list[dict]) -> list[dict]:
             "ioc_type":     ioc_type,
             "ioc_value":    ioc_value,
             "confidence":   _safe_confidence(ind.get("confidence")),
-            "labels":       [lbl.strip().lower() for lbl in (ind.get("labels") or [])],
+            "labels":       _clean_labels(ind.get("labels"), ioc_type),
             "created":      (ind.get("created") or ""),
             "modified":     (ind.get("modified") or ""),
         })

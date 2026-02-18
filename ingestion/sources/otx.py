@@ -33,7 +33,16 @@ def fetch_otx_indicators(api_key: str, max_pages: int = 0, feed: str = "activity
 
         # OTX groups indicators inside "pulses" (threat reports)
         for pulse in data.get("results", []):
-            pulse_tags     = pulse.get("tags", [])
+            # Use the structured malware_families field — these are curated family
+            # names (e.g. "AsyncRAT", "Cobalt Strike") rather than free-form tags.
+            malware_labels = [
+                name for name in (
+                    mf.strip().lower() if isinstance(mf, str)
+                    else mf.get("display_name", "").strip().lower()
+                    for mf in pulse.get("malware_families", [])
+                )
+                if name and "unknown" not in name
+            ]
             pulse_created  = pulse.get("created", "")
             pulse_modified = pulse.get("modified", "")
 
@@ -44,7 +53,7 @@ def fetch_otx_indicators(api_key: str, max_pages: int = 0, feed: str = "activity
                 all_indicators.append({
                     "ioc_type":     ioc_type,
                     "ioc_value":    ioc_value,
-                    "labels":       pulse_tags,
+                    "labels":       malware_labels,
                     "confidence":   None,  # OTX doesn't give per-indicator confidence
                     # Fall back to pulse timestamps if the indicator doesn't have its own
                     "created":      ind.get("created", "") or pulse_created,

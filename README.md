@@ -1,5 +1,5 @@
 # CTI-Aggregator
-Cyber threat intelligence aggregator used to pull data from different sources, normalize the data, and store the data in a PostgreSQL database
+Cyber threat intelligence aggregator that pulls IOCs from multiple sources, normalizes them into a unified schema, and stores them in a PostgreSQL database. Supports cross-source deduplication — the same indicator from different feeds gets merged, not duplicated.
 
 # Setting up PostgreSQL
 Install PostgreSQL using the download for your OS https://www.enterprisedb.com/downloads/postgres-postgresql-downloads
@@ -58,16 +58,9 @@ By default this fetches both the public activity feed and your subscribed feed, 
 
 ### Options
 ```
---pages N            Limit to N pages per feed (default 0 = all pages). Start with --pages 3 for a quick test.
+--pages N            Limit to N pages per feed (default 0 = all pages). Use for testing.
 --feed activity      Fetch only the public activity feed
 --feed subscribed    Fetch only pulses from users you follow
---source NAME        Tag all saved records with a custom source name (default: otx)
-```
-
-Examples:
-```
-python -B manage.py ingest_otx YOUR_KEY --pages 3
-python -B manage.py ingest_otx YOUR_KEY --feed activity --pages 5
 ```
 
 ## ThreatFox (abuse.ch)
@@ -83,32 +76,47 @@ python -B manage.py ingest_threatfox YOUR_API_KEY
 ### Options
 ```
 --days N      How many days back to fetch IOCs (default: 1). Use --days 7 for a week.
---source NAME Tag all saved records with a custom source name (default: threatfox)
 ```
 
-Examples:
+## MISP (CIRCL OSINT Feed)
+No API key required — this pulls from the publicly available CIRCL OSINT feed.
+
+Run ingestion with:
 ```
-python -B manage.py ingest_threatfox YOUR_KEY --days 3
-python -B manage.py ingest_threatfox YOUR_KEY --days 7 --source threatfox-week
+python -B manage.py ingest_misp
+```
+
+On first run this fetches all available events. On subsequent runs, use `--since` to only pull new events.
+
+### Options
+```
+--feed circl|botvrij    Which public MISP feed to use (default: circl)
+--since TIMESTAMP       Unix timestamp — only fetch events newer than this
+--max-events N          Cap how many events to fetch (default: 0 = all). Useful for testing.
+```
+
+Example for subsequent runs (only fetch events from the last 30 days):
+```
+python -B manage.py ingest_misp --since 1737000000
 ```
 
 ## STIX files (local folder)
 Place your .json STIX bundle files in a folder and run:
 ```
-python -B manage.py ingest_stix_folder /path/to/folder --source my-source
+python -B manage.py ingest_stix_folder /path/to/folder
 ```
 
 Sample STIX files are included in the `sample_stix/` folder for testing:
 ```
-python -B manage.py ingest_stix_folder sample_stix --source sample
+python -B manage.py ingest_stix_folder sample_stix
 ```
 
 ## TAXII server
 To pull from a TAXII 2.1 server:
 ```
-python -B manage.py ingest_taxii https://your-taxii-server/taxii/ --source taxii-source
+python -B manage.py ingest_taxii https://your-taxii-server/taxii/
 ```
 
-Data from all sources is saved to the `indicators_of_compromise` table in your database.
+Data from all sources is normalized to a common schema and saved to the `indicators_of_compromise` table. Duplicate indicators (same type + value) are merged across sources — timestamps, labels, and source lists are unioned rather than overwritten.
 
 # GOOD LUCK HAVE FUN BREAK THINGS

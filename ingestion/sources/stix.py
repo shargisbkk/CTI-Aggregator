@@ -11,12 +11,7 @@ def _parse_pattern(pattern: str) -> list[tuple[str, str]]:
     Pulls (type, value) pairs out of a STIX pattern string.
     Returns raw STIX type names — mapping to our standard names
     happens in normalize.py.
-
-    "[ipv4-addr:value = '1.2.3.4']"                          -> [("ipv4-addr", "1.2.3.4")]
-    "[ipv4-addr:value = '1.2.3.4' AND domain-name:value = 'evil.com']"
-                                                              -> [("ipv4-addr", "1.2.3.4"), ("domain-name", "evil.com")]
-    "[file:hashes.MD5 = 'abc123']"                            -> [("hash:md5", "abc123")]
-    """
+"""
     if not pattern:
         return []
 

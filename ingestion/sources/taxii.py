@@ -32,19 +32,14 @@ def _get_objects(api_root_url: str, collection_id: str, auth: tuple[str, str] | 
         params["added_after"] = added_after
 
     while True:
-        params = {"limit": limit}
-        if cursor:
-            params["added_after"] = cursor
-
         r = requests.get(url, headers=TAXII_HEADERS, auth=auth, params=params, timeout=60)
         r.raise_for_status()
         env = r.json()
         yield env
         if env.get("more") and env.get("next"):
             params = {"next": env["next"]}
-            continue
-
-        break
+        else:
+            break
 
 
 def fetch_taxii_indicators(
