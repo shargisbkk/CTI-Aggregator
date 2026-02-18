@@ -9,7 +9,6 @@ class Command(BaseCommand):
 
     def add_arguments(self, parser):
         parser.add_argument("api_key", type=str, help="Your ThreatFox API key")
-        parser.add_argument("--source", type=str, default="threatfox")
         parser.add_argument("--days",   type=int, default=1,
                             help="How many days back to fetch (default: 1)")
 
@@ -22,6 +21,6 @@ class Command(BaseCommand):
         if not indicators:
             return
 
-        normalized = normalize(indicators, source_name=opts["source"])
+        normalized = normalize(indicators)
         df         = make_dataframe(normalized)
-        save_indicators(df.to_dict("records"))
+        save_indicators(df.to_dict("records"), source_name="threatfox")

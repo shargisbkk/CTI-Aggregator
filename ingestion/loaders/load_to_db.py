@@ -7,7 +7,15 @@ def _clean_ts(value):
     return None if pd.isnull(value) else value
 
 
-def save_indicators(normalized_records: list[dict]) -> int:
+def _clean_conf(value):
+    """Pandas converts None confidence to NaN - convert back to None for Django."""
+    try:
+        return None if pd.isna(value) else int(value)
+    except (TypeError, ValueError):
+        return None
+
+
+def save_indicators(normalized_records: list[dict], source_name: str = "") -> int:
     """
     Saves normalized IOC records to the DB. Returns count of new records.
 
@@ -22,8 +30,8 @@ def save_indicators(normalized_records: list[dict]) -> int:
     for r in normalized_records:
         incoming_created  = _clean_ts(r["created"])
         incoming_modified = _clean_ts(r["modified"])
-        incoming_source   = r.get("source", "")
-        incoming_conf     = r["confidence"]
+        incoming_source   = source_name
+        incoming_conf     = _clean_conf(r["confidence"])
         incoming_labels   = r["labels"]
 
         try:

@@ -1,5 +1,5 @@
 # CTI-Aggregator
-Cyber threat intelligence aggregator used to pull data from different sources, normalize the data, and store the data in a PostgreSQL database
+Cyber threat intelligence aggregator that pulls IOCs from multiple sources, normalizes them into a unified schema, and stores them in a PostgreSQL database. Supports cross-source deduplication — the same indicator from different feeds gets merged, not duplicated.
 
 # Setting up PostgreSQL
 Install PostgreSQL using the download for your OS https://www.enterprisedb.com/downloads/postgres-postgresql-downloads
@@ -37,26 +37,82 @@ Make sure you are connected to your server in pgAdmin
 You will have to go into the project folder from the terminal and activate your virtual environment
 You can then use the command "python manage.py runserver" to run your server for testing.
 
-# Implementing Stix file ingestion
-In your venv, run pip install requests stix2 <br>
-then do python manage.py makemigrations <br>
-then python manage.py migrate <br>
-then run python manage.py shell <br>
-copy paste this into the ensuing window:
+# Ingesting threat intelligence
 
-from ingestion.models import TaxiiSource<br>
+## OTX (AlienVault)
+You will need a free OTX API key:
+1. Sign up at https://otx.alienvault.com
+2. After logging in, go to your profile settings page
+3. Copy the API key shown under "OTX Key"
 
-TaxiiSource.objects.update_or_create(<br>
-    name="mitre-attack",<br>
-    defaults={<br>
-        "discovery_url": "https://attack-taxii.mitre.org/api/v21/",<br>
-        "username": "",<br>
-        "password": "",<br>
-        "added_after": ""<br>
-    }<br>
-)<br>
+Run ingestion with:
+```
+python -B manage.py ingest_otx YOUR_API_KEY
+```
 
-then press ctrl+z, then press enter, which will exit the shell<br>
-then run python manage.py ingest_taxii<br>
-If all goes well, the data should populate in your database under ingestion_stixobject.
+By default this fetches both the public activity feed and your subscribed feed, deduplicates, normalizes, and saves to the database.
+
+### Options
+```
+--pages N            Limit to N pages per feed (default 0 = all pages). Use for testing.
+--feed activity      Fetch only the public activity feed
+--feed subscribed    Fetch only pulses from users you follow
+```
+
+## ThreatFox (abuse.ch)
+You will need a free ThreatFox API key:
+1. Sign up at https://auth.abuse.ch/
+2. After logging in, go to https://threatfox.abuse.ch/api/ and copy your API key
+
+Run ingestion with:
+```
+python -B manage.py ingest_threatfox YOUR_API_KEY
+```
+
+### Options
+```
+--days N      How many days back to fetch IOCs (default: 1). Use --days 7 for a week.
+```
+
+## MISP (CIRCL OSINT Feed)
+No API key required — this pulls from the publicly available CIRCL OSINT feed.
+
+Run ingestion with:
+```
+python -B manage.py ingest_misp
+```
+
+On first run this fetches all available events. On subsequent runs, use `--since` to only pull new events.
+
+### Options
+```
+--feed circl|botvrij    Which public MISP feed to use (default: circl)
+--since TIMESTAMP       Unix timestamp — only fetch events newer than this
+--max-events N          Cap how many events to fetch (default: 0 = all). Useful for testing.
+```
+
+Example for subsequent runs (only fetch events from the last 30 days):
+```
+python -B manage.py ingest_misp --since 1737000000
+```
+
+## STIX files (local folder)
+Place your .json STIX bundle files in a folder and run:
+```
+python -B manage.py ingest_stix_folder /path/to/folder
+```
+
+Sample STIX files are included in the `sample_stix/` folder for testing:
+```
+python -B manage.py ingest_stix_folder sample_stix
+```
+
+## TAXII server
+To pull from a TAXII 2.1 server:
+```
+python -B manage.py ingest_taxii https://your-taxii-server/taxii/
+```
+
+Data from all sources is normalized to a common schema and saved to the `indicators_of_compromise` table. Duplicate indicators (same type + value) are merged across sources — timestamps, labels, and source lists are unioned rather than overwritten.
+
 # GOOD LUCK HAVE FUN BREAK THINGS
