@@ -78,28 +78,6 @@ python -B manage.py ingest_threatfox YOUR_API_KEY
 --days N      How many days back to fetch IOCs (default: 1). Use --days 7 for a week.
 ```
 
-## MISP (CIRCL OSINT Feed)
-No API key required — this pulls from the publicly available CIRCL OSINT feed.
-
-Run ingestion with:
-```
-python -B manage.py ingest_misp
-```
-
-On first run this fetches all available events. On subsequent runs, use `--since` to only pull new events.
-
-### Options
-```
---feed circl|botvrij    Which public MISP feed to use (default: circl)
---since TIMESTAMP       Unix timestamp — only fetch events newer than this
---max-events N          Cap how many events to fetch (default: 0 = all). Useful for testing.
-```
-
-Example for subsequent runs (only fetch events from the last 30 days):
-```
-python -B manage.py ingest_misp --since 1737000000
-```
-
 ## STIX files (local folder)
 Place your .json STIX bundle files in a folder and run:
 ```
