@@ -58,9 +58,7 @@ By default this fetches both the public activity feed and your subscribed feed, 
 
 ### Options
 ```
---pages N            Limit to N pages per feed (default 0 = all pages). Use for testing.
---feed activity      Fetch only the public activity feed
---feed subscribed    Fetch only pulses from users you follow
+--pages N    Limit to N pages per feed (default 0 = all pages). Use for testing.
 ```
 
 ## ThreatFox (abuse.ch)
@@ -75,7 +73,7 @@ python -B manage.py ingest_threatfox YOUR_API_KEY
 
 ### Options
 ```
---days N      How many days back to fetch IOCs (default: 1). Use --days 7 for a week.
+--days N   How many days back to fetch IOCs (default: 1). Use --days 7 for a week.
 ```
 
 ## STIX files (local folder)
@@ -93,6 +91,12 @@ python -B manage.py ingest_stix_folder sample_stix
 To pull from a TAXII 2.1 server:
 ```
 python -B manage.py ingest_taxii https://your-taxii-server/taxii/
+```
+
+### Options
+```
+--username USERNAME    Username for authenticated TAXII servers (optional)
+--password PASSWORD    Password for authenticated TAXII servers (optional)
 ```
 
 Data from all sources is normalized to a common schema and saved to the `indicators_of_compromise` table. Duplicate indicators (same type + value) are merged across sources — timestamps, labels, and source lists are unioned rather than overwritten.
