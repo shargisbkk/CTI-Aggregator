@@ -1,6 +1,5 @@
 from django.db import models
 
-# Create your models here.
 class IndicatorOfCompromise(models.Model):
     ioc_type     = models.CharField(max_length=50, db_index=True)
     ioc_value    = models.CharField(max_length=500, db_index=True)
