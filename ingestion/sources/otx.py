@@ -2,31 +2,6 @@ import requests
 
 OTX_API_BASE = "https://otx.alienvault.com/api/v1"
 
-# OTX types mapped to our standard names (matched regardless of case)
-OTX_TYPE_MAP = {
-    "ipv4":             "ip",
-    "ipv6":             "ipv6",
-    "domain":           "domain",
-    "hostname":         "domain",
-    "url":              "url",
-    "uri":              "url",
-    "filehash-md5":     "hash:md5",
-    "filehash-sha1":    "hash:sha1",
-    "filehash-sha256":  "hash:sha256",
-    "filehash-pehash":  "hash:pehash",
-    "filehash-imphash": "hash:imphash",
-    "email":            "email",
-    "cidr":             "cidr",
-    "cve":              "cve",
-    "filepath":         "filepath",
-    "bitcoinaddress":   "bitcoin",
-    "sslcert":          "ssl_cert",
-    "mutex":            "mutex",
-    "yara":             "yara",
-    "ja3":              "ja3",
-    "ja3s":             "ja3s",
-}
-
 FEED_ENDPOINTS = {
     "activity":   "pulses/activity",
     "subscribed": "pulses/subscribed",
@@ -63,8 +38,7 @@ def fetch_otx_indicators(api_key: str, max_pages: int = 0, feed: str = "activity
             pulse_modified = pulse.get("modified", "")
 
             for ind in pulse.get("indicators", []):
-                raw_type  = ind.get("type", "").lower()
-                ioc_type  = OTX_TYPE_MAP.get(raw_type, raw_type)
+                ioc_type  = ind.get("type", "")
                 ioc_value = ind.get("indicator", "")
 
                 all_indicators.append({

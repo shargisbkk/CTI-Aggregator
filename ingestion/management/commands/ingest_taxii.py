@@ -9,7 +9,6 @@ class Command(BaseCommand):
 
     def add_arguments(self, parser):
         parser.add_argument("url", type=str, help="TAXII 2.1 discovery or API root URL")
-        parser.add_argument("--source",   type=str, default="taxii")
         parser.add_argument("--username", type=str, default="")
         parser.add_argument("--password", type=str, default="")
 
@@ -23,6 +22,6 @@ class Command(BaseCommand):
         if not indicators:
             return
 
-        normalized = normalize(indicators, source_name=opts["source"])
+        normalized = normalize(indicators)
         df         = make_dataframe(normalized)
-        save_indicators(df.to_dict("records"))
+        save_indicators(df.to_dict("records"), source_name="taxii")

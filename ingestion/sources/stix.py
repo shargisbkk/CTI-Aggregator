@@ -5,30 +5,16 @@ from stix2 import parse
 
 logger = logging.getLogger(__name__)
 
-# STIX types mapped to our standard names
-_STIX_TYPE_TO_IOC = {
-    "ipv4-addr":            "ip",
-    "ipv6-addr":            "ipv6",
-    "domain-name":          "domain",
-    "url":                  "url",
-    "email-addr":           "email",
-    "file":                 "file",
-    "network-traffic":      "network-traffic",
-    "autonomous-system":    "asn",
-    "x509-certificate":     "ssl_cert",
-    "windows-registry-key": "registry-key",
-    "mutex":                "mutex",
-}
-
 
 def _parse_pattern(pattern: str) -> list[tuple[str, str]]:
     """
     Pulls (type, value) pairs out of a STIX pattern string.
-    Works with simple patterns and compound ones (AND/OR).
+    Returns raw STIX type names — mapping to our standard names
+    happens in normalize.py.
 
-    "[ipv4-addr:value = '1.2.3.4']"                          -> [("ip", "1.2.3.4")]
+    "[ipv4-addr:value = '1.2.3.4']"                          -> [("ipv4-addr", "1.2.3.4")]
     "[ipv4-addr:value = '1.2.3.4' AND domain-name:value = 'evil.com']"
-                                                              -> [("ip", "1.2.3.4"), ("domain", "evil.com")]
+                                                              -> [("ipv4-addr", "1.2.3.4"), ("domain-name", "evil.com")]
     "[file:hashes.MD5 = 'abc123']"                            -> [("hash:md5", "abc123")]
     """
     if not pattern:
@@ -38,6 +24,7 @@ def _parse_pattern(pattern: str) -> list[tuple[str, str]]:
 
     results = []
     for obj_type, prop_path, value in matches:
+        # File hash sub-typing is part of pattern extraction
         if obj_type == "file":
             prop_upper = prop_path.upper()
             if "MD5" in prop_upper:
@@ -49,7 +36,7 @@ def _parse_pattern(pattern: str) -> list[tuple[str, str]]:
             else:
                 ioc_type = "hash"
         else:
-            ioc_type = _STIX_TYPE_TO_IOC.get(obj_type, obj_type)
+            ioc_type = obj_type
 
         results.append((ioc_type, value))
 

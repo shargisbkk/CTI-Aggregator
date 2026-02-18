@@ -9,7 +9,6 @@ class Command(BaseCommand):
 
     def add_arguments(self, parser):
         parser.add_argument("api_key", type=str, help="Your OTX API key")
-        parser.add_argument("--source", type=str, default="otx")
         parser.add_argument("--feed",   type=str, nargs="+",
                             choices=["activity", "subscribed"],
                             default=["activity", "subscribed"],
@@ -29,6 +28,6 @@ class Command(BaseCommand):
         if not all_indicators:
             return
 
-        normalized = normalize(all_indicators, source_name=opts["source"])
+        normalized = normalize(all_indicators)
         df         = make_dataframe(normalized)
-        save_indicators(df.to_dict("records"))
+        save_indicators(df.to_dict("records"), source_name="otx")

@@ -11,7 +11,6 @@ class Command(BaseCommand):
 
     def add_arguments(self, parser):
         parser.add_argument("folder", type=str)
-        parser.add_argument("--source", type=str, default="local-folder")
 
     def handle(self, *args, **opts):
         folder = Path(opts["folder"])
@@ -32,6 +31,6 @@ class Command(BaseCommand):
         if not all_indicators:
             return
 
-        normalized = normalize(all_indicators, source_name=opts["source"])
+        normalized = normalize(all_indicators)
         df         = make_dataframe(normalized)
-        save_indicators(df.to_dict("records"))
+        save_indicators(df.to_dict("records"), source_name="stix")

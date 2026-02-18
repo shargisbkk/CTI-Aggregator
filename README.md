@@ -68,7 +68,6 @@ Examples:
 ```
 python -B manage.py ingest_otx YOUR_KEY --pages 3
 python -B manage.py ingest_otx YOUR_KEY --feed activity --pages 5
-python -B manage.py ingest_otx YOUR_KEY --feed subscribed --source otx-subscribed
 ```
 
 ## ThreatFox (abuse.ch)
