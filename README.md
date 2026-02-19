@@ -1,4 +1,4 @@
-# README.md
+# CTI-Aggregator
 
 **CTI-Aggregator** is a cyber threat intelligence aggregator that pulls Indicators of Compromise (IOCs) from multiple sources, normalizes them into a unified schema, and stores them in a PostgreSQL database. It supports cross-source deduplication, ensuring that the same indicator from different feeds is merged rather than duplicated.
 
