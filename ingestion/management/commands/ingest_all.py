@@ -8,24 +8,12 @@ from processors.normalize import make_dataframe
 class Command(BaseCommand):
     help = "Run all registered API feed adapters."
 
-    def add_arguments(self, parser):
-        parser.add_argument("--otx-pages", type=int, default=None,
-                            help="Max OTX pages per feed (overrides config; 0 = all).")
-        parser.add_argument("--threatfox-days", type=int, default=1,
-                            help="ThreatFox lookback in days (default 1).")
-
     def handle(self, *args, **opts):
-        adapter_kwargs = {
-            "otx":       {"max_pages": opts["otx_pages"]},
-            "threatfox": {"days": opts["threatfox_days"]},
-        }
-
         total = 0
         for name, adapter_class in FeedRegistry.all().items():
             self.stdout.write(f"Fetching {name}...")
-            kwargs = adapter_kwargs.get(name, {})
             try:
-                adapter = adapter_class(**kwargs)
+                adapter = adapter_class()
                 iocs = adapter.fetch_indicators()
                 if not iocs:
                     self.stdout.write(f"  {name}: no indicators returned")

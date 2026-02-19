@@ -11,13 +11,13 @@ class ThreatFoxAdapter(FeedAdapter):
 
     source_name = "threatfox"
 
-    def __init__(self, days: int = 1):
+    def __init__(self, days: int | None = None):
         super().__init__()
         api_key = getattr(settings, "THREATFOX_API_KEY", "")
         if not api_key:
             raise RuntimeError("THREATFOX_API_KEY is not set.")
         self._api_key = api_key
-        self._days    = days
+        self._days    = days if days is not None else self._config.get("days", 1)
 
     def fetch_indicators(self) -> list[NormalizedIOC]:
         """Fetch raw indicators from ThreatFox, then normalize each one."""

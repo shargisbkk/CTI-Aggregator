@@ -1,4 +1,5 @@
 {
+  "days": 1,
   "type_map": {
     "ip:port":     "ip:port",
     "domain":      "domain",
