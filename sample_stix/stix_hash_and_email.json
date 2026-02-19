@@ -1,0 +1,71 @@
+{
+  "type": "bundle",
+  "id": "bundle--b2c3d4e5-f6a7-8901-bcde-f12345678901",
+  "objects": [
+    {
+      "type": "indicator",
+      "id": "indicator--cd9f07ef-5700-4988-ba32-32d7b4813a9e",
+      "spec_version": "2.1",
+      "name": "MD5 Hash",
+      "pattern": "[file:hashes.MD5 = 'd41d8cd98f00b204e9800998ecf8427e']",
+      "pattern_type": "stix",
+      "valid_from": "2024-05-01T00:00:00Z",
+      "created": "2024-05-01T00:00:00Z",
+      "modified": "2024-05-01T00:00:00Z",
+      "labels": ["malware"],
+      "confidence": 50
+    },
+    {
+      "type": "indicator",
+      "id": "indicator--d4e7c3ea-4513-437e-b2ec-e076532dec5d",
+      "spec_version": "2.1",
+      "name": "SHA-1 Hash",
+      "pattern": "[file:hashes.'SHA-1' = 'da39a3ee5e6b4b0d3255bfef95601890afd80709']",
+      "pattern_type": "stix",
+      "valid_from": "2024-05-02T00:00:00Z",
+      "created": "2024-05-02T00:00:00Z",
+      "modified": "2024-05-02T00:00:00Z",
+      "labels": ["trojan"],
+      "confidence": 65
+    },
+    {
+      "type": "indicator",
+      "id": "indicator--39d0240b-c8b6-4d7f-a9f3-9020ccf56ebf",
+      "spec_version": "2.1",
+      "name": "Email Address",
+      "pattern": "[email-addr:value = 'attacker@evil-domain.com']",
+      "pattern_type": "stix",
+      "valid_from": "2024-05-03T00:00:00Z",
+      "created": "2024-05-03T00:00:00Z",
+      "modified": "2024-05-03T00:00:00Z",
+      "labels": ["phishing", "spam"],
+      "confidence": 75
+    },
+    {
+      "type": "indicator",
+      "id": "indicator--9efd70a6-c8bd-4eb8-b81d-3f7ec5896977",
+      "spec_version": "2.1",
+      "name": "IPv6 Address",
+      "pattern": "[ipv6-addr:value = '2001:db8::1']",
+      "pattern_type": "stix",
+      "valid_from": "2024-05-04T00:00:00Z",
+      "created": "2024-05-04T00:00:00Z",
+      "modified": "2024-05-04T00:00:00Z",
+      "labels": ["scanner"],
+      "confidence": 40
+    },
+    {
+      "type": "indicator",
+      "id": "indicator--d3b6e387-da69-4008-8fa4-a4125a562449",
+      "spec_version": "2.1",
+      "name": "Duplicate IP (already in test_bundle.json)",
+      "pattern": "[ipv4-addr:value = '185.220.101.1']",
+      "pattern_type": "stix",
+      "valid_from": "2024-01-01T00:00:00Z",
+      "created": "2024-01-01T00:00:00Z",
+      "modified": "2024-08-01T00:00:00Z",
+      "labels": ["c2", "botnet"],
+      "confidence": 90
+    }
+  ]
+}

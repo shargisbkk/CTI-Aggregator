@@ -1,0 +1,10 @@
+{
+  "type_map": {
+    "ip:port":     "ip:port",
+    "domain":      "domain",
+    "url":         "url",
+    "md5_hash":    "hash:md5",
+    "sha256_hash": "hash:sha256",
+    "sha1_hash":   "hash:sha1"
+  }
+}

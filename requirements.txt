@@ -1,0 +1,6 @@
+django
+psycopg[binary]
+requests
+stix2
+pandas
+python-dotenv

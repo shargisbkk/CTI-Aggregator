@@ -49,10 +49,20 @@ def fetch_taxii_indicators(
     added_after: str | None = None,
 ) -> list[dict]:
     """
-    Queries a TAXII 2.1 server: discovers API roots, grabs every collection
-    from each root, and fetches the STIX objects inside them.
-    Returns extracted indicator dicts that still need schema mapping
-    and normalization before saving.
+    INGESTION — queries a TAXII 2.1 server and returns raw indicator dicts.
+
+    Discovery flow:
+      1. GET <discovery_url>       → list of API root URLs
+      2. GET <api_root>/collections/ → list of collection IDs
+      3. GET <api_root>/collections/<id>/objects/ (paginated) → STIX envelopes
+
+    Each envelope is a JSON object whose "objects" array contains STIX
+    objects. extract_indicators() filters those down to indicator objects
+    and pulls the observable values from their patterns.
+
+    Returns raw dicts with source-specific type strings (e.g. "ipv4-addr").
+    TAXIIAdapter.normalize_record() maps those to internal standard names
+    using ingestion/configs/taxii.json.
     """
     auth = (username, password) if username and password else None
 

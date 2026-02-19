@@ -9,21 +9,33 @@ logger = logging.getLogger(__name__)
 def _parse_pattern(pattern: str) -> list[tuple[str, str]]:
     """
     Pulls (type, value) pairs out of a STIX pattern string.
-    Returns raw STIX type names — mapping to our standard names
-    happens in normalize.py.
-"""
+
+    Returns raw STIX type names (e.g. "ipv4-addr", "domain-name").
+    Translation to our internal standard names.
+
+    File hashes are an exception: the hash algorithm (MD5, SHA-1, SHA-256)
+    is encoded in the STIX property path, not the object type, so we
+    resolve them here to "hash:md5", "hash:sha1", "hash:sha256" directly.
+    """
     if not pattern:
         return []
 
-    matches = re.findall(r"([\w-]+):([\w.'\"\\-]+)\s*=\s*'([^']+)'", pattern)
+    # Match quoted values:  type:prop = 'value'
+    # AND unquoted values:  type:prop = 64496  (for autonomous-system:number, etc.)
+    matches = re.findall(
+        r"([\w-]+):([\w.'\"\\-]+)\s*=\s*(?:'([^']+)'|(\S+))", pattern
+    )
 
     results = []
-    for obj_type, prop_path, value in matches:
-        # File hash sub-typing is part of pattern extraction
+    for obj_type, prop_path, quoted_val, unquoted_val in matches:
+        value = quoted_val or unquoted_val.rstrip("]")
+        # getting the file hash sub-type
         if obj_type == "file":
             prop_upper = prop_path.upper()
             if "MD5" in prop_upper:
                 ioc_type = "hash:md5"
+            elif "SHA-512" in prop_upper or "SHA512" in prop_upper:
+                ioc_type = "hash:sha512"
             elif "SHA-256" in prop_upper or "SHA256" in prop_upper:
                 ioc_type = "hash:sha256"
             elif "SHA-1" in prop_upper or "SHA1" in prop_upper:
@@ -40,10 +52,17 @@ def _parse_pattern(pattern: str) -> list[tuple[str, str]]:
 
 def extract_indicators(raw_objects: list[dict]) -> list[dict]:
     """
-    Takes raw STIX objects, keeps only the indicators, and pulls out
-    the type + value from each pattern. If a pattern has multiple
-    observables (e.g. an IP AND a domain), each one becomes its own record.
-    Returns dicts ready for the normalize pipeline.
+    Parses a list of raw STIX 2.x objects from a bundle.
+
+    Keeps only objects whose type is "indicator" (skips relationships,
+    threat-actors, malware objects, etc.). For each indicator, extracts
+    the observable(s) from its pattern string.
+
+    A single STIX indicator can match multiple observables at once
+    (e.g. "[ipv4-addr:value = '1.2.3.4' AND domain-name:value = 'evil.com']").
+    Each observable becomes its own dict so the adapter can treat them
+    independently.
+
     """
     out = []
     for o in raw_objects:
