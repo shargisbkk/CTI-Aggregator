@@ -1,4 +1,7 @@
+import logging
 import requests
+
+logger = logging.getLogger(__name__)
 
 OTX_API_BASE = "https://otx.alienvault.com/api/v1"
 
@@ -23,8 +26,15 @@ def fetch_otx_indicators(api_key: str, max_pages: int = 0, feed: str = "activity
         if max_pages and page >= max_pages:
             break
 
-        r = requests.get(url, headers=headers, timeout=60)
-        r.raise_for_status()
+        try:
+            r = requests.get(url, headers=headers, timeout=60)
+            r.raise_for_status()
+        except requests.RequestException as exc:
+            logger.warning(
+                "OTX page %d failed (%s); returning %d indicators collected so far.",
+                page + 1, exc, len(all_indicators),
+            )
+            break
         data = r.json()
         page += 1
 
