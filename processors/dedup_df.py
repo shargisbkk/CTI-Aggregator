@@ -1,12 +1,13 @@
 import pandas as pd
 
 
-def dedup_df(records: list[dict]) -> pd.DataFrame:
+def dedup(records: list[dict]) -> list[dict]:
     """
-    Deduplicate a batch of normalized IOC dicts and return a DataFrame.
+    Deduplicate a batch of parsed IOC dicts.
 
-    Sorts by modified descending, then drops duplicate (ioc_type, ioc_value)
-    pairs keeping the freshest. Timestamps are converted to UTC datetimes.
+    Converts timestamps to UTC, sorts by modified descending, then drops
+    duplicate (ioc_type, ioc_value) pairs keeping the freshest.
+    Returns a list of dicts ready for save_indicators().
     """
     columns = ["ioc_type", "ioc_value", "confidence", "labels", "created", "modified"]
     df = pd.DataFrame(records, columns=columns)
@@ -16,4 +17,4 @@ def dedup_df(records: list[dict]) -> pd.DataFrame:
 
     df = df.sort_values("modified", ascending=False)
     df = df.drop_duplicates(subset=["ioc_type", "ioc_value"], keep="first")
-    return df.reset_index(drop=True)
+    return df.reset_index(drop=True).to_dict("records")

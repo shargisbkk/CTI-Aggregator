@@ -1,7 +1,7 @@
 import requests
 from django.conf import settings
 
-from ingestion.adapters.base import FeedAdapter, NormalizedIOC
+from ingestion.adapters.base import FeedAdapter
 from ingestion.adapters.registry import FeedRegistry
 
 THREATFOX_API_URL = "https://threatfox-api.abuse.ch/api/v1/"
@@ -51,16 +51,22 @@ class ThreatFoxAdapter(FeedAdapter):
     """Adapter for ThreatFox (abuse.ch). Free accounts capped at 7 days lookback."""
 
     source_name = "threatfox"
+    type_map = {
+        "ip:port":     "ip:port",
+        "domain":      "domain",
+        "url":         "url",
+        "md5_hash":    "hash:md5",
+        "sha256_hash": "hash:sha256",
+        "sha1_hash":   "hash:sha1",
+    }
 
-    def __init__(self, days: int | None = None):
-        super().__init__()
+    def __init__(self, days: int = 1):
         api_key = getattr(settings, "THREATFOX_API_KEY", "")
         if not api_key:
             raise RuntimeError("THREATFOX_API_KEY is not set.")
         self._api_key = api_key
-        self._days    = days if days is not None else self._config.get("days", 1)
+        self._days    = days
 
-    def fetch_indicators(self) -> list[NormalizedIOC]:
-        """Fetch raw indicators from ThreatFox, then normalize each one."""
-        raw = _fetch_threatfox_raw(api_key=self._api_key, days=self._days)
-        return [self.normalize_record(r) for r in raw]
+    def fetch_raw(self) -> list[dict]:
+        """Fetch raw indicator dicts from ThreatFox."""
+        return _fetch_threatfox_raw(api_key=self._api_key, days=self._days)

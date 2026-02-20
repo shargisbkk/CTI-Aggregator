@@ -5,7 +5,7 @@ from pathlib import Path
 
 from stix2 import parse
 
-from ingestion.adapters.base import FeedAdapter, NormalizedIOC
+from ingestion.adapters.base import FeedAdapter
 
 logger = logging.getLogger(__name__)
 
@@ -15,8 +15,8 @@ def _parse_pattern(pattern: str) -> list[tuple[str, str]]:
     Pull (type, value) pairs out of a STIX pattern string.
 
     Returns raw STIX type names (e.g. "ipv4-addr", "domain-name").
-    Translation to our internal standard names happens in normalize_record()
-    via configs/stix.json.
+    Translation to our internal standard names happens in parse_record()
+    via the adapter's type_map.
 
     File hashes are an exception: the hash algorithm (MD5, SHA-1, SHA-256)
     is encoded in the STIX property path, not the object type, so we
@@ -25,8 +25,6 @@ def _parse_pattern(pattern: str) -> list[tuple[str, str]]:
     if not pattern:
         return []
 
-    # Match quoted values:  type:prop = 'value'
-    # AND unquoted values:  type:prop = 64496  (for autonomous-system:number, etc.)
     matches = re.findall(
         r"([\w-]+):([\w.'\"\\-]+)\s*=\s*(?:'([^']+)'|(\S+))", pattern
     )
@@ -97,6 +95,27 @@ def extract_indicators(raw_objects: list[dict]) -> list[dict]:
     return out
 
 
+# Shared by both STIXAdapter and TAXIIAdapter since TAXII delivers STIX data.
+STIX_TYPE_MAP = {
+    "ipv4-addr":            "ip",
+    "ipv6-addr":            "ipv6",
+    "domain-name":          "domain",
+    "url":                  "url",
+    "email-addr":           "email",
+    "network-traffic":      "network-traffic",
+    "autonomous-system":    "asn",
+    "x509-certificate":     "ssl_cert",
+    "windows-registry-key": "registry-key",
+    "mutex":                "mutex",
+    "vulnerability":        "cve",
+    "hash:md5":             "hash:md5",
+    "hash:sha1":            "hash:sha1",
+    "hash:sha256":          "hash:sha256",
+    "hash:sha512":          "hash:sha512",
+    "hash":                 "hash",
+}
+
+
 class STIXAdapter(FeedAdapter):
     """
     Adapter for STIX 2.x JSON files in a local folder.
@@ -104,13 +123,13 @@ class STIXAdapter(FeedAdapter):
     """
 
     source_name = "stix"
+    type_map = STIX_TYPE_MAP
 
     def __init__(self, folder_path: str):
-        super().__init__()
         self._folder = Path(folder_path)
 
-    def fetch_indicators(self) -> list[NormalizedIOC]:
-        """Read all .json files in the folder, extract STIX indicators, and normalize."""
+    def fetch_raw(self) -> list[dict]:
+        """Read all .json files in the folder and extract raw STIX indicator dicts."""
         raw = []
         for p in self._folder.glob("*.json"):
             try:
@@ -132,4 +151,4 @@ class STIXAdapter(FeedAdapter):
             except Exception as e:
                 logger.warning(f"Error extracting indicators from {p.name}: {e}")
 
-        return [self.normalize_record(r) for r in raw]
+        return raw

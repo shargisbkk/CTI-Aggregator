@@ -3,7 +3,7 @@ import logging
 import requests
 from django.conf import settings
 
-from ingestion.adapters.base import FeedAdapter, NormalizedIOC
+from ingestion.adapters.base import FeedAdapter
 from ingestion.adapters.registry import FeedRegistry
 
 logger = logging.getLogger(__name__)
@@ -78,18 +78,39 @@ class OTXAdapter(FeedAdapter):
     """Adapter for AlienVault OTX. Pulls from both 'activity' and 'subscribed' feeds."""
 
     source_name = "otx"
+    type_map = {
+        "ipv4":             "ip",
+        "ipv6":             "ipv6",
+        "domain":           "domain",
+        "hostname":         "domain",
+        "url":              "url",
+        "uri":              "url",
+        "email":            "email",
+        "filehash-md5":     "hash:md5",
+        "filehash-sha1":    "hash:sha1",
+        "filehash-sha256":  "hash:sha256",
+        "filehash-pehash":  "hash:pehash",
+        "filehash-imphash": "hash:imphash",
+        "bitcoinaddress":   "bitcoin",
+        "sslcert":          "ssl_cert",
+        "cidr":             "cidr",
+        "cve":              "cve",
+        "filepath":         "filepath",
+        "mutex":            "mutex",
+        "yara":             "yara",
+        "ja3":              "ja3",
+        "ja3s":             "ja3s",
+    }
 
-    def __init__(self, max_pages: int | None = None):
-        super().__init__()
+    def __init__(self, max_pages: int = 10):
         api_key = getattr(settings, "OTX_API_KEY", "")
         if not api_key:
             raise RuntimeError("OTX_API_KEY is not set.")
         self._api_key   = api_key
-        # CLI arg overrides config; config overrides default (0 = all pages)
-        self._max_pages = max_pages if max_pages is not None else self._config.get("max_pages", 0)
+        self._max_pages = max_pages
 
-    def fetch_indicators(self) -> list[NormalizedIOC]:
-        """Fetch raw indicators from both OTX feeds, then normalize each one."""
+    def fetch_raw(self) -> list[dict]:
+        """Fetch raw indicator dicts from both OTX feeds."""
         raw = []
         for feed in FEED_ENDPOINTS:
             raw.extend(
@@ -99,4 +120,4 @@ class OTXAdapter(FeedAdapter):
                     feed=feed,
                 )
             )
-        return [self.normalize_record(r) for r in raw]
+        return raw

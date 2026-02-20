@@ -1,10 +1,8 @@
-import json
-import os
+import logging
 from abc import ABC, abstractmethod
-from dataclasses import dataclass, field
 from typing import Optional
 
-CONFIG_DIR = os.path.join(os.path.dirname(__file__), "..", "configs")
+logger = logging.getLogger(__name__)
 
 # Types where original casing must be preserved.
 _CASE_SENSITIVE_TYPES = {"url", "filepath"}
@@ -21,7 +19,7 @@ def _safe_confidence(val) -> Optional[int]:
 
 
 def _clean_labels(raw_labels: list, ioc_type: str) -> list:
-    """Deduplicate and normalize a label list (lowercase, strip, remove empties)."""
+    """Normalize a label list (lowercase, strip, remove empties)."""
     seen = set()
     out = []
     for lbl in (raw_labels or []):
@@ -33,75 +31,81 @@ def _clean_labels(raw_labels: list, ioc_type: str) -> list:
     return out
 
 
-@dataclass
-class NormalizedIOC:
-    """
-    Internal IOC schema that every adapter produces.
-    Mirrors the IndicatorOfCompromise Django model.
-    """
-    ioc_type:   str
-    ioc_value:  str
-    confidence: Optional[int]  = None
-    labels:     list           = field(default_factory=list)
-    sources:    list           = field(default_factory=list)
-    created:    object         = None
-    modified:   object         = None
-
-    def to_dict(self) -> dict:
-        """Convert to dict for dedup_df(). Excludes sources (handled by save_indicators)."""
-        return {
-            "ioc_type":   self.ioc_type,
-            "ioc_value":  self.ioc_value,
-            "confidence": self.confidence,
-            "labels":     self.labels,
-            "created":    self.created,
-            "modified":   self.modified,
-        }
-
-
 class FeedAdapter(ABC):
     """
     Abstract base class for all feed adapters.
-    Subclasses set source_name and implement fetch_indicators().
+
+    Subclasses set source_name, optionally override type_map,
+    and implement fetch_raw().
+    The concrete fetch_indicators() handles parsing and error
+    recovery so that a single bad record never discards the entire batch.
     """
 
     source_name: str = ""
+    type_map: dict = {}
 
-    def __init__(self):
-        self._config = self._load_config()
+    def _map_type(self, raw_type: str) -> str:
+        """Look up a source type string in this adapter's type_map."""
+        return self.type_map.get(raw_type, raw_type)
 
-    def _load_config(self) -> dict:
-        """Read configs/<source_name>.json."""
-        path = os.path.join(CONFIG_DIR, f"{self.source_name}.json")
-        if os.path.exists(path):
-            with open(path, encoding="utf-8") as f:
-                return json.load(f)
-        return {}
+    def parse_record(self, raw: dict) -> dict:
+        """
+        Parse one raw source dict into a standardized indicator dict.
 
-    def _normalize_type(self, raw_type: str) -> str:
-        """Map a source type string to our internal standard via the JSON config."""
-        return self._config.get("type_map", {}).get(raw_type, raw_type)
-
-    def normalize_record(self, raw: dict) -> NormalizedIOC:
-        """Convert one raw source dict into a NormalizedIOC."""
+        Maps the type via type_map, lowercases the value (unless case-sensitive),
+        casts confidence to int, and cleans labels.
+        """
         raw_type  = raw.get("ioc_type", "unknown").strip().lower()
-        ioc_type  = self._normalize_type(raw_type)
+        ioc_type  = self._map_type(raw_type)
         raw_value = raw.get("ioc_value", "").strip()
         ioc_value = (
             raw_value if ioc_type in _CASE_SENSITIVE_TYPES
             else raw_value.lower()
         )
-        return NormalizedIOC(
-            ioc_type=ioc_type,
-            ioc_value=ioc_value,
-            confidence=_safe_confidence(raw.get("confidence")),
-            labels=_clean_labels(raw.get("labels") or [], ioc_type),
-            sources=[self.source_name],
-            created=raw.get("created") or None,
-            modified=raw.get("modified") or None,
+        return {
+            "ioc_type":   ioc_type,
+            "ioc_value":  ioc_value,
+            "confidence": _safe_confidence(raw.get("confidence")),
+            "labels":     _clean_labels(raw.get("labels") or [], ioc_type),
+            "created":    raw.get("created") or None,
+            "modified":   raw.get("modified") or None,
+        }
+
+    def fetch_indicators(self) -> list[dict]:
+        """
+        Fetch raw records and parse each one safely.
+
+        If fetch_raw() raises, logs the error and returns an empty list.
+        If a single record fails to parse, logs it and continues
+        with the rest of the batch.
+        """
+        raw_records = []
+        try:
+            raw_records = self.fetch_raw()
+        except Exception as exc:
+            logger.error(
+                "%s: fetch_raw() failed (%s); 0 indicators collected.",
+                self.source_name, exc,
+            )
+            return []
+
+        indicators = []
+        for i, raw in enumerate(raw_records):
+            try:
+                indicators.append(self.parse_record(raw))
+            except Exception as exc:
+                logger.warning(
+                    "%s: skipping record %d (%s)",
+                    self.source_name, i, exc,
+                )
+
+        logger.info(
+            "%s: parsed %d / %d raw records.",
+            self.source_name, len(indicators), len(raw_records),
         )
+        return indicators
 
     @abstractmethod
-    def fetch_indicators(self) -> list[NormalizedIOC]:
-        """Fetch from the source and return normalized indicators."""
+    def fetch_raw(self) -> list[dict]:
+        """Fetch from the source and return raw indicator dicts."""
         ...

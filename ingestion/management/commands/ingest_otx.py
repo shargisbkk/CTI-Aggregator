@@ -2,7 +2,7 @@ from django.core.management.base import BaseCommand
 
 from ingestion.adapters.otx import OTXAdapter
 from ingestion.loaders.db_write import save_indicators
-from processors.dedup_df import dedup_df
+from processors.dedup_df import dedup
 
 
 class Command(BaseCommand):
@@ -10,8 +10,8 @@ class Command(BaseCommand):
 
     def add_arguments(self, parser):
         parser.add_argument(
-            "--pages", type=int, default=None,
-            help="Max pages to fetch per feed (overrides config; 0 = all).",
+            "--pages", type=int, default=10,
+            help="Max pages to fetch per feed (default: 10, 0 = all).",
         )
 
     def handle(self, *args, **opts):
@@ -26,6 +26,6 @@ class Command(BaseCommand):
             self.stdout.write("No indicators returned.")
             return
 
-        df = dedup_df([ioc.to_dict() for ioc in iocs])
-        count = save_indicators(df.to_dict("records"), source_name="otx")
+        deduped = dedup(iocs)
+        count = save_indicators(deduped, source_name="otx")
         self.stdout.write(self.style.SUCCESS(f"Saved {count} new OTX indicators."))
