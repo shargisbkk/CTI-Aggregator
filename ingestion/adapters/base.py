@@ -48,7 +48,7 @@ class NormalizedIOC:
     modified:   object         = None
 
     def to_dict(self) -> dict:
-        """Convert to dict for make_dataframe(). Excludes sources (handled by save_indicators)."""
+        """Convert to dict for dedup_df(). Excludes sources (handled by save_indicators)."""
         return {
             "ioc_type":   self.ioc_type,
             "ioc_value":  self.ioc_value,
@@ -71,7 +71,7 @@ class FeedAdapter(ABC):
         self._config = self._load_config()
 
     def _load_config(self) -> dict:
-        """Read configs/<source_name>.json. Returns {} if not found."""
+        """Read configs/<source_name>.json."""
         path = os.path.join(CONFIG_DIR, f"{self.source_name}.json")
         if os.path.exists(path):
             with open(path, encoding="utf-8") as f:

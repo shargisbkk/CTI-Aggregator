@@ -1,8 +1,8 @@
 import ingestion.adapters  # noqa: F401 -- triggers @FeedRegistry.register decorators
 from django.core.management.base import BaseCommand
 from ingestion.adapters.registry import FeedRegistry
-from ingestion.loaders.load_to_db import save_indicators
-from processors.normalize import make_dataframe
+from ingestion.loaders.db_write import save_indicators
+from processors.dedup_df import dedup_df
 
 
 class Command(BaseCommand):
@@ -19,7 +19,7 @@ class Command(BaseCommand):
                     self.stdout.write(f"  {name}: no indicators returned")
                     continue
 
-                df = make_dataframe([ioc.to_dict() for ioc in iocs])
+                df = dedup_df([ioc.to_dict() for ioc in iocs])
                 count = save_indicators(df.to_dict("records"), source_name=name)
                 self.stdout.write(f"  {name}: {count} new indicators")
                 total += count

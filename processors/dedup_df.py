@@ -1,7 +1,7 @@
 import pandas as pd
 
 
-def make_dataframe(records: list[dict]) -> pd.DataFrame:
+def dedup_df(records: list[dict]) -> pd.DataFrame:
     """
     Deduplicate a batch of normalized IOC dicts and return a DataFrame.
 
