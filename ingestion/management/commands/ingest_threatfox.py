@@ -1,8 +1,7 @@
 from django.core.management.base import BaseCommand
-
 from ingestion.adapters.threatfox import ThreatFoxAdapter
-from ingestion.loaders.db_write import save_indicators
-from processors.dedup_df import dedup
+from ingestion.loaders.upsert import upsert_indicators
+from processors.dedup import dedup
 
 
 class Command(BaseCommand):
@@ -21,11 +20,11 @@ class Command(BaseCommand):
             self.stderr.write(str(e))
             return
 
-        iocs = adapter.fetch_indicators()
+        iocs = adapter.ingest()
         if not iocs:
             self.stdout.write("No indicators returned.")
             return
 
         deduped = dedup(iocs)
-        count = save_indicators(deduped, source_name="threatfox")
+        count = upsert_indicators(deduped, source_name="threatfox")
         self.stdout.write(self.style.SUCCESS(f"Saved {count} new ThreatFox indicators."))

@@ -37,7 +37,7 @@ class FeedAdapter(ABC):
 
     Subclasses set source_name, optionally override type_map,
     and implement fetch_raw().
-    The concrete fetch_indicators() handles parsing and error
+    The concrete ingest() handles parsing and error
     recovery so that a single bad record never discards the entire batch.
     """
 
@@ -48,7 +48,7 @@ class FeedAdapter(ABC):
         """Look up a source type string in this adapter's type_map."""
         return self.type_map.get(raw_type, raw_type)
 
-    def parse_record(self, raw: dict) -> dict:
+    def normalize_record(self, raw: dict) -> dict:
         """
         Parse one raw source dict into a standardized indicator dict.
 
@@ -63,15 +63,15 @@ class FeedAdapter(ABC):
             else raw_value.lower()
         )
         return {
-            "ioc_type":   ioc_type,
-            "ioc_value":  ioc_value,
-            "confidence": _safe_confidence(raw.get("confidence")),
-            "labels":     _clean_labels(raw.get("labels") or [], ioc_type),
-            "created":    raw.get("created") or None,
-            "modified":   raw.get("modified") or None,
+            "ioc_type":    ioc_type,
+            "ioc_value":   ioc_value,
+            "confidence":  _safe_confidence(raw.get("confidence")),
+            "labels":      _clean_labels(raw.get("labels") or [], ioc_type),
+            "first_seen":  raw.get("first_seen") or None,
+            "last_seen":   raw.get("last_seen") or None,
         }
 
-    def fetch_indicators(self) -> list[dict]:
+    def ingest(self) -> list[dict]:
         """
         Fetch raw records and parse each one safely.
 
@@ -92,7 +92,7 @@ class FeedAdapter(ABC):
         indicators = []
         for i, raw in enumerate(raw_records):
             try:
-                indicators.append(self.parse_record(raw))
+                indicators.append(self.normalize_record(raw))
             except Exception as exc:
                 logger.warning(
                     "%s: skipping record %d (%s)",

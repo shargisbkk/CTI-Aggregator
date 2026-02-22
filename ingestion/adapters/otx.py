@@ -45,17 +45,17 @@ def _fetch_otx_raw(api_key: str, max_pages: int = 0, feed: str = "activity") -> 
 
         for pulse in data.get("results", []):
             # Use malware_families for labels (curated, consistent names)
-            malware_labels = [
-                name for name in (
-                    mf.strip().lower() if isinstance(mf, str)
-                    else mf.get("display_name", "").strip().lower()
-                    for mf in pulse.get("malware_families", [])
-                )
-                if name and "unknown" not in name
-            ]
+            malware_labels = []
+            for mf in pulse.get("malware_families", []):
+                if isinstance(mf, str):
+                    name = mf.strip().lower()
+                else:
+                    name = mf.get("display_name", "").strip().lower()
+                if name and "unknown" not in name:
+                    malware_labels.append(name)
 
-            pulse_created     = pulse.get("created", "")
-            pulse_modified    = pulse.get("modified", "")
+            pulse_first_seen  = pulse.get("created", "")
+            pulse_last_seen   = pulse.get("modified", "")
             pulse_confidence  = pulse.get("confidence")
 
             for ind in pulse.get("indicators", []):
@@ -64,8 +64,8 @@ def _fetch_otx_raw(api_key: str, max_pages: int = 0, feed: str = "activity") -> 
                     "ioc_value":  ind.get("indicator", ""),
                     "labels":     malware_labels,
                     "confidence": pulse_confidence,
-                    "created":    ind.get("created", "") or pulse_created,
-                    "modified":   ind.get("modified", "") or pulse_modified,
+                    "first_seen": ind.get("created", "") or pulse_first_seen,
+                    "last_seen":  ind.get("modified", "") or pulse_last_seen,
                 })
 
         url = data.get("next")
@@ -78,29 +78,6 @@ class OTXAdapter(FeedAdapter):
     """Adapter for AlienVault OTX. Pulls from both 'activity' and 'subscribed' feeds."""
 
     source_name = "otx"
-    type_map = {
-        "ipv4":             "ip",
-        "ipv6":             "ipv6",
-        "domain":           "domain",
-        "hostname":         "domain",
-        "url":              "url",
-        "uri":              "url",
-        "email":            "email",
-        "filehash-md5":     "hash:md5",
-        "filehash-sha1":    "hash:sha1",
-        "filehash-sha256":  "hash:sha256",
-        "filehash-pehash":  "hash:pehash",
-        "filehash-imphash": "hash:imphash",
-        "bitcoinaddress":   "bitcoin",
-        "sslcert":          "ssl_cert",
-        "cidr":             "cidr",
-        "cve":              "cve",
-        "filepath":         "filepath",
-        "mutex":            "mutex",
-        "yara":             "yara",
-        "ja3":              "ja3",
-        "ja3s":             "ja3s",
-    }
 
     def __init__(self, max_pages: int = 10):
         api_key = getattr(settings, "OTX_API_KEY", "")
@@ -121,3 +98,18 @@ class OTXAdapter(FeedAdapter):
                 )
             )
         return raw
+
+
+OTXAdapter.type_map = {
+    "ipv4":             "ip",
+    "ipv6":             "ipv6",
+    "hostname":         "domain",
+    "uri":              "url",
+    "filehash-md5":     "hash:md5",
+    "filehash-sha1":    "hash:sha1",
+    "filehash-sha256":  "hash:sha256",
+    "filehash-pehash":  "hash:pehash",
+    "filehash-imphash": "hash:imphash",
+    "bitcoinaddress":   "bitcoin",
+    "sslcert":          "ssl_cert",
+}

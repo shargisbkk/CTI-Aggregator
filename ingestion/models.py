@@ -7,8 +7,8 @@ class IndicatorOfCompromise(models.Model):
     confidence   = models.IntegerField(null=True, blank=True)
     labels       = models.JSONField(default=list, blank=True)
     sources      = models.JSONField(default=list, blank=True)
-    created      = models.DateTimeField(null=True, blank=True)
-    modified     = models.DateTimeField(null=True, blank=True)
+    first_seen   = models.DateTimeField(null=True, blank=True)
+    last_seen    = models.DateTimeField(null=True, blank=True)
 
     class Meta:
         db_table = "indicators_of_compromise"

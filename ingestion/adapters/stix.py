@@ -15,7 +15,7 @@ def _parse_pattern(pattern: str) -> list[tuple[str, str]]:
     Pull (type, value) pairs out of a STIX pattern string.
 
     Returns raw STIX type names (e.g. "ipv4-addr", "domain-name").
-    Translation to our internal standard names happens in parse_record()
+    Translation to our internal standard names happens in normalize_record()
     via the adapter's type_map.
 
     File hashes are an exception: the hash algorithm (MD5, SHA-1, SHA-256)
@@ -74,8 +74,8 @@ def extract_indicators(raw_objects: list[dict]) -> list[dict]:
             pattern    = getattr(obj, "pattern",  "")
             labels     = list(getattr(obj, "labels",  []) or [])
             confidence = getattr(obj, "confidence", None)
-            created    = getattr(obj, "valid_from", None) or getattr(obj, "created", None)
-            modified   = getattr(obj, "modified", None)
+            first_seen = getattr(obj, "valid_from", None) or getattr(obj, "created", None)
+            last_seen  = getattr(obj, "modified", None)
 
             observables = _parse_pattern(pattern)
             for ioc_type, ioc_value in observables:
@@ -84,8 +84,8 @@ def extract_indicators(raw_objects: list[dict]) -> list[dict]:
                     "ioc_value":    ioc_value,
                     "labels":       labels,
                     "confidence":   confidence,
-                    "created":      created,
-                    "modified":     modified,
+                    "first_seen":   first_seen,
+                    "last_seen":    last_seen,
                 })
 
         except Exception as e:
@@ -95,27 +95,6 @@ def extract_indicators(raw_objects: list[dict]) -> list[dict]:
     return out
 
 
-# Shared by both STIXAdapter and TAXIIAdapter since TAXII delivers STIX data.
-STIX_TYPE_MAP = {
-    "ipv4-addr":            "ip",
-    "ipv6-addr":            "ipv6",
-    "domain-name":          "domain",
-    "url":                  "url",
-    "email-addr":           "email",
-    "network-traffic":      "network-traffic",
-    "autonomous-system":    "asn",
-    "x509-certificate":     "ssl_cert",
-    "windows-registry-key": "registry-key",
-    "mutex":                "mutex",
-    "vulnerability":        "cve",
-    "hash:md5":             "hash:md5",
-    "hash:sha1":            "hash:sha1",
-    "hash:sha256":          "hash:sha256",
-    "hash:sha512":          "hash:sha512",
-    "hash":                 "hash",
-}
-
-
 class STIXAdapter(FeedAdapter):
     """
     Adapter for STIX 2.x JSON files in a local folder.
@@ -123,7 +102,6 @@ class STIXAdapter(FeedAdapter):
     """
 
     source_name = "stix"
-    type_map = STIX_TYPE_MAP
 
     def __init__(self, folder_path: str):
         self._folder = Path(folder_path)
@@ -152,3 +130,18 @@ class STIXAdapter(FeedAdapter):
                 logger.warning(f"Error extracting indicators from {p.name}: {e}")
 
         return raw
+
+
+# Shared by both STIXAdapter and TAXIIAdapter since TAXII delivers STIX data.
+STIX_TYPE_MAP = {
+    "ipv4-addr":            "ip",
+    "ipv6-addr":            "ipv6",
+    "domain-name":          "domain",
+    "email-addr":           "email",
+    "autonomous-system":    "asn",
+    "x509-certificate":     "ssl_cert",
+    "windows-registry-key": "registry-key",
+    "vulnerability":        "cve",
+}
+
+STIXAdapter.type_map = STIX_TYPE_MAP

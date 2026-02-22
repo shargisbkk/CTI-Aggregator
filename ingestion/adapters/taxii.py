@@ -84,7 +84,6 @@ class TAXIIAdapter(FeedAdapter):
     """
 
     source_name = "taxii"
-    type_map = STIX_TYPE_MAP
 
     def __init__(self, discovery_url: str, username: str = "", password: str = ""):
         self._url      = discovery_url
@@ -98,3 +97,6 @@ class TAXIIAdapter(FeedAdapter):
             username=self._username,
             password=self._password,
         )
+
+
+TAXIIAdapter.type_map = STIX_TYPE_MAP

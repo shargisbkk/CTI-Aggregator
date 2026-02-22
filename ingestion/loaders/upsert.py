@@ -15,20 +15,20 @@ def _clean_conf(value):
         return None
 
 
-def save_indicators(normalized_records: list[dict], source_name: str = "") -> int:
+def upsert_indicators(normalized_records: list[dict], source_name: str = "") -> int:
     """
     Upsert normalized IOC records into the database.
 
     New indicators are created. Existing ones are merged:
-    created=keep earlier, modified=keep later, sources=union,
+    first_seen=keep earlier, last_seen=keep later, sources=union,
     labels=union, confidence=keep highest.
 
     Returns the number of newly created records.
     """
     saved = 0
     for r in normalized_records:
-        incoming_created  = _clean_ts(r["created"])
-        incoming_modified = _clean_ts(r["modified"])
+        incoming_first_seen = _clean_ts(r["first_seen"])
+        incoming_last_seen  = _clean_ts(r["last_seen"])
         incoming_source   = source_name
         incoming_conf     = _clean_conf(r["confidence"])
         incoming_labels   = r["labels"]
@@ -40,15 +40,15 @@ def save_indicators(normalized_records: list[dict], source_name: str = "") -> in
             )
 
             # Merge timestamps
-            if incoming_created and existing.created:
-                existing.created = min(existing.created, incoming_created)
-            elif incoming_created:
-                existing.created = incoming_created
+            if incoming_first_seen and existing.first_seen:
+                existing.first_seen = min(existing.first_seen, incoming_first_seen)
+            elif incoming_first_seen:
+                existing.first_seen = incoming_first_seen
 
-            if incoming_modified and existing.modified:
-                existing.modified = max(existing.modified, incoming_modified)
-            elif incoming_modified:
-                existing.modified = incoming_modified
+            if incoming_last_seen and existing.last_seen:
+                existing.last_seen = max(existing.last_seen, incoming_last_seen)
+            elif incoming_last_seen:
+                existing.last_seen = incoming_last_seen
 
             # Merge sources
             if incoming_source and incoming_source not in existing.sources:
@@ -75,8 +75,8 @@ def save_indicators(normalized_records: list[dict], source_name: str = "") -> in
                 confidence=incoming_conf,
                 labels=incoming_labels,
                 sources=[incoming_source] if incoming_source else [],
-                created=incoming_created,
-                modified=incoming_modified,
+                first_seen=incoming_first_seen,
+                last_seen=incoming_last_seen,
             )
             saved += 1
 
