@@ -146,3 +146,4 @@ LOGOUT_REDIRECT_URL = '/login/'
 # new API-backed feed adapter.
 OTX_API_KEY       = os.environ.get("OTX_API_KEY", "")
 THREATFOX_API_KEY = os.environ.get("THREATFOX_API_KEY", "")
+URLHAUS_API_KEY   = os.environ.get("URLHAUS_API_KEY", "")

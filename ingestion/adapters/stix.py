@@ -65,32 +65,33 @@ def extract_indicators(raw_objects: list[dict]) -> list[dict]:
     for o in raw_objects:
         if o.get("type") != "indicator":
             continue
+
         try:
             obj = parse(o, allow_custom=True)
-
-            # Use the parsed object's attributes — stix2 already converted
-            # timestamps to datetime objects, so we avoid re-parsing strings
-            # downstream in pd.to_datetime().
             pattern    = getattr(obj, "pattern",  "")
             labels     = list(getattr(obj, "labels",  []) or [])
             confidence = getattr(obj, "confidence", None)
             first_seen = getattr(obj, "valid_from", None) or getattr(obj, "created", None)
             last_seen  = getattr(obj, "modified", None)
+        except Exception:
+            # stix2 strict validation failed (e.g. escaped unicode in patterns).
+            # Fall back to the raw dict — our regex parser is more lenient.
+            pattern    = o.get("pattern", "")
+            labels     = list(o.get("labels") or [])
+            confidence = o.get("confidence")
+            first_seen = o.get("valid_from") or o.get("created")
+            last_seen  = o.get("modified")
 
-            observables = _parse_pattern(pattern)
-            for ioc_type, ioc_value in observables:
-                out.append({
-                    "ioc_type":     ioc_type,
-                    "ioc_value":    ioc_value,
-                    "labels":       labels,
-                    "confidence":   confidence,
-                    "first_seen":   first_seen,
-                    "last_seen":    last_seen,
-                })
-
-        except Exception as e:
-            logger.warning("Skipping unparseable STIX object %s: %s", o.get("id", "<no id>"), e)
-            continue
+        observables = _parse_pattern(pattern)
+        for ioc_type, ioc_value in observables:
+            out.append({
+                "ioc_type":     ioc_type,
+                "ioc_value":    ioc_value,
+                "labels":       labels,
+                "confidence":   confidence,
+                "first_seen":   first_seen,
+                "last_seen":    last_seen,
+            })
 
     return out
 

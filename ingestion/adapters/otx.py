@@ -8,108 +8,76 @@ from ingestion.adapters.registry import FeedRegistry
 
 logger = logging.getLogger(__name__)
 
-OTX_API_BASE = "https://otx.alienvault.com/api/v1"
-
-FEED_ENDPOINTS = {
-    "activity":   "pulses/activity",
-    "subscribed": "pulses/subscribed",
-}
-
-
-def _fetch_otx_raw(api_key: str, max_pages: int = 0, feed: str = "activity") -> list[dict]:
-    """
-    Page through an OTX pulse feed and return a flat list of indicator dicts.
-    max_pages=0 means fetch everything.
-    """
-    endpoint = FEED_ENDPOINTS.get(feed, "pulses/activity")
-    headers = {"X-OTX-API-KEY": api_key}
-    url = f"{OTX_API_BASE}/{endpoint}"
-    all_indicators = []
-    page = 0
-
-    while url:
-        if max_pages and page >= max_pages:
-            break
-
-        try:
-            r = requests.get(url, headers=headers, timeout=60)
-            r.raise_for_status()
-        except requests.RequestException as exc:
-            logger.warning(
-                "OTX page %d failed (%s); returning %d indicators collected so far.",
-                page + 1, exc, len(all_indicators),
-            )
-            break
-        data = r.json()
-        page += 1
-
-        for pulse in data.get("results", []):
-            # Use malware_families for labels (curated, consistent names)
-            malware_labels = []
-            for mf in pulse.get("malware_families", []):
-                if isinstance(mf, str):
-                    name = mf.strip().lower()
-                else:
-                    name = mf.get("display_name", "").strip().lower()
-                if name and "unknown" not in name:
-                    malware_labels.append(name)
-
-            pulse_first_seen  = pulse.get("created", "")
-            pulse_last_seen   = pulse.get("modified", "")
-            pulse_confidence  = pulse.get("confidence")
-
-            for ind in pulse.get("indicators", []):
-                all_indicators.append({
-                    "ioc_type":   ind.get("type", ""),
-                    "ioc_value":  ind.get("indicator", ""),
-                    "labels":     malware_labels,
-                    "confidence": pulse_confidence,
-                    "first_seen": ind.get("created", "") or pulse_first_seen,
-                    "last_seen":  ind.get("modified", "") or pulse_last_seen,
-                })
-
-        url = data.get("next")
-
-    return all_indicators
-
 
 @FeedRegistry.register
 class OTXAdapter(FeedAdapter):
-    """Adapter for AlienVault OTX. Pulls from both 'activity' and 'subscribed' feeds."""
+    """Adapter for AlienVault OTX. Pulls indicators from the global activity feed."""
 
     source_name = "otx"
 
-    def __init__(self, max_pages: int = 10):
-        api_key = getattr(settings, "OTX_API_KEY", "")
-        if not api_key:
+    def __init__(self, max_pages: int = 0):
+        self._api_key = getattr(settings, "OTX_API_KEY", "")
+        if not self._api_key:
             raise RuntimeError("OTX_API_KEY is not set.")
-        self._api_key   = api_key
         self._max_pages = max_pages
 
     def fetch_raw(self) -> list[dict]:
-        """Fetch raw indicator dicts from both OTX feeds."""
-        raw = []
-        for feed in FEED_ENDPOINTS:
-            raw.extend(
-                _fetch_otx_raw(
-                    api_key=self._api_key,
-                    max_pages=self._max_pages,
-                    feed=feed,
-                )
-            )
-        return raw
+        """Paginate through OTX pulses and extract indicators."""
+        headers = {"X-OTX-API-KEY": self._api_key}
+        base_url = "https://otx.alienvault.com/api/v1/pulses/activity"
+        params = {"limit": 50}
+        logger.info("Fetching from OTX global activity feed.")
+
+        indicators = []
+        page_count = 0
+        next_url = base_url
+
+        while next_url:
+            # For the first request, `requests` will combine `next_url` and `params`.
+            # For subsequent requests, `next_url` is a full URL with its own query string,
+            # and `params` will be None.
+            r = requests.get(next_url, headers=headers, params=params, timeout=120)
+            params = None  # Clear params after the first request
+
+            r.raise_for_status()
+            data = r.json()
+            pulses = data.get("results", [])
+
+            if not pulses:
+                logger.info("OTX fetch complete: no more pulses in response.")
+                break
+
+            for pulse in pulses:
+                for ioc in pulse.get("indicators", []):
+                    indicators.append({
+                        "ioc_type":  ioc.get("type", ""),
+                        "ioc_value": ioc.get("indicator", ""),
+                        "labels":    pulse.get("tags", []),
+                        "confidence":None,
+                        "first_seen": ioc.get("created"),
+                        "last_seen":  ioc.get("created"),
+                    })
+
+            page_count += 1
+            if self._max_pages > 0 and page_count >= self._max_pages:
+                logger.warning("OTX fetch stopped at page %d (max_pages limit)", page_count)
+                break
+
+            next_url = data.get("next")
+            if next_url and page_count % 100 == 0:
+                logger.info("OTX page %d — %d indicators so far", page_count, len(indicators))
+
+        return indicators
 
 
 OTXAdapter.type_map = {
-    "ipv4":             "ip",
-    "ipv6":             "ipv6",
-    "hostname":         "domain",
-    "uri":              "url",
-    "filehash-md5":     "hash:md5",
-    "filehash-sha1":    "hash:sha1",
-    "filehash-sha256":  "hash:sha256",
-    "filehash-pehash":  "hash:pehash",
-    "filehash-imphash": "hash:imphash",
-    "bitcoinaddress":   "bitcoin",
-    "sslcert":          "ssl_cert",
+    "IPv4": "ip",
+    "IPv6": "ipv6",
+    "domain": "domain",
+    "hostname": "domain",
+    "URL": "url",
+    "FileHash-MD5": "hash:md5",
+    "FileHash-SHA1": "hash:sha1",
+    "FileHash-SHA256": "hash:sha256",
+    "email": "email",
 }

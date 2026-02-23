@@ -6,17 +6,17 @@ from processors.dedup import dedup
 
 
 class Command(BaseCommand):
-    help = "Fetch indicators from AlienVault OTX into the DB."
+    help = "Fetch indicators from AlienVault OTX (REST API) into the DB."
 
     def add_arguments(self, parser):
         parser.add_argument(
-            "--pages", type=int, default=10,
-            help="Max pages to fetch per feed (default: 10, 0 = all).",
+            "--max-pages", type=int, default=0,
+            help="Maximum number of API pages to fetch (default: 0, i.e., all pages. 50 pulses per page).",
         )
 
     def handle(self, *args, **opts):
         try:
-            adapter = OTXAdapter(max_pages=opts["pages"])
+            adapter = OTXAdapter(max_pages=opts["max_pages"])
         except RuntimeError as e:
             self.stderr.write(str(e))
             return

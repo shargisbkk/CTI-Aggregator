@@ -1,8 +1,5 @@
-import logging
 from abc import ABC, abstractmethod
 from typing import Optional
-
-logger = logging.getLogger(__name__)
 
 # Types where original casing must be preserved.
 _CASE_SENSITIVE_TYPES = {"url", "filepath"}
@@ -82,27 +79,16 @@ class FeedAdapter(ABC):
         raw_records = []
         try:
             raw_records = self.fetch_raw()
-        except Exception as exc:
-            logger.error(
-                "%s: fetch_raw() failed (%s); 0 indicators collected.",
-                self.source_name, exc,
-            )
+        except Exception:
             return []
 
         indicators = []
-        for i, raw in enumerate(raw_records):
+        for raw in raw_records:
             try:
                 indicators.append(self.normalize_record(raw))
-            except Exception as exc:
-                logger.warning(
-                    "%s: skipping record %d (%s)",
-                    self.source_name, i, exc,
-                )
+            except Exception:
+                continue
 
-        logger.info(
-            "%s: parsed %d / %d raw records.",
-            self.source_name, len(indicators), len(raw_records),
-        )
         return indicators
 
     @abstractmethod
