@@ -48,14 +48,15 @@ class OTXAdapter(FeedAdapter):
                 break
 
             for pulse in pulses:
+                pulse_modified = pulse.get("modified") or pulse.get("created")
                 for ioc in pulse.get("indicators", []):
                     indicators.append({
-                        "ioc_type":  ioc.get("type", ""),
-                        "ioc_value": ioc.get("indicator", ""),
-                        "labels":    pulse.get("tags", []),
-                        "confidence":None,
+                        "ioc_type":   ioc.get("type", ""),
+                        "ioc_value":  ioc.get("indicator", ""),
+                        "labels":     pulse.get("tags", []),
+                        "confidence": None,
                         "first_seen": ioc.get("created"),
-                        "last_seen":  ioc.get("created"),
+                        "last_seen":  pulse_modified,
                     })
 
             page_count += 1
