@@ -15,34 +15,41 @@ class OTXAdapter(FeedAdapter):
 
     source_name = "otx"
 
-    def __init__(self, max_pages: int = 0):
+    def __init__(self, max_pages: int = 500, days: int = 30):
         self._api_key = getattr(settings, "OTX_API_KEY", "")
         if not self._api_key:
             raise RuntimeError("OTX_API_KEY is not set.")
         self._max_pages = max_pages
+        self._days = days
 
     def fetch_raw(self) -> list[dict]:
         """Paginate through OTX pulses and extract indicators."""
         headers = {"X-OTX-API-KEY": self._api_key}
         base_url = "https://otx.alienvault.com/api/v1/pulses/activity"
         params = {"limit": 50}
-        logger.info("Fetching from OTX global activity feed.")
+        if self._days > 0:
+            from datetime import datetime, timedelta, timezone
+            cutoff = datetime.now(timezone.utc) - timedelta(days=self._days)
+            params["modified_since"] = cutoff.strftime("%Y-%m-%dT%H:%M:%SZ")
+        logger.info("Fetching from OTX global activity feed (days=%d, max_pages=%d).",
+                     self._days, self._max_pages)
 
         indicators = []
         page_count = 0
         next_url = base_url
 
         while next_url:
-            # For the first request, `requests` will combine `next_url` and `params`.
-            # For subsequent requests, `next_url` is a full URL with its own query string,
-            # and `params` will be None.
-            r = requests.get(next_url, headers=headers, params=params, timeout=120)
-            params = None  # Clear params after the first request
+            try:
+                r = requests.get(next_url, headers=headers, params=params, timeout=120)
+                params = None
+                r.raise_for_status()
+                data = r.json()
+            except Exception as e:
+                logger.warning("OTX page %d failed (%s); returning %d indicators collected so far.",
+                               page_count + 1, e, len(indicators))
+                break
 
-            r.raise_for_status()
-            data = r.json()
             pulses = data.get("results", [])
-
             if not pulses:
                 logger.info("OTX fetch complete: no more pulses in response.")
                 break
@@ -61,13 +68,14 @@ class OTXAdapter(FeedAdapter):
 
             page_count += 1
             if self._max_pages > 0 and page_count >= self._max_pages:
-                logger.warning("OTX fetch stopped at page %d (max_pages limit)", page_count)
+                logger.info("OTX fetch stopped at page %d (max_pages limit).", page_count)
                 break
 
             next_url = data.get("next")
-            if next_url and page_count % 100 == 0:
+            if next_url and page_count % 50 == 0:
                 logger.info("OTX page %d — %d indicators so far", page_count, len(indicators))
 
+        logger.info("OTX fetch done: %d pages, %d indicators.", page_count, len(indicators))
         return indicators
 
 
