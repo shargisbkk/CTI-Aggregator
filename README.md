@@ -22,7 +22,7 @@ Install a Python version of your choosing from [python.org](https://www.python.o
 
 * **Virtual Environment**: Open terminal as administrator and change directory into the project folder. Use `python -m venv venv` to create a folder to deploy a python virtual environment.
 
-* **Activation (Windows)**: Change directory into `venv` and then `Scripts` in the terminal. Use `.\activate` to enter your virtual environment. If there is a permissions issue, use `Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass` and then `.\activate` again.
+* **Activation (Windows)**: Change directory into `venv` and then `Scripts` in the terminal. Use `venv\\Scripts\\activate` to enter your virtual environment. If there is a permissions issue, use `Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass` and then `.\activate` again.
 
 * **Activation (macOS/Linux)**: Use `source venv/bin/activate`.
 
