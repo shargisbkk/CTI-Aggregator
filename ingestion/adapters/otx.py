@@ -79,14 +79,16 @@ class OTXAdapter(FeedAdapter):
         return indicators
 
 
+# Keys must be lowercase — normalize_record() lowercases before lookup.
 OTXAdapter.type_map = {
-    "IPv4": "ip",
-    "IPv6": "ipv6",
-    "domain": "domain",
-    "hostname": "domain",
-    "URL": "url",
-    "FileHash-MD5": "hash:md5",
-    "FileHash-SHA1": "hash:sha1",
-    "FileHash-SHA256": "hash:sha256",
-    "email": "email",
+    "ipv4":            "ip",
+    "ipv6":            "ipv6",
+    "domain":          "domain",
+    "hostname":        "domain",
+    "url":             "url",
+    "filehash-md5":    "hash:md5",
+    "filehash-sha1":   "hash:sha1",
+    "filehash-sha256": "hash:sha256",
+    "email":           "email",
+    "ip:port":         "ip",
 }

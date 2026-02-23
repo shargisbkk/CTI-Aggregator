@@ -54,8 +54,12 @@ class ThreatFoxAdapter(FeedAdapter):
         return indicators
 
 
+# Keys must be lowercase — normalize_record() lowercases before lookup.
 ThreatFoxAdapter.type_map = {
     "md5_hash":    "hash:md5",
     "sha256_hash": "hash:sha256",
     "sha1_hash":   "hash:sha1",
+    "ip:port":     "ip",
+    "domain":      "domain",
+    "url":         "url",
 }
