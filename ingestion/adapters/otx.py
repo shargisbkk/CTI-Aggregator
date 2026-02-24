@@ -1,8 +1,11 @@
+import logging
 import requests
 from django.conf import settings
 
 from ingestion.adapters.base import FeedAdapter
 from ingestion.adapters.registry import FeedRegistry
+
+logger = logging.getLogger(__name__)
 
 
 @FeedRegistry.register
@@ -35,10 +38,24 @@ class OTXAdapter(FeedAdapter):
         while next_url:
             try:
                 r = requests.get(next_url, headers=headers, params=params, timeout=120)
-                params = None
-                r.raise_for_status()
+                params = None  # Subsequent requests use the full 'next_url'
+                r.raise_for_status()  # Raises HTTPError for 4xx/5xx responses
                 data = r.json()
-            except Exception:
+            except requests.exceptions.RequestException as e:
+                logger.warning(
+                    "[%s] API request for page %d failed with a network error: %s. "
+                    "Stopping pagination and returning indicators collected so far.",
+                    self.source_name, page_count + 1, e
+                )
+                break
+            except requests.exceptions.JSONDecodeError as e:
+                logger.warning(
+                    "[%s] Failed to decode JSON response from page %d: %s. Stopping pagination.",
+                    self.source_name, page_count + 1, e
+                )
+                break
+            except Exception as e:
+                logger.error("[%s] An unexpected error occurred on page %d: %s. Halting ingestion.", self.source_name, page_count + 1, e)
                 break
 
             pulses = data.get("results", [])
@@ -63,4 +80,5 @@ class OTXAdapter(FeedAdapter):
 
             next_url = data.get("next")
 
+        logger.info("[%s] Fetched %d raw indicators over %d pages.", self.source_name, len(indicators), page_count)
         return indicators
