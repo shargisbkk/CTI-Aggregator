@@ -17,4 +17,5 @@ def dedup(records: list[dict]) -> list[dict]:
 
     df = df.sort_values("last_seen", ascending=False)
     df = df.drop_duplicates(subset=["ioc_type", "ioc_value"], keep="first")
+
     return df.reset_index(drop=True).to_dict("records")

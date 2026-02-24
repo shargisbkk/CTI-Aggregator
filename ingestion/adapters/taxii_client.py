@@ -1,19 +1,14 @@
 """
-TAXII 2.1 transport utilities.
-
 Shared by any adapter that pulls from a TAXII 2.1 server
 (e.g. TAXIIAdapter, OTXAdapter). These are pure HTTP helpers
 with no adapter or Django dependencies.
 """
 
-import logging
 from datetime import datetime, timezone
 
 import requests
 
 from ingestion.adapters.stix import extract_indicators
-
-logger = logging.getLogger(__name__)
 
 TAXII_HEADERS = {"Accept": "application/taxii+json; version=2.1"}
 
@@ -45,7 +40,6 @@ def get_objects(api_root_url: str, collection_id: str, auth: tuple[str, str] | N
     while True:
         r = requests.get(url, headers=TAXII_HEADERS, auth=auth, params=params, timeout=60)
         if r.status_code == 404:
-            logger.warning("TAXII 404 on %s (params=%s); stopping pagination.", url, params)
             break
         r.raise_for_status()
         env = r.json()

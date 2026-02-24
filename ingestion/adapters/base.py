@@ -1,8 +1,77 @@
+import logging
+import re
 from abc import ABC, abstractmethod
 from typing import Optional
 
+logger = logging.getLogger(__name__)
+
+# ── Canonical IOC types ─────────────────────────────────────────────
+# Single source of truth.  _detect_type() maps every indicator value
+# to one of these; anything that falls outside gets a warning.
+CANONICAL_TYPES = frozenset({
+    # network
+    "ip", "ipv6", "cidr", "domain", "url", "uri", "email", "asn",
+    # file / host artefacts
+    "hash", "filepath", "mutex",
+    # threat-intel meta
+    "cve", "yara", "ssl_cert", "registry-key",
+})
+
 # Types where original casing must be preserved.
-_CASE_SENSITIVE_TYPES = {"url", "filepath"}
+_CASE_SENSITIVE_TYPES = {"url", "uri", "filepath"}
+
+# ── Compiled patterns (module-level, compiled once) ─────────────────
+_RE_URL   = re.compile(r"^https?://", re.IGNORECASE)
+_RE_URI   = re.compile(r"^/|^[a-z][a-z0-9+.-]*://", re.IGNORECASE)
+_RE_EMAIL = re.compile(r"^[^@\s]+@[^@\s]+\.[a-z]{2,}$", re.IGNORECASE)
+_RE_CVE   = re.compile(r"^CVE-\d{4}-\d+$", re.IGNORECASE)
+_RE_CIDR  = re.compile(r"^\d{1,3}(?:\.\d{1,3}){3}/\d{1,3}$")
+_RE_IPV4  = re.compile(r"^\d{1,3}(?:\.\d{1,3}){3}(?::\d+)?$")
+_RE_IPV6  = re.compile(r"^[0-9a-f:]+(?:%[a-z0-9]+)?$", re.IGNORECASE)
+_RE_HASH  = re.compile(r"^[0-9a-f]{32}$|^[0-9a-f]{40}$|^[0-9a-f]{64}$|^[0-9a-f]{128}$", re.IGNORECASE)
+_RE_DOMAIN = re.compile(r"^(?:[a-z0-9](?:[a-z0-9-]*[a-z0-9])?\.)+[a-z]{2,}$", re.IGNORECASE)
+
+
+def _detect_type(value: str) -> Optional[str]:
+    """
+    Infer the canonical IOC type from the indicator value itself.
+
+    Checks are ordered so that more specific patterns match first
+    (URL before domain, CIDR before plain IPv4, etc.).
+    Returns None if no pattern matches.
+    """
+    if not value:
+        return None
+
+    if _RE_URL.search(value):
+        return "url"
+    if _RE_EMAIL.match(value):
+        return "email"
+    if _RE_CVE.match(value):
+        return "cve"
+    if _RE_CIDR.match(value):
+        return "cidr"
+    if _RE_IPV4.match(value):
+        return "ip"
+    if ":" in value and _RE_IPV6.match(value):
+        return "ipv6"
+    if _RE_HASH.match(value):
+        return "hash"
+    if _RE_URI.search(value):
+        return "uri"
+    if _RE_DOMAIN.match(value):
+        return "domain"
+
+    # Handle wildcard domains (*.evil.com)
+    cleaned = value.lstrip("*.")
+    if "\\" in cleaned:
+        cleaned = cleaned.split("\\")[0]
+    if "/" in cleaned and not cleaned.startswith("/"):
+        cleaned = cleaned.split("/")[0]
+    if cleaned != value and _RE_DOMAIN.match(cleaned):
+        return "domain"
+
+    return None
 
 
 def _safe_confidence(val) -> Optional[int]:
@@ -32,33 +101,35 @@ class FeedAdapter(ABC):
     """
     Abstract base class for all feed adapters.
 
-    Subclasses set source_name, optionally override type_map,
-    and implement fetch_raw().
-    The concrete ingest() handles parsing and error
-    recovery so that a single bad record never discards the entire batch.
+    Subclasses set source_name and implement fetch_raw().
+    Type classification is automatic via _detect_type() — no type_map needed.
+    The concrete ingest() handles parsing and error recovery so that
+    a single bad record never discards the entire batch.
     """
 
     source_name: str = ""
-    type_map: dict = {}
-
-    def _map_type(self, raw_type: str) -> str:
-        """Look up a source type string in this adapter's type_map."""
-        return self.type_map.get(raw_type, raw_type)
 
     def normalize_record(self, raw: dict) -> dict:
         """
         Parse one raw source dict into a standardized indicator dict.
 
-        Maps the type via type_map, lowercases the value (unless case-sensitive),
-        casts confidence to int, and cleans labels.
+        Infers the IOC type from the value via _detect_type().
+        Falls back to the source-provided type (lowercased) if detection fails.
         """
-        raw_type  = raw.get("ioc_type", "unknown").strip().lower()
-        ioc_type  = self._map_type(raw_type)
         raw_value = raw.get("ioc_value", "").strip()
+
+        # Detect type from value; fall back to source-provided type.
+        detected = _detect_type(raw_value)
+        if detected:
+            ioc_type = detected
+        else:
+            ioc_type = raw.get("ioc_type", "unknown").strip().lower()
+
         ioc_value = (
             raw_value if ioc_type in _CASE_SENSITIVE_TYPES
             else raw_value.lower()
         )
+
         return {
             "ioc_type":    ioc_type,
             "ioc_value":   ioc_value,
@@ -72,14 +143,14 @@ class FeedAdapter(ABC):
         """
         Fetch raw records and parse each one safely.
 
-        If fetch_raw() raises, logs the error and returns an empty list.
-        If a single record fails to parse, logs it and continues
+        If fetch_raw() raises, returns an empty list.
+        If a single record fails to parse, skips it and continues
         with the rest of the batch.
         """
-        raw_records = []
         try:
             raw_records = self.fetch_raw()
         except Exception:
+            logger.exception("[%s] fetch_raw failed", self.source_name)
             return []
 
         indicators = []

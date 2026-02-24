@@ -1,5 +1,4 @@
 from ingestion.adapters.base import FeedAdapter
-from ingestion.adapters.stix import STIX_TYPE_MAP
 from ingestion.adapters.taxii_client import fetch_taxii_raw
 
 
@@ -25,6 +24,3 @@ class TAXIIAdapter(FeedAdapter):
             password=self._password,
             added_after=self._added_after,
         )
-
-
-TAXIIAdapter.type_map = STIX_TYPE_MAP

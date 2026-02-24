@@ -1,13 +1,10 @@
 import csv
 import io
-import logging
 
 import requests
 
 from ingestion.adapters.base import FeedAdapter
 from ingestion.adapters.registry import FeedRegistry
-
-logger = logging.getLogger(__name__)
 
 URLHAUS_CSV_URL = "https://urlhaus.abuse.ch/downloads/csv_recent/"
 

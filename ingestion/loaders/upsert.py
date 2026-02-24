@@ -25,13 +25,12 @@ def upsert_indicators(normalized_records: list[dict], source_name: str = "") -> 
 
     Returns the number of newly created records.
     """
-    saved = 0
+    created = 0
     for r in normalized_records:
         incoming_first_seen = _clean_ts(r["first_seen"])
         incoming_last_seen  = _clean_ts(r["last_seen"])
-        incoming_source   = source_name
-        incoming_conf     = _clean_conf(r["confidence"])
-        incoming_labels   = r["labels"]
+        incoming_conf       = _clean_conf(r["confidence"])
+        incoming_labels     = r["labels"]
 
         try:
             existing = IndicatorOfCompromise.objects.get(
@@ -39,29 +38,30 @@ def upsert_indicators(normalized_records: list[dict], source_name: str = "") -> 
                 ioc_value=r["ioc_value"],
             )
 
-            # Merge timestamps
+            # first_seen: keep earlier
             if incoming_first_seen and existing.first_seen:
                 existing.first_seen = min(existing.first_seen, incoming_first_seen)
             elif incoming_first_seen:
                 existing.first_seen = incoming_first_seen
 
+            # last_seen: keep later
             if incoming_last_seen and existing.last_seen:
                 existing.last_seen = max(existing.last_seen, incoming_last_seen)
             elif incoming_last_seen:
                 existing.last_seen = incoming_last_seen
 
-            # Merge sources
-            if incoming_source and incoming_source not in existing.sources:
-                existing.sources = existing.sources + [incoming_source]
+            # sources: union
+            if source_name and source_name not in existing.sources:
+                existing.sources = existing.sources + [source_name]
 
-            # Merge labels
+            # labels: union
             merged_labels = list(existing.labels)
             for lbl in incoming_labels:
                 if lbl not in merged_labels:
                     merged_labels.append(lbl)
             existing.labels = merged_labels
 
-            # Merge confidence (keep highest)
+            # confidence: keep highest
             if incoming_conf is not None:
                 if existing.confidence is None or incoming_conf > existing.confidence:
                     existing.confidence = incoming_conf
@@ -74,10 +74,10 @@ def upsert_indicators(normalized_records: list[dict], source_name: str = "") -> 
                 ioc_value=r["ioc_value"],
                 confidence=incoming_conf,
                 labels=incoming_labels,
-                sources=[incoming_source] if incoming_source else [],
+                sources=[source_name] if source_name else [],
                 first_seen=incoming_first_seen,
                 last_seen=incoming_last_seen,
             )
-            saved += 1
+            created += 1
 
-    return saved
+    return created

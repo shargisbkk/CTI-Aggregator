@@ -1,5 +1,4 @@
 import json
-import logging
 import re
 from pathlib import Path
 
@@ -7,20 +6,14 @@ from stix2 import parse
 
 from ingestion.adapters.base import FeedAdapter
 
-logger = logging.getLogger(__name__)
-
 
 def _parse_pattern(pattern: str) -> list[tuple[str, str]]:
     """
-    Pull (type, value) pairs out of a STIX pattern string.
+    Extract (type, value) pairs from a STIX pattern string.
 
-    Returns raw STIX type names (e.g. "ipv4-addr", "domain-name").
-    Translation to our internal standard names happens in normalize_record()
-    via the adapter's type_map.
-
-    File hashes are an exception: the hash algorithm (MD5, SHA-1, SHA-256)
-    is encoded in the STIX property path, not the object type, so we
-    resolve them here to "hash:md5", "hash:sha1", "hash:sha256" directly.
+    Returns the raw STIX object type and the observable value.
+    Type classification (ip, hash, domain, etc.) is handled downstream
+    by _detect_type() in base.py — this function just extracts values.
     """
     if not pattern:
         return []
@@ -32,23 +25,7 @@ def _parse_pattern(pattern: str) -> list[tuple[str, str]]:
     results = []
     for obj_type, prop_path, quoted_val, unquoted_val in matches:
         value = quoted_val or unquoted_val.rstrip("]")
-        # getting the file hash sub-type
-        if obj_type == "file":
-            prop_upper = prop_path.upper()
-            if "MD5" in prop_upper:
-                ioc_type = "hash:md5"
-            elif "SHA-512" in prop_upper or "SHA512" in prop_upper:
-                ioc_type = "hash:sha512"
-            elif "SHA-256" in prop_upper or "SHA256" in prop_upper:
-                ioc_type = "hash:sha256"
-            elif "SHA-1" in prop_upper or "SHA1" in prop_upper:
-                ioc_type = "hash:sha1"
-            else:
-                ioc_type = "hash"
-        else:
-            ioc_type = obj_type
-
-        results.append((ioc_type, value))
+        results.append((obj_type, value))
 
     return results if results else [("unknown", "")]
 
@@ -74,7 +51,6 @@ def extract_indicators(raw_objects: list[dict]) -> list[dict]:
             first_seen = getattr(obj, "valid_from", None) or getattr(obj, "created", None)
             last_seen  = getattr(obj, "modified", None)
         except Exception:
-            # stix2 strict validation failed (e.g. escaped unicode in patterns).
             # Fall back to the raw dict — our regex parser is more lenient.
             pattern    = o.get("pattern", "")
             labels     = list(o.get("labels") or [])
@@ -113,8 +89,7 @@ class STIXAdapter(FeedAdapter):
         for p in self._folder.glob("*.json"):
             try:
                 data = json.loads(p.read_text(encoding="utf-8"))
-            except (OSError, ValueError) as e:
-                logger.warning(f"Skipping invalid STIX file {p.name}: {e}")
+            except (OSError, ValueError):
                 continue
 
             # Handle the three possible STIX file shapes
@@ -127,22 +102,7 @@ class STIXAdapter(FeedAdapter):
 
             try:
                 raw.extend(extract_indicators(objs))
-            except Exception as e:
-                logger.warning(f"Error extracting indicators from {p.name}: {e}")
+            except Exception:
+                continue
 
         return raw
-
-
-# Shared by both STIXAdapter and TAXIIAdapter since TAXII delivers STIX data.
-STIX_TYPE_MAP = {
-    "ipv4-addr":            "ip",
-    "ipv6-addr":            "ipv6",
-    "domain-name":          "domain",
-    "email-addr":           "email",
-    "autonomous-system":    "asn",
-    "x509-certificate":     "ssl_cert",
-    "windows-registry-key": "registry-key",
-    "vulnerability":        "cve",
-}
-
-STIXAdapter.type_map = STIX_TYPE_MAP

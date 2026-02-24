@@ -1,11 +1,8 @@
-import logging
 import requests
 from django.conf import settings
 
 from ingestion.adapters.base import FeedAdapter
 from ingestion.adapters.registry import FeedRegistry
-
-logger = logging.getLogger(__name__)
 
 THREATFOX_API_URL = "https://threatfox-api.abuse.ch/api/v1/"
 
@@ -52,14 +49,3 @@ class ThreatFoxAdapter(FeedAdapter):
             })
 
         return indicators
-
-
-# Keys must be lowercase — normalize_record() lowercases before lookup.
-ThreatFoxAdapter.type_map = {
-    "md5_hash":    "hash:md5",
-    "sha256_hash": "hash:sha256",
-    "sha1_hash":   "hash:sha1",
-    "ip:port":     "ip",
-    "domain":      "domain",
-    "url":         "url",
-}
