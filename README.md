@@ -32,87 +32,83 @@ python manage.py migrate
 python manage.py createsuperuser
 You can make the superuser whatever name, email, and password you want
 
-# Running the server
-Make sure you are connected to your server in pgAdmin
-You will have to go into the project folder from the terminal and activate your virtual environment
-You can then use the command "python manage.py runserver" to run your server for testing.
+**CTI-Aggregator** is a cyber threat intelligence aggregator that pulls Indicators of Compromise (IOCs) from multiple sources, normalizes them into a unified schema, and stores them in a PostgreSQL database. It supports cross-source deduplication, ensuring that the same indicator from different feeds is merged rather than duplicated.
 
-# Ingesting threat intelligence
+## Setting up PostgreSQL
 
-## OTX (AlienVault)
-You will need a free OTX API key:
-1. Sign up at https://otx.alienvault.com
-2. After logging in, go to your profile settings page
-3. Copy the API key shown under "OTX Key"
+Install PostgreSQL using the download for your OS: [EnterpriseDB Downloads](https://www.enterprisedb.com/downloads/postgres-postgresql-downloads).
 
-Run ingestion with:
-```
-python -B manage.py ingest_otx YOUR_API_KEY
-```
+* **Permissions**: You cannot complete the install without having administrative-level permissions on your device.
 
-By default this fetches both the public activity feed and your subscribed feed, deduplicates, normalizes, and saves to the database.
+* **Installation**: During installation, you will set up a password for your PostgreSQL server/database. Once the installation is complete, open up pgAdmin4 and use the password to login.
 
-### Options
-```
---pages N            Limit to N pages per feed (default 0 = all pages). Use for testing.
---feed activity      Fetch only the public activity feed
---feed subscribed    Fetch only pulses from users you follow
-```
+* **Database Creation**: Right-click on Databases and create a new database named `cti_db`. You can name the database whatever you would like, but will have to change the routing accordingly.
 
-## ThreatFox (abuse.ch)
-You will need a free ThreatFox API key:
-1. Sign up at https://auth.abuse.ch/
-2. After logging in, go to https://threatfox.abuse.ch/api/ and copy your API key
+* **Configuration**: In the project folder, open the `cti` folder and the `settings.py` file. There are lines referring to the database (around lines 83-92). The name of the database, user, and password are set up by you, the admin. The default port is 5432 and can be changed in pgAdmin.
 
-Run ingestion with:
-```
-python -B manage.py ingest_threatfox YOUR_API_KEY
-```
+* **Environment**: This database is completely local. Any changes or issues with the database will not affect others unless they are connected to your specific database.
 
-### Options
-```
---days N      How many days back to fetch IOCs (default: 1). Use --days 7 for a week.
+## Setting up Python
+
+Install a Python version of your choosing from [python.org](https://www.python.org/downloads/) (Version 3.11 is recommended).
+
+* **Virtual Environment**: Open terminal as administrator and change directory into the project folder. Use `python -m venv venv` to create a folder to deploy a python virtual environment.
+
+* **Activation (Windows)**: Change directory into `venv` and then `Scripts` in the terminal. Use `venv\\Scripts\\activate` to enter your virtual environment. If there is a permissions issue, use `Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass` and then `.\activate` again.
+
+* **Activation (macOS/Linux)**: Use `source venv/bin/activate`.
+
+## Setting up Django
+
+From the project folder, inside of the virtual environment, use the following commands:
+
+```bash
+pip install django psycopg2-binary requests pandas stix2 python-dotenv
+python manage.py migrate
+python manage.py createsuperuser
 ```
 
-## MISP (CIRCL OSINT Feed)
-No API key required — this pulls from the publicly available CIRCL OSINT feed.
 
-Run ingestion with:
+## Ingesting Intelligence
+
+
+API Keys:
+
+Create a `.env` file in the project root and add your keys. This file is gitignored and should never be committed.
+
 ```
-python -B manage.py ingest_misp
+OTX_API_KEY=your_otx_key_here
+THREATFOX_API_KEY=your_threatfox_key_here
 ```
 
-On first run this fetches all available events. On subsequent runs, use `--since` to only pull new events.
 
 ### Options
-```
---feed circl|botvrij    Which public MISP feed to use (default: circl)
---since TIMESTAMP       Unix timestamp — only fetch events newer than this
---max-events N          Cap how many events to fetch (default: 0 = all). Useful for testing.
+
+```bash
+# Fetch all feeds 
+python manage.py ingest_all
+
+# Fetch OTX only, override page limit
+python manage.py ingest_otx --pages 3
+
+# Fetch ThreatFox only, last 7 days
+python manage.py ingest_threatfox --days 7
+
+# Ingest local STIX files
+python manage.py ingest_stix_folder sample_stix
+
+# Pull from a TAXII server with credentials
+python manage.py ingest_taxii https://your-server/taxii2/ --username admin --password secret
 ```
 
-Example for subsequent runs (only fetch events from the last 30 days):
-```
-python -B manage.py ingest_misp --since 1737000000
-```
+---
 
-## STIX files (local folder)
-Place your .json STIX bundle files in a folder and run:
-```
-python -B manage.py ingest_stix_folder /path/to/folder
-```
+## Running the Web Server
 
-Sample STIX files are included in the `sample_stix/` folder for testing:
-```
-python -B manage.py ingest_stix_folder sample_stix
-```
+1. Make sure you are connected to your server in pgAdmin.
+2. Activate your virtual environment.
+3. Run the following command:
 
-## TAXII server
-To pull from a TAXII 2.1 server:
+```bash
+python manage.py runserver
 ```
-python -B manage.py ingest_taxii https://your-taxii-server/taxii/
-```
-
-Data from all sources is normalized to a common schema and saved to the `indicators_of_compromise` table. Duplicate indicators (same type + value) are merged across sources — timestamps, labels, and source lists are unioned rather than overwritten.
-
-# GOOD LUCK HAVE FUN BREAK THINGS

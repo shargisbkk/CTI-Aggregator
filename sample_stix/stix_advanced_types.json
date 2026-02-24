@@ -1,0 +1,90 @@
+{
+  "type": "bundle",
+  "id": "bundle--c3d4e5f6-a7b8-9012-cdef-234567890abc",
+  "objects": [
+    {
+      "type": "indicator",
+      "id": "indicator--9948713e-37cf-4a43-b40e-1a438b37431d",
+      "spec_version": "2.1",
+      "name": "CVE-2024-3400 PAN-OS Command Injection",
+      "description": "Palo Alto Networks PAN-OS command injection vulnerability actively exploited in the wild.",
+      "pattern": "[vulnerability:name = 'CVE-2024-3400']",
+      "pattern_type": "stix",
+      "valid_from": "2024-04-12T00:00:00Z",
+      "created": "2024-04-12T00:00:00Z",
+      "modified": "2024-06-01T00:00:00Z",
+      "labels": ["vulnerability", "exploit"],
+      "confidence": 95
+    },
+    {
+      "type": "indicator",
+      "id": "indicator--e6cb33d1-d03f-40ab-bc27-f966d3f7fb58",
+      "spec_version": "2.1",
+      "name": "Cobalt Strike Mutex",
+      "description": "Named mutex used by Cobalt Strike beacon for single-instance enforcement.",
+      "pattern": "[mutex:name = 'MSCTF.Asm.MutexDefault1']",
+      "pattern_type": "stix",
+      "valid_from": "2024-03-01T00:00:00Z",
+      "created": "2024-03-01T00:00:00Z",
+      "modified": "2024-07-15T00:00:00Z",
+      "labels": ["c2", "cobalt-strike"],
+      "confidence": 85
+    },
+    {
+      "type": "indicator",
+      "id": "indicator--8f48ce42-8cb3-4452-b4e8-13fb1e42c984",
+      "spec_version": "2.1",
+      "name": "SHA-512 Hash of Ransomware Binary",
+      "description": "SHA-512 hash from a known LockBit ransomware sample.",
+      "pattern": "[file:hashes.'SHA-512' = 'cf83e1357eefb8bdf1542850d66d8007d620e4050b5715dc83f4a921d36ce9ce47d0d13c5d85f2b0ff8318d2877eec2f63b931bd47417a81a538327af927da3e']",
+      "pattern_type": "stix",
+      "valid_from": "2024-06-01T00:00:00Z",
+      "created": "2024-06-01T00:00:00Z",
+      "modified": "2024-06-01T00:00:00Z",
+      "labels": ["ransomware", "lockbit"],
+      "confidence": 90
+    },
+    {
+      "type": "indicator",
+      "id": "indicator--9b92f548-ce77-4563-94da-262d780c0074",
+      "spec_version": "2.1",
+      "name": "Malicious CIDR Block",
+      "description": "IP range hosting multiple C2 servers observed in APT campaigns.",
+      "pattern": "[ipv4-addr:value = '198.51.100.0/24']",
+      "pattern_type": "stix",
+      "valid_from": "2024-02-01T00:00:00Z",
+      "created": "2024-02-01T00:00:00Z",
+      "modified": "2024-09-01T00:00:00Z",
+      "labels": ["apt", "infrastructure"],
+      "confidence": 70
+    },
+    {
+      "type": "indicator",
+      "id": "indicator--a3e0832c-7c07-4aed-a12f-db4cd721fd91",
+      "spec_version": "2.1",
+      "name": "Malicious Autonomous System",
+      "description": "ASN repeatedly used to host bulletproof hosting for malware distribution.",
+      "pattern": "[autonomous-system:number = 64496]",
+      "pattern_type": "stix",
+      "valid_from": "2024-01-15T00:00:00Z",
+      "created": "2024-01-15T00:00:00Z",
+      "modified": "2024-08-01T00:00:00Z",
+      "labels": ["bulletproof-hosting", "malware-distribution"],
+      "confidence": 65
+    },
+    {
+      "type": "indicator",
+      "id": "indicator--e5c62bf2-f82b-4f14-9beb-e7d5aec31c62",
+      "spec_version": "2.1",
+      "name": "C2 Domain with HTTPS Certificate",
+      "description": "Self-signed X.509 certificate serial number used by APT group for C2 communications.",
+      "pattern": "[x509-certificate:serial_number = '36:f7:d4:ee:ac:1a:12:cf:b0:71:3f:f6:20:d4:a1:3f']",
+      "pattern_type": "stix",
+      "valid_from": "2024-05-20T00:00:00Z",
+      "created": "2024-05-20T00:00:00Z",
+      "modified": "2024-05-20T00:00:00Z",
+      "labels": ["c2", "apt"],
+      "confidence": 75
+    }
+  ]
+}
