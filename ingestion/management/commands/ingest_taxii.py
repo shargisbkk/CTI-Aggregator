@@ -6,7 +6,7 @@ from ingestion.adapters.taxii import TAXIIAdapter
 from ingestion.loaders.upsert import upsert_indicators
 from processors.dedup import dedup
 
-
+# This command fetches indicators from a TAXII 2.1 server using the provided discovery URL and optional credentials, then saves them to the database.
 class Command(BaseCommand):
     help = "Fetch indicators from a TAXII 2.1 server into the DB."
 

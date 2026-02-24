@@ -4,7 +4,7 @@ from ingestion.adapters.stix import STIXAdapter
 from ingestion.loaders.upsert import upsert_indicators
 from processors.dedup import dedup
 
-
+# This command ingests STIX JSON files from a specified folder, extracts indicators, normalizes them, and saves them to the database.
 class Command(BaseCommand):
     help = "Ingest STIX 2.x JSON bundle files from a local folder into the DB."
 

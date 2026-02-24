@@ -1,22 +1,48 @@
-<!-- This code is just a placeholder -->
-<!-- PLEASE CHANGE THIS ONCE WE HAVE THE TEMPLATE -->
-
 {% extends "dashboard/base.html" %}
-{% block title %}Threat Feeds{% endblock %}
+
+{% block title %}
+    Threat Feeds
+{% endblock %}
+
 
 {% block content %}
+
+<!-- ======================================================
+     PAGE CONTAINER
+     Main wrapper for the Threat Feeds dashboard
+====================================================== -->
+
 <div class="container-fluid">
+
+    <!-- ==================================================
+         PAGE HEADER
+         Title + future action button
+    =================================================== -->
 
     <div class="d-flex justify-content-between align-items-center mb-4">
         <h2 class="fw-bold">Threat Feeds</h2>
-        <a href="#" class="btn btn-primary">+ Add Feed</a>
+
+        <!-- Placeholder for future feed creation -->
+        <a href="#" class="btn btn-primary">
+            + Add Feed
+        </a>
     </div>
 
-    <!-- Feeds Table -->
+
+    <!-- ==================================================
+         ACTIVE FEEDS TABLE
+         Displays configured threat feeds
+    =================================================== -->
+
     <div class="card shadow-sm p-4 mb-4">
-        <h5 class="fw-bold mb-3">Active Feeds</h5>
+
+        <h5 class="fw-bold mb-3">
+            Active Feeds
+        </h5>
 
         <table class="table table-hover align-middle">
+
+            <!-- Table header -->
             <thead>
                 <tr>
                     <th>Name</th>
@@ -24,41 +50,122 @@
                     <th>Status</th>
                     <th>Last Run</th>
                     <th>Indicators Pulled</th>
-                    <th></th>
+                    <th>Actions</th>
                 </tr>
             </thead>
-            <tbody>
-                <!-- Example row -->
-                <tr>
-                    <td>AlienVault OTX</td>
-                    <td>https://otx.alienvault.com</td>
-                    <td>
-                        <span class="badge bg-success">Active</span>
-                    </td>
-                    <td>2026-01-26 14:32</td>
-                    <td>124</td>
-                    <td>
-                        <a href="#" class="btn btn-sm btn-outline-secondary">Run Now</a>
-                    </td>
-                </tr>
 
-                <tr>
-                    <td colspan="6" class="text-center text-muted">
-                        More feeds coming soon.
-                    </td>
-                </tr>
+            <!-- Table body -->
+            <tbody>
+
+                {% for feed in feeds %}
+
+                    <tr>
+                        <!-- Feed name -->
+                        <td>{{ feed.name }}</td>
+
+                        <!-- Feed URL -->
+                        <td>
+                            <a href="{{ feed.url }}" target="_blank">
+                                {{ feed.url }}
+                            </a>
+                        </td>
+
+                        <!-- Active / inactive badge -->
+                        <td>
+                            {% if feed.active %}
+                                <span class="badge bg-success">
+                                    Active
+                                </span>
+                            {% else %}
+                                <span class="badge bg-danger">
+                                    Inactive
+                                </span>
+                            {% endif %}
+                        </td>
+
+                        <!-- Last ingestion run -->
+                        <td>
+                            {% if feed.last_run %}
+                                {{ feed.last_run|date:"Y-m-d H:i" }}
+                            {% else %}
+                                <span class="text-muted">Never</span>
+                            {% endif %}
+                        </td>
+
+
+                        <!-- Number of indicators pulled -->
+                        <td>
+                            {{ feed.last_count }}
+                        </td>
+
+                        <!-- Manual run action -->
+                        <td>
+
+                            <form method="post"
+                                  action="{% url 'run_feed' feed.id %}">
+                                {% csrf_token %}
+
+                                <button class="btn btn-sm btn-outline-secondary">
+                                    Run Now
+                                </button>
+                            </form>
+
+                        </td>
+                    </tr>
+
+                {% empty %}
+
+                    <!-- Display when no feeds exist -->
+                    <tr>
+                        <td colspan="6"
+                            class="text-center text-muted">
+                            No feeds configured.
+                        </td>
+                    </tr>
+
+                {% endfor %}
+
             </tbody>
+
         </table>
+
     </div>
 
-    <!-- Ingestion Logs -->
-    <div class="card shadow-sm p-4">
-        <h5 class="fw-bold mb-3">Ingestion Logs</h5>
 
-        <div class="bg-light rounded p-3 text-muted" style="height: 200px; overflow-y: auto;">
-            No logs yet.
+    <!-- ==================================================
+         INGESTION LOGS PANEL
+         Shows recent ingestion activity
+    =================================================== -->
+
+    <div class="card shadow-sm p-4">
+
+        <h5 class="fw-bold mb-3">
+            Recent Ingestion Logs
+        </h5>
+
+        <div class="bg-light rounded p-3 text-muted"
+             style="height: 200px; overflow-y: auto;">
+
+            {% for log in logs %}
+
+                <div class="mb-1">
+                    <small class="text-muted">
+                        {{ log.timestamp }}
+                    </small>
+                    —
+                    {{ log.message }}
+                </div>
+
+            {% empty %}
+
+                No logs yet.
+
+            {% endfor %}
+
         </div>
+
     </div>
 
 </div>
+
 {% endblock %}
