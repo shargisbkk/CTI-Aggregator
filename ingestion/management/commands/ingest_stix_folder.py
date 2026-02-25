@@ -1,8 +1,12 @@
+import logging
 from django.core.management.base import BaseCommand
 
 from ingestion.adapters.stix import STIXAdapter
 from ingestion.loaders.upsert import upsert_indicators
 from processors.dedup import dedup
+
+
+logger = logging.getLogger(__name__)
 
 
 class Command(BaseCommand):
@@ -21,6 +25,14 @@ class Command(BaseCommand):
         if not iocs:
             self.stdout.write("No indicators found.")
             return
+
+        self.stdout.write(f"Fetched {len(iocs)} raw indicators from STIX source.")
+        for ioc in iocs:
+            logger.info(
+                "Fetched STIX indicator: %s - %s",
+                ioc.get("ioc_type"),
+                ioc.get("ioc_value"),
+            )
 
         deduped = dedup(iocs)
         count = upsert_indicators(deduped, source_name="stix")

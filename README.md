@@ -43,7 +43,7 @@ python manage.py createsuperuser
 
 API Keys:
 
-Create a `.env` file in the project root and add your keys. This file is gitignored and should never be committed.
+Create a `.env` file in the venv folder. This file is gitignored and should never be committed.
 
 ```
 OTX_API_KEY=your_otx_key_here

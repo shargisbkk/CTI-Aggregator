@@ -18,10 +18,10 @@ class OTXAdapter(FeedAdapter):
 
     source_name = "otx"
 
-    def __init__(self, max_pages: int = 500, days: int = 30):
-        self._api_key = getattr(settings, "OTX_API_KEY", "")
+    def __init__(self, api_key: str = "", max_pages: int = 500, days: int = 30):
+        self._api_key = api_key or getattr(settings, "OTX_API_KEY", "")
         if not self._api_key:
-            raise RuntimeError("OTX_API_KEY is not set.")
+            raise RuntimeError("OTX_API_KEY is not set. Pass it via CLI or settings.")
         self._max_pages = max_pages
         self._days = days
 
@@ -75,13 +75,31 @@ class OTXAdapter(FeedAdapter):
                 break
 
             for pulse in pulses:
+                # Extract the Pulse Name to use as a label
+                pulse_name = pulse.get("name")
                 pulse_modified = pulse.get("modified") or pulse.get("created")
+                
+                # Start with existing tags, filtering out noisy ones
+                tags = [
+                    t for t in (pulse.get("tags") or [])
+                    if t and t.lower() not in ("auto-generated",)
+                ]
+
+                # Normalize OTX reliability (1-10) to standard confidence (10-100)
+                reliability = pulse.get("reliability")
+                confidence = None
+                if reliability is not None:
+                    try:
+                        confidence = int(reliability) * 10
+                    except (ValueError, TypeError):
+                        pass
+
                 for ioc in pulse.get("indicators", []):
                     indicators.append({
                         "ioc_type":   ioc.get("type", ""),
                         "ioc_value":  ioc.get("indicator", ""),
-                        "labels":     pulse.get("tags", []),
-                        "confidence": None,
+                        "labels":     tags,
+                        "confidence": confidence,
                         "first_seen": ioc.get("created"),
                         "last_seen":  pulse_modified,
                     })

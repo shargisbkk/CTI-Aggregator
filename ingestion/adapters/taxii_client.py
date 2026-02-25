@@ -32,19 +32,23 @@ def list_collections(api_root_url: str, auth: tuple[str, str] | None) -> list[di
     r.raise_for_status()
     collections = r.json().get("collections", [])
     logger.info("Found %d collections at %s", len(collections), api_root_url)
+    for c in collections:
+        logger.info(" - Collection: %s (ID: %s)", c.get("title"), c.get("id"))
     return collections
 
 
 def get_objects(api_root_url: str, collection_id: str, auth: tuple[str, str] | None, added_after: str | None):
     """Page through a TAXII collection, yielding one envelope at a time."""
     url = api_root_url.rstrip("/") + f"/collections/{collection_id}/objects"
-    params = {}
+    # Filter for indicators specifically to reduce noise and payload size
+    params = {"match[type]": "indicator"}
     if added_after:
         params["added_after"] = added_after
 
     page = 0
     while True:
         try:
+            logger.info("Fetching page %d (params=%s)", page + 1, params)
             r = requests.get(url, headers=TAXII_HEADERS, auth=auth, params=params, timeout=120)
             if r.status_code == 404:
                 break
@@ -59,12 +63,14 @@ def get_objects(api_root_url: str, collection_id: str, auth: tuple[str, str] | N
 
         obj_count = len(env.get("objects", []))
         page += 1
+        if obj_count == 0:
+            logger.info("Collection %s page %d returned 0 objects.", collection_id, page)
         logger.info("Collection %s page %d: %d objects", collection_id, page, obj_count)
 
         yield env
 
         if env.get("more") and env.get("next"):
-            params["next"] = env["next"]
+            params = {"next": env["next"]}
         else:
             break
 
@@ -86,7 +92,11 @@ def fetch_taxii_raw(
     if "/api/v21/" in discovery_url.rstrip("/") + "/":
         api_roots = [discovery_url.rstrip("/")]
     else:
-        api_roots = discover_api_roots(discovery_url, auth)
+        try:
+            api_roots = discover_api_roots(discovery_url, auth)
+        except Exception as e:
+            logger.warning("Discovery failed at %s: %s. Attempting to use URL as API Root directly.", discovery_url, e)
+            api_roots = [discovery_url.rstrip("/")]
 
     all_indicators = []
     for api_root_url in api_roots:
@@ -100,14 +110,23 @@ def fetch_taxii_raw(
             col_id = col.get("id", "")
             col_title = col.get("title", col_id)
             logger.info("Fetching collection: %s (%s)", col_title, col_id)
+
+            col_stix_count = 0
+            col_ind_count = 0
             try:
                 for env in get_objects(api_root_url, col_id, auth, added_after):
-                    all_indicators.extend(extract_indicators(env.get("objects", [])))
+                    objects = env.get("objects", [])
+                    extracted = extract_indicators(objects)
+
+                    col_stix_count += len(objects)
+                    col_ind_count += len(extracted)
+                    all_indicators.extend(extracted)
+                    logger.info("  Batch: %d STIX objects -> %d indicators", len(objects), len(extracted))
             except Exception as e:
                 logger.warning("Error fetching collection %s: %s — skipping", col_title, e)
                 continue
 
-            logger.info("Collection %s: %d total indicators so far", col_title, len(all_indicators))
+            logger.info("Collection %s finished: %d STIX objects -> %d indicators", col_title, col_stix_count, col_ind_count)
 
     logger.info("TAXII fetch complete: %d raw indicators total", len(all_indicators))
     return all_indicators

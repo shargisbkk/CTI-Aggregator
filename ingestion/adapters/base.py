@@ -1,56 +1,19 @@
+import json
 import logging
 from abc import ABC, abstractmethod
+from pathlib import Path
 from typing import Optional
 
 logger = logging.getLogger(__name__)
 
-# Every source type string we've seen, mapped to our canonical name.
-TYPE_MAP: dict[str, str] = {
-    "ip":                   "ip",
-    "ipv4":                 "ip",
-    "ipv4-addr":            "ip",
-    "ip:port":              "ip",
-    "ipv6":                 "ipv6",
-    "ipv6-addr":            "ipv6",
-    "cidr":                 "cidr",
-    "subnet":               "cidr",
-    "domain":               "domain",
-    "domain-name":          "domain",
-    "hostname":             "domain",
-    "url":                  "url",
-    "uri":                  "uri",
-    "email":                "email",
-    "email-addr":           "email",
-    "email-message":        "email",
-    "hash":                 "hash",
-    "file":                 "hash",
-    "md5_hash":             "hash",
-    "sha1_hash":            "hash",
-    "sha256_hash":          "hash",
-    "filehash-md5":         "hash",
-    "filehash-sha1":        "hash",
-    "filehash-sha256":      "hash",
-    "filehash-sha512":      "hash",
-    "filepath":             "filepath",
-    "file_path":            "filepath",
-    "mutex":                "mutex",
-    "cve":                  "cve",
-    "vulnerability":        "cve",
-    "yara":                 "yara",
-    "ssl_cert":             "ssl_cert",
-    "asn":                  "asn",
-    "ja3":                  "hash",
-    "registry-key":         "registry-key",
-    "regkey":               "registry-key",
-    "windows-registry-key": "registry-key",
-}
+# Load type mapping from external JSON configuration.
+TYPE_MAP_FILE = Path(__file__).resolve().parent.parent / "type_mapping.json"
 
-# All valid canonical types.
-CANONICAL_TYPES = frozenset(TYPE_MAP.values()) | {"unknown"}
+with open(TYPE_MAP_FILE, "r", encoding="utf-8") as f:
+    TYPE_MAP = json.load(f)
 
-# Types where original casing must be preserved.
-_CASE_SENSITIVE_TYPES = {"url", "uri", "filepath", "registry-key"}
-
+# Types where we should NOT lowercase the value (e.g. file paths are case sensitive)
+PRESERVE_CASE = {"url", "file", "regkey"}
 
 def _safe_confidence(val) -> Optional[int]:
     """Cast confidence to int, or None if absent/invalid."""
@@ -84,6 +47,14 @@ class FeedAdapter(ABC):
     canonical name via TYPE_MAP.
     The concrete ingest() handles parsing and error recovery so that
     a single bad record never discards the entire batch.
+
+    Internal Schema (dict):
+        - ioc_type (str): Canonical type (e.g., 'ip', 'domain').
+        - ioc_value (str): The indicator value.
+        - confidence (int|None): 0-100.
+        - labels (list[str]): Tags.
+        - first_seen (str|None): ISO8601.
+        - last_seen (str|None): ISO8601.
     """
 
     source_name: str = ""
@@ -94,8 +65,9 @@ class FeedAdapter(ABC):
 
         Maps the source-provided ioc_type to a canonical type via TYPE_MAP.
         """
-        raw_value = raw.get("ioc_value", "").strip()
-        raw_type = raw.get("ioc_type", "").strip().lower()
+        # Ensure we have strings even if the source passed None
+        raw_value = str(raw.get("ioc_value") or "").strip()
+        raw_type = str(raw.get("ioc_type") or "").strip().lower()
 
         ioc_type = TYPE_MAP.get(raw_type)
 
@@ -107,7 +79,7 @@ class FeedAdapter(ABC):
             ioc_type = "unknown"
 
         ioc_value = (
-            raw_value if ioc_type in _CASE_SENSITIVE_TYPES
+            raw_value if ioc_type in PRESERVE_CASE
             else raw_value.lower()
         )
 
