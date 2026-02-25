@@ -1,62 +1,174 @@
-<!-- This code is just a placeholder -->
-<!-- PLEASE CHANGE THIS ONCE WE HAVE THE TEMPLATE -->
-
 {% extends "dashboard/base.html" %}
-{% block title %}Analytics{% endblock %}
+
+{% block title %}
+    Analytics
+{% endblock %}
+
 
 {% block content %}
+
+<!-- ======================================================
+     PAGE CONTAINER
+====================================================== -->
+
 <div class="container-fluid">
 
-    <h2 class="fw-bold mb-4">Analytics</h2>
+    <!-- ==================================================
+         PAGE HEADER
+    =================================================== -->
 
-    <!-- Stats Row -->
+    <h2 class="fw-bold mb-4">
+        Analytics
+    </h2>
+
+
+    <!-- ==================================================
+         SUMMARY STAT CARDS
+    =================================================== -->
+
     <div class="row g-4 mb-4">
+
+        <!-- Total indicators -->
         <div class="col-md-3">
             <div class="card shadow-sm p-3">
-                <h6 class="text-muted">Total Indicators</h6>
-                <h2 class="fw-bold">0</h2>
+                <h6 class="text-muted">
+                    Total Indicators
+                </h6>
+                <h2 class="fw-bold">
+                    {{ total_indicators }}
+                </h2>
             </div>
         </div>
+
+        <!-- High confidence -->
         <div class="col-md-3">
             <div class="card shadow-sm p-3">
-                <h6 class="text-muted">High Confidence</h6>
-                <h2 class="fw-bold">0</h2>
+                <h6 class="text-muted">
+                    High Confidence
+                </h6>
+                <h2 class="fw-bold">
+                    {{ high_confidence }}
+                </h2>
             </div>
         </div>
+
+        <!-- New this week -->
         <div class="col-md-3">
             <div class="card shadow-sm p-3">
-                <h6 class="text-muted">New This Week</h6>
-                <h2 class="fw-bold">0</h2>
+                <h6 class="text-muted">
+                    New This Week
+                </h6>
+                <h2 class="fw-bold">
+                    {{ new_this_week }}
+                </h2>
             </div>
         </div>
+
+        <!-- Active feeds -->
         <div class="col-md-3">
             <div class="card shadow-sm p-3">
-                <h6 class="text-muted">Active Feeds</h6>
-                <h2 class="fw-bold">0</h2>
+                <h6 class="text-muted">
+                    Active Feeds
+                </h6>
+                <h2 class="fw-bold">
+                    {{ active_feeds }}
+                </h2>
             </div>
         </div>
+
     </div>
 
-    <!-- Charts -->
+
+    <!-- ==================================================
+         ANALYTICS TABLE: TOP SOURCES
+    =================================================== -->
+
+    <div class="card shadow-sm p-4 mb-4">
+
+        <h5 class="fw-bold mb-3">
+            Top Sources by Indicator Volume
+        </h5>
+
+        <table class="table table-hover">
+
+            <thead>
+                <tr>
+                    <th>Feed Name</th>
+                    <th>URL</th>
+                    <th>Indicator Count</th>
+                </tr>
+            </thead>
+
+            <tbody>
+
+                {% for feed in top_sources %}
+
+                    <tr>
+                        <td>{{ feed.name }}</td>
+
+                        <td>
+                            <a href="{{ feed.url }}"
+                               target="_blank">
+                                {{ feed.url }}
+                            </a>
+                        </td>
+
+                        <td>
+                            {{ feed.count }}
+                        </td>
+                    </tr>
+
+                {% empty %}
+
+                    <tr>
+                        <td colspan="3"
+                            class="text-center text-muted">
+                            No feed data available.
+                        </td>
+                    </tr>
+
+                {% endfor %}
+
+            </tbody>
+
+        </table>
+
+    </div>
+
+
+    <!-- ==================================================
+         FUTURE CHART PLACEHOLDERS
+         (Ready for Chart.js)
+    =================================================== -->
+
     <div class="row g-4">
-        <div class="col-md-6">
-            <div class="card shadow-sm p-3">
-                <h5 class="fw-bold mb-3">Indicator Volume Over Time</h5>
-                <div style="height: 300px;" class="bg-light rounded d-flex align-items-center justify-content-center text-muted">
-                    Chart placeholder
-                </div>
-            </div>
-        </div>
 
         <div class="col-md-6">
             <div class="card shadow-sm p-3">
-                <h5 class="fw-bold mb-3">Top Sources</h5>
-                <div style="height: 300px;" class="bg-light rounded d-flex align-items-center justify-content-center text-muted">
-                    Chart placeholder
+                <h5 class="fw-bold mb-3">
+                    Indicator Volume Over Time
+                </h5>
+
+                <div class="bg-light rounded p-3">
+
+                    {% for row in volume_over_time %}
+                        <div>
+                            {{ row.day }} —
+                            {{ row.count }} indicators
+                        </div>
+                    {% empty %}
+                        <div class="text-muted">
+                            No volume data.
+                        </div>
+                    {% endfor %}
+
                 </div>
+
             </div>
         </div>
+
     </div>
 
 </div>
+
 {% endblock %}

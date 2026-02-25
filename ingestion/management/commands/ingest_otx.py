@@ -4,7 +4,7 @@ from ingestion.adapters.otx import OTXAdapter
 from ingestion.loaders.upsert import upsert_indicators
 from processors.dedup import dedup
 
-
+# This command fetches indicators from AlienVault OTX into the database using the provided API key and optional feed/page parameters.
 class Command(BaseCommand):
     help = "Fetch indicators from AlienVault OTX (REST API) into the DB."
 
