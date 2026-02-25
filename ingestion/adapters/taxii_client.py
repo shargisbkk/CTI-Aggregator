@@ -64,7 +64,7 @@ def get_objects(api_root_url: str, collection_id: str, auth: tuple[str, str] | N
         yield env
 
         if env.get("more") and env.get("next"):
-            params = {"added_after": env["next"]}
+            params["next"] = env["next"]
         else:
             break
 

@@ -18,8 +18,8 @@ class Command(BaseCommand):
         parser.add_argument("--username", type=str, default="")
         parser.add_argument("--password", type=str, default="")
         parser.add_argument(
-            "--days", type=int, default=30,
-            help="Only fetch objects added in the last N days (default: 30). Use 0 to fetch all.",
+            "--days", type=int, default=90,
+            help="Only fetch objects added in the last N days (default: 90). Use 0 to fetch all.",
         )
 
     def handle(self, *args, **opts):
