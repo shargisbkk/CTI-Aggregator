@@ -3,7 +3,7 @@ from ingestion.adapters.threatfox import ThreatFoxAdapter
 from ingestion.loaders.upsert import upsert_indicators
 from processors.dedup import dedup
 
-
+# This command fetches indicators from ThreatFox (abuse.ch) using the provided API key and saves them to the database.
 class Command(BaseCommand):
     help = "Fetch indicators from ThreatFox (abuse.ch) into the DB."
 

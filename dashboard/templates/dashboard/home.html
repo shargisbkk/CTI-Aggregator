@@ -1,5 +1,4 @@
 {% extends "dashboard/base.html" %}
-
 {% block title %}Dashboard{% endblock %}
 
 {% block content %}
@@ -7,10 +6,6 @@
 
 <div class="row g-4">
 
-    <!-- Side Bar -->
-    <!-- Each card represents a section of the dashboard -->
-
-    <!-- Card 1 -->
     <div class="col-md-4">
         <div class="card shadow-sm p-3">
             <h5>Total Indicators</h5>
@@ -18,15 +13,17 @@
         </div>
     </div>
 
-    <!-- Card 2 -->
     <div class="col-md-4">
         <div class="card shadow-sm p-3">
             <h5>Active Threat Feeds</h5>
             <p class="display-6">{{ feed_count }}</p>
+            {% if feed_count == 0 %}
+            <small class="text-muted">No feeds configured yet</small>
+            {% endif %}
         </div>
     </div>
 
-    <!-- Card 3 -->
+
     <div class="col-md-4">
         <div class="card shadow-sm p-3">
             <h5>New in Last 24h</h5>
@@ -39,8 +36,41 @@
 <div class="row mt-5">
     <div class="col-md-12">
         <div class="card shadow-sm p-4">
-            <h4>Recent Indicators</h4>
-            <p class="text-muted">Table or chart goes here</p>
+
+            <h4 class="mb-3">Recent Indicators</h4>
+
+            <table class="table table-sm table-hover">
+                <thead>
+                    <tr>
+                        <th>STIX ID</th>
+                        <th>Type</th>
+                        <th>Spec Version</th>
+                        <th>Created</th>
+                        <th>Modified</th>
+                        <th>Source</th>
+                        <th>Collection ID</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for indicator in recent_indicators %}
+                    <tr>
+                        <td>{{ indicator.stix_id }}</td>
+                        <td>{{ indicator.stix_type }}</td>
+                        <td>{{ indicator.spec_version }}</td>
+                        <td>{{ indicator.created }}</td>
+                        <td>{{ indicator.modified }}</td>
+                        <td>{{ indicator.source_name }}</td>
+                        <td>{{ indicator.collection_id }}</td>
+                    </tr>
+                    {% empty %}
+                    <tr>
+                        <td colspan="7" class="text-center text-muted">No indicators yet.</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+
+
         </div>
     </div>
 </div>
