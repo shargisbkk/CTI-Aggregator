@@ -7,8 +7,11 @@ from django.views.decorators.http import require_POST
 from django.db.models import Count
 from django.db.models.functions import TruncDate
 from django.utils import timezone
+from django.http import JsonResponse
+from django.core.management import call_command
 from datetime import timedelta
 from dashboard.models import Indicator, ThreatFeed, IngestionLog
+from io import StringIO
 
 
 from datetime import timedelta
@@ -129,20 +132,35 @@ def threat_feeds(request):
     }
     return render(request, "dashboard/threat_feeds.html", context)
 
+# ======================================================
+# UPDATE ALL FEEDS VIEW
+# Runs all ingestion adapters to fetch latest indicators
+# ======================================================
+
 @login_required
-def run_feed(request, feed_id):
-    feed = get_object_or_404(ThreatFeed, id=feed_id)
-    feed.last_run = timezone.now()
-    feed.last_count = feed.indicators.count()
-    feed.save()
-
-    # Add a log entry
-    IngestionLog.objects.create(
-        feed=feed,
-        message=f"Manually triggered ingestion; {feed.last_count} indicators pulled."
-    )
-
-    return redirect("dashboard:dashboard-threat-feeds")
+@require_POST
+def update_all_feeds(request):
+    """
+    Execute the ingest_all management command to pull data from all feeds.
+    Returns JSON response with status and output.
+    """
+    try:
+        # Capture command output
+        output = StringIO()
+        
+        # Run the ingest_all command
+        call_command('ingest_all', stdout=output)
+        
+        return JsonResponse({
+            "status": "success",
+            "message": "Database update completed successfully.",
+            "output": output.getvalue()
+        })
+    except Exception as e:
+        return JsonResponse({
+            "status": "error",
+            "message": f"Error during database update: {str(e)}"
+        }, status=400)
 
 
 # ======================================================
@@ -220,21 +238,6 @@ def settings(request):
         request,
         "dashboard/settings.html"
     )
-
-
-# ======================================================
-# MANUAL FEED RUN TRIGGER
-# POST-only action
-# ======================================================
-
-@login_required
-@require_POST
-def run_feed(request, feed_id):
-
-    # TODO:
-    # Trigger ingestion job (Celery / background worker)
-
-    return redirect("threat_feeds")
 
 
 # ======================================================

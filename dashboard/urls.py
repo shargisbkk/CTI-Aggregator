@@ -50,10 +50,11 @@ urlpatterns = [
     # Actions
     # ------------------------------
 
+
     path(
-        "feeds/run/<int:feed_id>/",
-        views.run_feed,
-        name="dashboard-run-feed"
+        "feeds/update-all/",
+        views.update_all_feeds,
+        name="dashboard-update-all-feeds"
     ),
 
     path(
