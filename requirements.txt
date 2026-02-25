@@ -4,3 +4,4 @@ requests
 stix2
 pandas
 python-dotenv
+taxii2-client

@@ -1,4 +1,6 @@
 import logging
+import time
+
 import requests
 from django.conf import settings
 
@@ -7,10 +9,12 @@ from ingestion.adapters.registry import FeedRegistry
 
 logger = logging.getLogger(__name__)
 
+MAX_CONSECUTIVE_FAILURES = 5
+
 
 @FeedRegistry.register
 class OTXAdapter(FeedAdapter):
-    """Adapter for AlienVault OTX. Pulls indicators from the global activity feed."""
+    """Adapter for AlienVault OTX. Pulls indicators from all subscribed pulses."""
 
     source_name = "otx"
 
@@ -22,9 +26,9 @@ class OTXAdapter(FeedAdapter):
         self._days = days
 
     def fetch_raw(self) -> list[dict]:
-        """Paginate through OTX pulses and extract indicators."""
+        """Paginate through all subscribed OTX pulses and extract indicators."""
         headers = {"X-OTX-API-KEY": self._api_key}
-        base_url = "https://otx.alienvault.com/api/v1/pulses/activity"
+        base_url = "https://otx.alienvault.com/api/v1/pulses/subscribed"
         params = {"limit": 50}
         if self._days > 0:
             from datetime import datetime, timedelta, timezone
@@ -33,30 +37,38 @@ class OTXAdapter(FeedAdapter):
 
         indicators = []
         page_count = 0
+        failed_pages = 0
+        consecutive_failures = 0
         next_url = base_url
 
         while next_url:
             try:
                 r = requests.get(next_url, headers=headers, params=params, timeout=120)
-                params = None  # Subsequent requests use the full 'next_url'
-                r.raise_for_status()  # Raises HTTPError for 4xx/5xx responses
+                params = None  # subsequent requests use the full next_url
+                r.raise_for_status()
                 data = r.json()
-            except requests.exceptions.RequestException as e:
-                logger.warning(
-                    "[%s] API request for page %d failed with a network error: %s. "
-                    "Stopping pagination and returning indicators collected so far.",
-                    self.source_name, page_count + 1, e
-                )
-                break
-            except requests.exceptions.JSONDecodeError as e:
-                logger.warning(
-                    "[%s] Failed to decode JSON response from page %d: %s. Stopping pagination.",
-                    self.source_name, page_count + 1, e
-                )
-                break
             except Exception as e:
-                logger.error("[%s] An unexpected error occurred on page %d: %s. Halting ingestion.", self.source_name, page_count + 1, e)
-                break
+                failed_pages += 1
+                consecutive_failures += 1
+                logger.warning(
+                    "[%s] Page %d failed: %s — skipping (%d consecutive failures)",
+                    self.source_name, page_count + 1, e, consecutive_failures,
+                )
+                if consecutive_failures >= MAX_CONSECUTIVE_FAILURES:
+                    logger.error(
+                        "[%s] %d consecutive failures — stopping pagination",
+                        self.source_name, consecutive_failures,
+                    )
+                    break
+                # Wait then try the next page 
+                time.sleep(2)
+                page_count += 1
+                next_url = f"{base_url}?limit=50&page={page_count + 1}"
+                if self._max_pages > 0 and page_count >= self._max_pages:
+                    break
+                continue
+
+            consecutive_failures = 0
 
             pulses = data.get("results", [])
             if not pulses:
@@ -80,5 +92,8 @@ class OTXAdapter(FeedAdapter):
 
             next_url = data.get("next")
 
-        logger.info("[%s] Fetched %d raw indicators over %d pages.", self.source_name, len(indicators), page_count)
+        logger.info(
+            "[%s] Fetched %d raw indicators over %d pages (%d failed).",
+            self.source_name, len(indicators), page_count, failed_pages,
+        )
         return indicators

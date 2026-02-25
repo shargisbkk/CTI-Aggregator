@@ -10,10 +10,7 @@ from ingestion.adapters.base import FeedAdapter
 def _parse_pattern(pattern: str) -> list[tuple[str, str]]:
     """
     Extract (type, value) pairs from a STIX pattern string.
-
     Returns the raw STIX object type and the observable value.
-    Type classification (ip, hash, domain, etc.) is handled downstream
-    by _detect_type() in base.py — this function just extracts values.
     """
     if not pattern:
         return []

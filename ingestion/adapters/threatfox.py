@@ -1,8 +1,12 @@
+import logging
+
 import requests
 from django.conf import settings
 
 from ingestion.adapters.base import FeedAdapter
 from ingestion.adapters.registry import FeedRegistry
+
+logger = logging.getLogger(__name__)
 
 THREATFOX_API_URL = "https://threatfox-api.abuse.ch/api/v1/"
 
@@ -22,11 +26,23 @@ class ThreatFoxAdapter(FeedAdapter):
         headers = {"Auth-Key": self._api_key}
         payload = {"query": "get_iocs", "days": self._days}
 
-        r = requests.post(THREATFOX_API_URL, json=payload, headers=headers, timeout=60)
-        r.raise_for_status()
-        data = r.json()
+        try:
+            r = requests.post(THREATFOX_API_URL, json=payload, headers=headers, timeout=60)
+            r.raise_for_status()
+            data = r.json()
+        except requests.exceptions.RequestException as e:
+            logger.warning(
+                "[%s] API request failed: %s. Returning 0 indicators.",
+                self.source_name, e,
+            )
+            return []
 
-        if data.get("query_status") != "ok":
+        query_status = data.get("query_status", "")
+        if query_status != "ok":
+            logger.warning(
+                "[%s] API returned query_status=%r — returning 0 indicators.",
+                self.source_name, query_status,
+            )
             return []
 
         indicators = []
@@ -48,4 +64,5 @@ class ThreatFoxAdapter(FeedAdapter):
                 "last_seen":  ioc.get("last_seen") or ioc.get("first_seen"),
             })
 
+        logger.info("[%s] Fetched %d raw indicators.", self.source_name, len(indicators))
         return indicators
