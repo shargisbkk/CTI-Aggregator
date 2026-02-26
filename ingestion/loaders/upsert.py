@@ -1,5 +1,35 @@
+import json
+
 import pandas as pd
+from django.db import connection
+
 from ingestion.models import IndicatorOfCompromise
+
+BATCH_SIZE = 1000
+
+UPSERT_SQL = """
+    INSERT INTO indicators_of_compromise
+        (ioc_type, ioc_value, confidence, labels, sources, first_seen, last_seen)
+    VALUES {placeholders}
+    ON CONFLICT (ioc_type, ioc_value) DO UPDATE SET
+        first_seen  = LEAST(indicators_of_compromise.first_seen, EXCLUDED.first_seen),
+        last_seen   = GREATEST(indicators_of_compromise.last_seen, EXCLUDED.last_seen),
+        confidence  = GREATEST(indicators_of_compromise.confidence, EXCLUDED.confidence),
+        sources     = (
+            SELECT jsonb_agg(DISTINCT elem)
+            FROM jsonb_array_elements(
+                COALESCE(indicators_of_compromise.sources, '[]'::jsonb) ||
+                COALESCE(EXCLUDED.sources, '[]'::jsonb)
+            ) AS elem
+        ),
+        labels      = (
+            SELECT jsonb_agg(DISTINCT elem)
+            FROM jsonb_array_elements(
+                COALESCE(indicators_of_compromise.labels, '[]'::jsonb) ||
+                COALESCE(EXCLUDED.labels, '[]'::jsonb)
+            ) AS elem
+        )
+"""
 
 
 def _clean_ts(value):
@@ -15,69 +45,44 @@ def _clean_conf(value):
         return None
 
 
+def _upsert_batch(rows: list[tuple]) -> int:
+    """Execute a single batch upsert and return how many rows were inserted."""
+    placeholders = ", ".join(["(%s, %s, %s, %s, %s, %s, %s)"] * len(rows))
+    params = [val for row in rows for val in row]
+
+    before = IndicatorOfCompromise.objects.count()
+    with connection.cursor() as cur:
+        cur.execute(UPSERT_SQL.format(placeholders=placeholders), params)
+    after = IndicatorOfCompromise.objects.count()
+
+    return after - before
+
+
 def upsert_indicators(normalized_records: list[dict], source_name: str = "") -> int:
     """
-    Upsert normalized IOC records into the database.
-
-    New indicators are created. Existing ones are merged:
-    first_seen=keep earlier, last_seen=keep later, sources=union,
-    labels=union, confidence=keep highest.
-
-    Returns the number of newly created records.
+    Batch upsert into Postgres using ON CONFLICT with merge rules:
+    first_seen=LEAST, last_seen=GREATEST, confidence=GREATEST,
+    sources=union, labels=union.
     """
     created = 0
+    batch: list[tuple] = []
+
     for r in normalized_records:
-        incoming_first_seen = _clean_ts(r["first_seen"])
-        incoming_last_seen  = _clean_ts(r["last_seen"])
-        incoming_conf       = _clean_conf(r["confidence"])
-        incoming_labels     = r["labels"]
+        batch.append((
+            r["ioc_type"],
+            r["ioc_value"],
+            _clean_conf(r["confidence"]),
+            json.dumps(r["labels"] or []),
+            json.dumps([source_name] if source_name else []),
+            _clean_ts(r["first_seen"]),
+            _clean_ts(r["last_seen"]),
+        ))
 
-        try:
-            existing = IndicatorOfCompromise.objects.get(
-                ioc_type=r["ioc_type"],
-                ioc_value=r["ioc_value"],
-            )
+        if len(batch) >= BATCH_SIZE:
+            created += _upsert_batch(batch)
+            batch.clear()
 
-            # first_seen: keep earlier
-            if incoming_first_seen and existing.first_seen:
-                existing.first_seen = min(existing.first_seen, incoming_first_seen)
-            elif incoming_first_seen:
-                existing.first_seen = incoming_first_seen
-
-            # last_seen: keep later
-            if incoming_last_seen and existing.last_seen:
-                existing.last_seen = max(existing.last_seen, incoming_last_seen)
-            elif incoming_last_seen:
-                existing.last_seen = incoming_last_seen
-
-            # sources: union
-            if source_name and source_name not in existing.sources:
-                existing.sources = existing.sources + [source_name]
-
-            # labels: union
-            merged_labels = list(existing.labels)
-            for lbl in incoming_labels:
-                if lbl not in merged_labels:
-                    merged_labels.append(lbl)
-            existing.labels = merged_labels
-
-            # confidence: keep highest
-            if incoming_conf is not None:
-                if existing.confidence is None or incoming_conf > existing.confidence:
-                    existing.confidence = incoming_conf
-
-            existing.save()
-
-        except IndicatorOfCompromise.DoesNotExist:
-            IndicatorOfCompromise.objects.create(
-                ioc_type=r["ioc_type"],
-                ioc_value=r["ioc_value"],
-                confidence=incoming_conf,
-                labels=incoming_labels,
-                sources=[source_name] if source_name else [],
-                first_seen=incoming_first_seen,
-                last_seen=incoming_last_seen,
-            )
-            created += 1
+    if batch:
+        created += _upsert_batch(batch)
 
     return created

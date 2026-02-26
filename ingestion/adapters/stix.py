@@ -24,7 +24,7 @@ def _parse_pattern(pattern: str) -> list[tuple[str, str]]:
         value = quoted_val or unquoted_val.rstrip("]")
         results.append((obj_type, value))
 
-    return results if results else [("unknown", "")]
+    return results
 
 
 def extract_indicators(raw_objects: list[dict]) -> list[dict]:

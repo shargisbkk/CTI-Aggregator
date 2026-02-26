@@ -17,6 +17,10 @@ class Command(BaseCommand):
         )
         parser.add_argument("--username", type=str, default="")
         parser.add_argument("--password", type=str, default="")
+        parser.add_argument("--api-key", type=str, default="",
+                            help="API key passed as a query parameter (e.g. Pulsedive).")
+        parser.add_argument("--collection", type=str, default="",
+                            help="Specific collection ID to query (skips discovery).")
         parser.add_argument(
             "--days", type=int, default=90,
             help="Only fetch objects added in the last N days (default: 90). Use 0 to fetch all.",
@@ -34,6 +38,8 @@ class Command(BaseCommand):
             username=opts["username"],
             password=opts["password"],
             added_after=added_after,
+            api_key=opts["api_key"],
+            collection_id=opts["collection"],
         )
 
         iocs = adapter.ingest()

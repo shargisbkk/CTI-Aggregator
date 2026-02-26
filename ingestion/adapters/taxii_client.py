@@ -1,78 +1,105 @@
 """
-Shared by any adapter that pulls from a TAXII 2.1 server.
+Shared TAXII 2.1 protocol handler used by TAXIIAdapter.
+
+Supports two pagination styles:
+  - Body-based:   envelope contains "more" and "next" fields
+  - Header-based: server returns X-TAXII-Date-Added-Last, used as
+                   the next added_after value (e.g. MITRE ATT&CK)
 """
 
-import logging
-from datetime import datetime, timezone
+from urllib.parse import urljoin
 
 import requests
 
 from ingestion.adapters.stix import extract_indicators
 
-logger = logging.getLogger(__name__)
-
-TAXII_HEADERS = {"Accept": "application/taxii+json; version=2.1"}
-
-
-def now_rfc3339() -> str:
-    return datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
+TAXII_ACCEPT = "application/taxii+json; version=2.1"
+TAXII_HEADERS = {"Accept": TAXII_ACCEPT}
 
 
-def discover_api_roots(discovery_url: str, auth: tuple[str, str] | None) -> list[str]:
-    r = requests.get(discovery_url, headers=TAXII_HEADERS, auth=auth, timeout=60)
+def _resolve_url(base: str, url: str) -> str:
+    """Resolve a possibly-relative API root URL against the discovery base."""
+    if url.startswith("http"):
+        return url
+    return urljoin(base, url)
+
+
+def _build_params(extra: dict | None = None, api_key: str = "") -> dict:
+    """Return a params dict, including the API key when provided."""
+    params: dict = {}
+    if api_key:
+        params["key"] = api_key
+    if extra:
+        params.update(extra)
+    return params
+
+
+def discover_api_roots(discovery_url: str, auth: tuple[str, str] | None, api_key: str = "") -> list[str]:
+    """GET the discovery endpoint and return the list of API root URLs."""
+    r = requests.get(discovery_url, headers=TAXII_HEADERS, auth=auth,
+                     params=_build_params(api_key=api_key), timeout=60)
     r.raise_for_status()
-    roots = r.json().get("api_roots", [])
-    logger.info("Discovered %d API roots from %s", len(roots), discovery_url)
-    return roots
+    data = r.json()
+
+    roots = data.get("api_roots", [])
+    default = data.get("default")
+    if default and default not in roots:
+        roots.insert(0, default)
+
+    return [_resolve_url(discovery_url, root) for root in roots]
 
 
-def list_collections(api_root_url: str, auth: tuple[str, str] | None) -> list[dict]:
+def list_collections(api_root_url: str, auth: tuple[str, str] | None, api_key: str = "") -> list[dict]:
+    """List all collections at an API root."""
     url = api_root_url.rstrip("/") + "/collections/"
-    r = requests.get(url, headers=TAXII_HEADERS, auth=auth, timeout=60)
+    r = requests.get(url, headers=TAXII_HEADERS, auth=auth,
+                     params=_build_params(api_key=api_key), timeout=60)
     r.raise_for_status()
-    collections = r.json().get("collections", [])
-    logger.info("Found %d collections at %s", len(collections), api_root_url)
-    for c in collections:
-        logger.info(" - Collection: %s (ID: %s)", c.get("title"), c.get("id"))
-    return collections
+    return r.json().get("collections", [])
 
 
-def get_objects(api_root_url: str, collection_id: str, auth: tuple[str, str] | None, added_after: str | None):
-    """Page through a TAXII collection, yielding one envelope at a time."""
-    url = api_root_url.rstrip("/") + f"/collections/{collection_id}/objects"
-    # Filter for indicators specifically to reduce noise and payload size
-    params = {"match[type]": "indicator"}
+def get_objects(api_root_url: str, collection_id: str, auth: tuple[str, str] | None,
+                added_after: str | None, api_key: str = ""):
+    """
+    Page through a TAXII collection, yielding one envelope at a time.
+
+    Handles both pagination styles:
+      1. Body-based (more/next in JSON envelope)
+      2. Header-based (X-TAXII-Date-Added-Last for cursor pagination)
+    """
+    url = api_root_url.rstrip("/") + f"/collections/{collection_id}/objects/"
+    base_extra = {"match[type]": "indicator"}
     if added_after:
-        params["added_after"] = added_after
+        base_extra["added_after"] = added_after
 
-    page = 0
+    params = _build_params(base_extra, api_key)
+
     while True:
-        try:
-            logger.info("Fetching page %d (params=%s)", page + 1, params)
-            r = requests.get(url, headers=TAXII_HEADERS, auth=auth, params=params, timeout=120)
-            if r.status_code == 404:
-                break
-            r.raise_for_status()
-            env = r.json()
-        except Exception as e:
-            logger.warning(
-                "Collection %s page %d failed: %s — skipping rest of collection",
-                collection_id, page + 1, e,
-            )
+        r = requests.get(url, headers=TAXII_HEADERS, auth=auth, params=params, timeout=120)
+        if r.status_code == 404:
             break
+        r.raise_for_status()
+        env = r.json()
 
-        obj_count = len(env.get("objects", []))
-        page += 1
-        if obj_count == 0:
-            logger.info("Collection %s page %d returned 0 objects.", collection_id, page)
-        logger.info("Collection %s page %d: %d objects", collection_id, page, obj_count)
+        if not env.get("objects"):
+            break
 
         yield env
 
+        # Body-based pagination (more/next in envelope)
         if env.get("more") and env.get("next"):
-            params = {"next": env["next"]}
-        else:
-            break
+            params = _build_params(base_extra, api_key)
+            params["next"] = env["next"]
+            continue
+
+        # Header-based pagination (X-TAXII-Date-Added-Last)
+        date_last = r.headers.get("X-TAXII-Date-Added-Last")
+        if date_last and date_last != params.get("added_after"):
+            params = _build_params(base_extra, api_key)
+            params["added_after"] = date_last
+            continue
+
+        break
 
 
 def fetch_taxii_raw(
@@ -80,53 +107,52 @@ def fetch_taxii_raw(
     username: str = "",
     password: str = "",
     added_after: str | None = None,
+    api_key: str = "",
+    collection_id: str = "",
 ) -> list[dict]:
     """
     Query a TAXII 2.1 server and return raw indicator dicts.
 
-    Each envelope's "objects" array is passed through extract_indicators()
-    (from the STIX adapter) to pull indicators from STIX patterns.
+    Supports two auth styles:
+      - Basic auth (username/password)
+      - API key as query parameter (e.g. Pulsedive)
+
+    If collection_id is provided, only that collection is queried.
+    Otherwise, discovers all collections and queries each one.
     """
     auth = (username, password) if username else None
 
-    if "/api/v21/" in discovery_url.rstrip("/") + "/":
+    # When a specific collection ID is given, use the URL directly as the API root
+    if collection_id:
+        api_root_url = discovery_url.rstrip("/")
+        all_indicators = []
+        for env in get_objects(api_root_url, collection_id, auth, added_after, api_key):
+            objects = env.get("objects", [])
+            all_indicators.extend(extract_indicators(objects))
+        return all_indicators
+
+    # Auto-discover API roots and iterate all readable collections
+    try:
+        api_roots = discover_api_roots(discovery_url, auth, api_key)
+    except Exception:
         api_roots = [discovery_url.rstrip("/")]
-    else:
-        try:
-            api_roots = discover_api_roots(discovery_url, auth)
-        except Exception as e:
-            logger.warning("Discovery failed at %s: %s. Attempting to use URL as API Root directly.", discovery_url, e)
-            api_roots = [discovery_url.rstrip("/")]
 
     all_indicators = []
     for api_root_url in api_roots:
         try:
-            collections = list_collections(api_root_url, auth)
-        except Exception as e:
-            logger.warning("Failed to list collections at %s: %s — skipping", api_root_url, e)
+            collections = list_collections(api_root_url, auth, api_key)
+        except Exception:
             continue
 
         for col in collections:
+            if col.get("can_read") is False:
+                continue
             col_id = col.get("id", "")
-            col_title = col.get("title", col_id)
-            logger.info("Fetching collection: %s (%s)", col_title, col_id)
-
-            col_stix_count = 0
-            col_ind_count = 0
             try:
-                for env in get_objects(api_root_url, col_id, auth, added_after):
+                for env in get_objects(api_root_url, col_id, auth, added_after, api_key):
                     objects = env.get("objects", [])
-                    extracted = extract_indicators(objects)
-
-                    col_stix_count += len(objects)
-                    col_ind_count += len(extracted)
-                    all_indicators.extend(extracted)
-                    logger.info("  Batch: %d STIX objects -> %d indicators", len(objects), len(extracted))
-            except Exception as e:
-                logger.warning("Error fetching collection %s: %s — skipping", col_title, e)
+                    all_indicators.extend(extract_indicators(objects))
+            except Exception:
                 continue
 
-            logger.info("Collection %s finished: %d STIX objects -> %d indicators", col_title, col_stix_count, col_ind_count)
-
-    logger.info("TAXII fetch complete: %d raw indicators total", len(all_indicators))
     return all_indicators
