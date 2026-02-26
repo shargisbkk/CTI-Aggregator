@@ -25,7 +25,7 @@ class OTXAdapter(FeedAdapter):
 
     source_name = "otx"
 
-    def __init__(self, api_key: str = "", max_pages: int = 500, days: int = 30):
+    def __init__(self, api_key: str = "", max_pages: int = 500, days: int = 90):
         self._api_key = api_key or getattr(settings, "OTX_API_KEY", "")
         if not self._api_key:
             raise RuntimeError("OTX_API_KEY is not set. Pass it via CLI or settings.")
