@@ -44,7 +44,6 @@ INSTALLED_APPS = [
 
     'dashboard',
     'accounts',
-    'indicators',
     'api',
     'ingestion',
     'processors',
@@ -89,7 +88,7 @@ DATABASES = {
         'ENGINE': 'django.db.backends.postgresql',
         'NAME': 'cti_db',
         'USER': 'postgres',
-        'PASSWORD': 'Admin123456',
+        'PASSWORD': 'Sasquatch23',
         'HOST': 'localhost',
         'PORT': '5432',
     }
