@@ -39,7 +39,7 @@ pause
 goto menu
 
 :start
-call start.bat
+call run.bat
 goto menu
 
 :stop
