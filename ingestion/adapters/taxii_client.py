@@ -9,8 +9,7 @@ Supports two pagination styles:
 
 from urllib.parse import urljoin
 
-import requests
-
+from ingestion.adapters.http import request_with_retry
 from ingestion.adapters.stix import extract_indicators
 
 TAXII_ACCEPT = "application/taxii+json; version=2.1"
@@ -36,9 +35,8 @@ def _build_params(extra: dict | None = None, api_key: str = "") -> dict:
 
 def discover_api_roots(discovery_url: str, auth: tuple[str, str] | None, api_key: str = "") -> list[str]:
     """GET the discovery endpoint and return the list of API root URLs."""
-    r = requests.get(discovery_url, headers=TAXII_HEADERS, auth=auth,
-                     params=_build_params(api_key=api_key), timeout=60)
-    r.raise_for_status()
+    r = request_with_retry("GET", discovery_url, headers=TAXII_HEADERS, auth=auth,
+                           params=_build_params(api_key=api_key), timeout=60)
     data = r.json()
 
     roots = data.get("api_roots", [])
@@ -52,9 +50,8 @@ def discover_api_roots(discovery_url: str, auth: tuple[str, str] | None, api_key
 def list_collections(api_root_url: str, auth: tuple[str, str] | None, api_key: str = "") -> list[dict]:
     """List all collections at an API root."""
     url = api_root_url.rstrip("/") + "/collections/"
-    r = requests.get(url, headers=TAXII_HEADERS, auth=auth,
-                     params=_build_params(api_key=api_key), timeout=60)
-    r.raise_for_status()
+    r = request_with_retry("GET", url, headers=TAXII_HEADERS, auth=auth,
+                           params=_build_params(api_key=api_key), timeout=60)
     return r.json().get("collections", [])
 
 
@@ -75,10 +72,13 @@ def get_objects(api_root_url: str, collection_id: str, auth: tuple[str, str] | N
     params = _build_params(base_extra, api_key)
 
     while True:
-        r = requests.get(url, headers=TAXII_HEADERS, auth=auth, params=params, timeout=120)
+        try:
+            r = request_with_retry("GET", url, headers=TAXII_HEADERS, auth=auth,
+                                   params=params, timeout=120)
+        except Exception:
+            break
         if r.status_code == 404:
             break
-        r.raise_for_status()
         env = r.json()
 
         if not env.get("objects"):

@@ -11,7 +11,7 @@ THREATFOX_API_URL = "https://threatfox-api.abuse.ch/api/v1/"
 class ThreatFoxAdapter(FeedAdapter):
     source_name = "threatfox"
 
-    def __init__(self, days: int = 1):
+    def __init__(self, days: int = 7):
         api_key = getattr(settings, "THREATFOX_API_KEY", "")
         if not api_key:
             raise RuntimeError("THREATFOX_API_KEY is not set.")

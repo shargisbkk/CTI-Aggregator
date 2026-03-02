@@ -23,13 +23,9 @@ load_dotenv(BASE_DIR / ".env")
 # Quick-start development settings - unsuitable for production
 # See https://docs.djangoproject.com/en/5.2/howto/deployment/checklist/
 
-# SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = 'django-insecure--@&xaqm4%+pfxx-s(1nfz1%x28bx(j1pvhbt#x5*8)be!xqk_z'
-
-# SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = True
-
-ALLOWED_HOSTS = []
+SECRET_KEY = os.environ.get("DJANGO_SECRET_KEY", "django-insecure-dev-only")
+DEBUG = os.environ.get("DJANGO_DEBUG", "0") == "1"
+ALLOWED_HOSTS = [h.strip() for h in os.environ.get("DJANGO_ALLOWED_HOSTS", "").split(",") if h.strip()]
 
 
 # Application definition
@@ -83,14 +79,14 @@ WSGI_APPLICATION = 'cti.wsgi.application'
 # Database
 # https://docs.djangoproject.com/en/5.2/ref/settings/#databases
 
-DATABASES = {
-    'default': {
-        'ENGINE': 'django.db.backends.postgresql',
-        'NAME': 'cti_db',
-        'USER': 'postgres',
-        'PASSWORD': 'Admin123456',
-        'HOST': 'localhost',
-        'PORT': '5432',
+DATABASES = { #Anon db credentials
+    "default": {
+        "ENGINE": "django.db.backends.postgresql",
+        "NAME": os.environ.get("POSTGRES_DB", "cti_db"),
+        "USER": os.environ.get("POSTGRES_USER", "postgres"),
+        "PASSWORD": os.environ.get("POSTGRES_PASSWORD", "password"),
+        "HOST": os.environ.get("POSTGRES_HOST", "db"),
+        "PORT": os.environ.get("POSTGRES_PORT", "5432"),
     }
 }
 

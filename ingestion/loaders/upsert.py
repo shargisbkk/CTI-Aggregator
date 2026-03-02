@@ -1,5 +1,5 @@
 import json
-
+import math
 import pandas as pd
 from django.db import connection
 
@@ -15,20 +15,21 @@ UPSERT_SQL = """
         first_seen  = LEAST(indicators_of_compromise.first_seen, EXCLUDED.first_seen),
         last_seen   = GREATEST(indicators_of_compromise.last_seen, EXCLUDED.last_seen),
         confidence  = GREATEST(indicators_of_compromise.confidence, EXCLUDED.confidence),
-        sources     = (
+        sources = COALESCE((
             SELECT jsonb_agg(DISTINCT elem)
             FROM jsonb_array_elements(
                 COALESCE(indicators_of_compromise.sources, '[]'::jsonb) ||
                 COALESCE(EXCLUDED.sources, '[]'::jsonb)
             ) AS elem
-        ),
-        labels      = (
+        ), '[]'::jsonb),
+
+        labels = COALESCE((
             SELECT jsonb_agg(DISTINCT elem)
             FROM jsonb_array_elements(
                 COALESCE(indicators_of_compromise.labels, '[]'::jsonb) ||
                 COALESCE(EXCLUDED.labels, '[]'::jsonb)
             ) AS elem
-        )
+        ), '[]'::jsonb)
 """
 
 
@@ -47,7 +48,8 @@ def _clean_conf(value):
 
 def _upsert_batch(rows: list[tuple]) -> int:
     """Execute a single batch upsert and return how many rows were inserted."""
-    placeholders = ", ".join(["(%s, %s, %s, %s, %s, %s, %s)"] * len(rows))
+    placeholders = ", ".join(
+    ["(%s, %s, %s, COALESCE(%s::jsonb, '[]'::jsonb), COALESCE(%s::jsonb, '[]'::jsonb), %s, %s)"] * len(rows))
     params = [val for row in rows for val in row]
 
     before = IndicatorOfCompromise.objects.count()
@@ -72,7 +74,7 @@ def upsert_indicators(normalized_records: list[dict], source_name: str = "") -> 
             r["ioc_type"],
             r["ioc_value"],
             _clean_conf(r["confidence"]),
-            json.dumps(r["labels"] or []),
+            json.dumps(_clean_list(r.get("labels"))),
             json.dumps([source_name] if source_name else []),
             _clean_ts(r["first_seen"]),
             _clean_ts(r["last_seen"]),
@@ -86,3 +88,20 @@ def upsert_indicators(normalized_records: list[dict], source_name: str = "") -> 
         created += _upsert_batch(batch)
 
     return created
+
+#Commenting done by Claude - but what this does in essence is prevents an issue with nullable labels in the DB
+def _clean_list(value):
+    # None -> []
+    if value is None:
+        return []
+    # pandas/float NaN -> []
+    try:
+        if pd.isna(value):
+            return []
+    except Exception:
+        pass
+    # already list-like
+    if isinstance(value, (list, tuple, set)):
+        return list(value)
+    # if something weird slips in, coerce to a single string label
+    return [str(value)]
