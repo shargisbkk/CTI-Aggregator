@@ -4,7 +4,7 @@ from ingestion.adapters.stix import STIXAdapter
 from ingestion.loaders.upsert import upsert_indicators
 from processors.dedup import dedup
 
-# This command ingests STIX JSON files from a specified folder, extracts indicators, normalizes them, and saves them to the database.
+
 class Command(BaseCommand):
     help = "Ingest STIX 2.x JSON bundle files from a local folder into the DB."
 
@@ -19,8 +19,10 @@ class Command(BaseCommand):
 
         iocs = adapter.ingest()
         if not iocs:
-            self.stdout.write("No indicators found.")
+            self.stdout.write("No indicators returned.")
             return
+
+        self.stdout.write(f"Fetched {len(iocs)} raw indicators from STIX source.")
 
         deduped = dedup(iocs)
         count = upsert_indicators(deduped, source_name="stix")

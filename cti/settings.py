@@ -89,7 +89,7 @@ DATABASES = {
         'ENGINE': 'django.db.backends.postgresql',
         'NAME': 'cti_db',
         'USER': 'postgres',
-        'PASSWORD': 'Admin123456',
+        'PASSWORD': 'password',
         'HOST': 'localhost',
         'PORT': '5432',
     }
@@ -147,3 +147,26 @@ LOGOUT_REDIRECT_URL = '/login/'
 OTX_API_KEY       = os.environ.get("OTX_API_KEY", "")
 THREATFOX_API_KEY = os.environ.get("THREATFOX_API_KEY", "")
 URLHAUS_API_KEY   = os.environ.get("URLHAUS_API_KEY", "")
+
+# Logging Configuration
+# https://docs.djangoproject.com/en/5.2/topics/logging/
+LOGGING = {
+    "version": 1,
+    "disable_existing_loggers": False,
+    "formatters": {
+        "verbose": {
+            "format": "[{asctime}] [{levelname}] [{name}] {message}",
+            "style": "{",
+        },
+    },
+    "handlers": {
+        "console": {
+            "class": "logging.StreamHandler",
+            "formatter": "verbose",
+        },
+    },
+    "root": {
+        "handlers": ["console"],
+        "level": "INFO",
+    },
+}

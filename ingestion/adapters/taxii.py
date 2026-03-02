@@ -10,11 +10,14 @@ class TAXIIAdapter(FeedAdapter):
 
     source_name = "taxii"
 
-    def __init__(self, discovery_url: str, username: str = "", password: str = "", added_after: str = ""):
-        self._url         = discovery_url
-        self._username    = username
-        self._password    = password
-        self._added_after = added_after or None
+    def __init__(self, discovery_url: str, username: str = "", password: str = "",
+                 added_after: str = "", api_key: str = "", collection_id: str = ""):
+        self._url           = discovery_url
+        self._username      = username
+        self._password      = password
+        self._added_after   = added_after or None
+        self._api_key       = api_key
+        self._collection_id = collection_id
 
     def fetch_raw(self) -> list[dict]:
         """Discover collections and fetch raw STIX indicator dicts."""
@@ -23,4 +26,6 @@ class TAXIIAdapter(FeedAdapter):
             username=self._username,
             password=self._password,
             added_after=self._added_after,
+            api_key=self._api_key,
+            collection_id=self._collection_id,
         )
