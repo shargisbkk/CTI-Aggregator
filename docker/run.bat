@@ -16,5 +16,5 @@ if not exist .env (
 )
 
 echo Starting CTI-Aggregator...
-docker compose up --build
+docker compose -f docker-compose.yml up --build
 pause

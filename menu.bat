@@ -2,7 +2,6 @@
 setlocal
 cd /d %~dp0
 
-:check_docker
 docker info >nul 2>&1
 if %errorlevel% neq 0 (
   echo.
@@ -27,31 +26,15 @@ echo  0) Exit
 echo.
 set /p choice=Choose an option: 
 
-if "%choice%"=="1" goto start
-if "%choice%"=="2" goto stop
-if "%choice%"=="3" goto reset
-if "%choice%"=="4" goto ingest
+if "%choice%"=="1" call docker\run.bat & goto menu
+if "%choice%"=="2" call docker\stop.bat & goto menu
+if "%choice%"=="3" call docker\reset_db.bat & goto menu
+if "%choice%"=="4" call docker\ingest_all.bat & goto menu
 if "%choice%"=="0" goto end
 
 echo.
 echo Invalid choice.
 pause
-goto menu
-
-:start
-call run.bat
-goto menu
-
-:stop
-call stop.bat
-goto menu
-
-:reset
-call reset_db.bat
-goto menu
-
-:ingest
-call ingest_all.bat
 goto menu
 
 :end

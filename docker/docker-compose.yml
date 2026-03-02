@@ -16,14 +16,16 @@ services:
       retries: 10
 
   web:
-    build: .
+    build:
+    context: ..
+    dockerfile: docker/Dockerfile
     depends_on:
       db:
         condition: service_healthy
     env_file:
-      - .env
+      - ../.env
     volumes:
-      - .:/app
+      - ..:/app
     ports:
       - "8000:8000"
 

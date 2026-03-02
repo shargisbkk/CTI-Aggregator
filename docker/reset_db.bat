@@ -17,10 +17,10 @@ pause >nul
 
 echo.
 echo Stopping containers and removing volumes...
-docker compose down -v --remove-orphans
+docker compose -f docker-compose.yml down -v --remove-orphans
 
 echo.
 echo Rebuilding and starting containers...
-docker compose up --build
+docker compose -f docker-compose.yml up -d --build
 
 pause
