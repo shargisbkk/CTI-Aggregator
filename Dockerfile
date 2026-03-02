@@ -17,5 +17,7 @@ COPY . /app
 
 EXPOSE 8000
 
-# Run django dev server (OK for local dev)
-CMD ["python", "manage.py", "runserver", "0.0.0.0:8000"]
+COPY entrypoint.sh /app/entrypoint.sh
+RUN chmod +x /app/entrypoint.sh
+
+CMD ["/app/entrypoint.sh"]

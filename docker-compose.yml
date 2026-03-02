@@ -10,20 +10,17 @@ services:
     volumes:
       - pgdata:/var/lib/postgresql/data
 
+  services:
   web:
     build: .
     depends_on:
       - db
     env_file:
       - .env
-    ports:
-      - "8000:8000"
-    # For live-edit development:
     volumes:
       - .:/app
-    command: >
-      bash -lc "python manage.py migrate &&
-                python manage.py runserver 0.0.0.0:8000"
+    ports:
+      - "8000:8000"
 
 volumes:
   pgdata:
