@@ -1,0 +1,21 @@
+FROM python:3.11-slim
+
+WORKDIR /app
+
+# System deps needed for some Python packages
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    build-essential \
+    libpq-dev \
+  && rm -rf /var/lib/apt/lists/*
+
+# Install Python deps (repo uses requirements.txt) 
+COPY requirements.txt /app/requirements.txt
+RUN pip install --no-cache-dir -r requirements.txt
+
+# Copy app
+COPY . /app
+
+EXPOSE 8000
+
+# Run django dev server (OK for local dev)
+CMD ["python", "manage.py", "runserver", "0.0.0.0:8000"]
