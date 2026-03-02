@@ -47,7 +47,8 @@ def _clean_conf(value):
 
 def _upsert_batch(rows: list[tuple]) -> int:
     """Execute a single batch upsert and return how many rows were inserted."""
-    placeholders = ", ".join(["(%s, %s, %s, %s, %s, %s, %s)"] * len(rows))
+    placeholders = ", ".join(
+    ["(%s, %s, %s, COALESCE(%s::jsonb, '[]'::jsonb), COALESCE(%s::jsonb, '[]'::jsonb), %s, %s)"] * len(rows))
     params = [val for row in rows for val in row]
 
     before = IndicatorOfCompromise.objects.count()
