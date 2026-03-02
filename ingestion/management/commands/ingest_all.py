@@ -16,12 +16,13 @@ class Command(BaseCommand):
                 adapter = adapter_class()
                 iocs = adapter.ingest()
                 if not iocs:
-                    self.stdout.write(f"  {name}: no indicators returned")
+                    self.stdout.write(self.style.WARNING(
+                        f"  {name}: no indicators returned (check logs for errors)"))
                     continue
 
                 deduped = dedup(iocs)
                 count = upsert_indicators(deduped, source_name=name)
-                self.stdout.write(f"  {name}: {count} new indicators")
+                self.stdout.write(f"  {name}: saved {count} new indicators ({len(iocs)} raw, {len(deduped)} after dedup)")
                 total += count
 
             except RuntimeError as e:

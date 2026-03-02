@@ -89,17 +89,24 @@ class FeedAdapter(ABC):
         try:
             raw_records = self.fetch_raw()
         except Exception:
+            logger.exception("%s: fetch_raw() failed", self.source_name)
             return []
 
         indicators = []
+        skipped = 0
         for raw in raw_records:
             try:
                 rec = self.normalize_record(raw)
                 if rec is not None:
                     indicators.append(rec)
             except Exception:
+                skipped += 1
                 continue
 
+        if skipped:
+            logger.warning("%s: skipped %d bad records", self.source_name, skipped)
+        logger.info("%s: normalized %d indicators from %d raw records",
+                    self.source_name, len(indicators), len(raw_records))
         return indicators
 
     @abstractmethod
