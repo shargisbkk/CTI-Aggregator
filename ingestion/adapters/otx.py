@@ -1,8 +1,12 @@
-import requests
+import logging
+
 from django.conf import settings
 
 from ingestion.adapters.base import FeedAdapter
+from ingestion.adapters.http import request_with_retry
 from ingestion.adapters.registry import FeedRegistry
+
+logger = logging.getLogger(__name__)
 
 
 def _build_labels(pulse: dict) -> list[str]:
@@ -25,7 +29,7 @@ class OTXAdapter(FeedAdapter):
 
     source_name = "otx"
 
-    def __init__(self, api_key: str = "", max_pages: int = 500, days: int = 90):
+    def __init__(self, api_key: str = "", max_pages: int = 500, days: int = 365):
         self._api_key = api_key or getattr(settings, "OTX_API_KEY", "")
         if not self._api_key:
             raise RuntimeError("OTX_API_KEY is not set. Pass it via CLI or settings.")
@@ -48,10 +52,14 @@ class OTXAdapter(FeedAdapter):
         next_url = base_url
 
         while next_url:
-            r = requests.get(next_url, headers=headers, params=params, timeout=120)
-            params = None
-            r.raise_for_status()
-            data = r.json()
+            try:
+                r = request_with_retry("GET", next_url, headers=headers, params=params, timeout=120)
+                params = None
+                data = r.json()
+            except Exception:
+                logger.warning("OTX: page %d failed, returning %d indicators collected so far",
+                               page + 1, len(indicators))
+                break
 
             pulses = data.get("results", [])
             if not pulses:
