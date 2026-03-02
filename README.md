@@ -65,6 +65,7 @@ From the project folder, inside of the virtual environment, use the following co
 ```bash
 # Use the requirements.txt file to install all necessary packages
 python -m pip install -r requirements.txt
+python manage.py makemigrations
 python manage.py migrate
 python manage.py createsuperuser
 ```
