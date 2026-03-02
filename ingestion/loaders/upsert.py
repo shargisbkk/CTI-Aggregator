@@ -15,20 +15,21 @@ UPSERT_SQL = """
         first_seen  = LEAST(indicators_of_compromise.first_seen, EXCLUDED.first_seen),
         last_seen   = GREATEST(indicators_of_compromise.last_seen, EXCLUDED.last_seen),
         confidence  = GREATEST(indicators_of_compromise.confidence, EXCLUDED.confidence),
-        sources     = (
+        sources = COALESCE((
             SELECT jsonb_agg(DISTINCT elem)
             FROM jsonb_array_elements(
                 COALESCE(indicators_of_compromise.sources, '[]'::jsonb) ||
                 COALESCE(EXCLUDED.sources, '[]'::jsonb)
             ) AS elem
-        ),
-        labels      = (
+        ), '[]'::jsonb),
+
+        labels = COALESCE((
             SELECT jsonb_agg(DISTINCT elem)
             FROM jsonb_array_elements(
                 COALESCE(indicators_of_compromise.labels, '[]'::jsonb) ||
                 COALESCE(EXCLUDED.labels, '[]'::jsonb)
             ) AS elem
-        )
+        ), '[]'::jsonb)
 """
 
 
