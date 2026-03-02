@@ -10,17 +10,25 @@ class Command(BaseCommand):
 
     def add_arguments(self, parser):
         parser.add_argument(
+            "--api-key", type=str, default="",
+            help="OTX API Key (overrides settings.OTX_API_KEY).",
+        )
+        parser.add_argument(
             "--max-pages", type=int, default=500,
             help="Maximum number of API pages to fetch (default: 500, 50 pulses per page). Use 0 for no limit.",
         )
         parser.add_argument(
-            "--days", type=int, default=30,
-            help="Only fetch pulses modified in the last N days (default: 30). Use 0 for no limit.",
+            "--days", type=int, default=90,
+            help="Only fetch pulses modified in the last N days (default: 90). Use 0 for no limit.",
         )
 
     def handle(self, *args, **opts):
         try:
-            adapter = OTXAdapter(max_pages=opts["max_pages"], days=opts["days"])
+            adapter = OTXAdapter(
+                api_key=opts["api_key"],
+                max_pages=opts["max_pages"],
+                days=opts["days"]
+            )
         except RuntimeError as e:
             self.stderr.write(str(e))
             return

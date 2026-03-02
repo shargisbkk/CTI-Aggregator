@@ -6,7 +6,7 @@ from ingestion.adapters.taxii import TAXIIAdapter
 from ingestion.loaders.upsert import upsert_indicators
 from processors.dedup import dedup
 
-# This command fetches indicators from a TAXII 2.1 server using the provided discovery URL and optional credentials, then saves them to the database.
+
 class Command(BaseCommand):
     help = "Fetch indicators from a TAXII 2.1 server into the DB."
 
@@ -17,9 +17,13 @@ class Command(BaseCommand):
         )
         parser.add_argument("--username", type=str, default="")
         parser.add_argument("--password", type=str, default="")
+        parser.add_argument("--api-key", type=str, default="",
+                            help="API key passed as a query parameter (e.g. Pulsedive).")
+        parser.add_argument("--collection", type=str, default="",
+                            help="Specific collection ID to query (skips discovery).")
         parser.add_argument(
-            "--days", type=int, default=30,
-            help="Only fetch objects added in the last N days (default: 30). Use 0 to fetch all.",
+            "--days", type=int, default=90,
+            help="Only fetch objects added in the last N days (default: 90). Use 0 to fetch all.",
         )
 
     def handle(self, *args, **opts):
@@ -34,12 +38,16 @@ class Command(BaseCommand):
             username=opts["username"],
             password=opts["password"],
             added_after=added_after,
+            api_key=opts["api_key"],
+            collection_id=opts["collection"],
         )
 
         iocs = adapter.ingest()
         if not iocs:
             self.stdout.write("No indicators returned.")
             return
+
+        self.stdout.write(f"Fetched {len(iocs)} raw indicators from TAXII source.")
 
         deduped = dedup(iocs)
         count = upsert_indicators(deduped, source_name="taxii")

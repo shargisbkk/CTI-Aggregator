@@ -63,7 +63,8 @@ Install a Python version of your choosing from [python.org](https://www.python.o
 From the project folder, inside of the virtual environment, use the following commands:
 
 ```bash
-pip install django psycopg2-binary requests pandas stix2 python-dotenv
+# Use the requirements.txt file to install all necessary packages
+python -m pip install -r requirements.txt
 python manage.py migrate
 python manage.py createsuperuser
 ```
@@ -74,7 +75,7 @@ python manage.py createsuperuser
 
 API Keys:
 
-Create a `.env` file in the project root and add your keys. This file is gitignored and should never be committed.
+Create a `.env` file in the venv folder. This file is gitignored and should never be committed.
 
 ```
 OTX_API_KEY=your_otx_key_here

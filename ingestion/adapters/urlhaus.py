@@ -17,8 +17,6 @@ class URLhausAdapter(FeedAdapter):
         r = requests.get(URLHAUS_CSV_URL, timeout=120)
         r.raise_for_status()
 
-        # Column positions: id(0) dateadded(1) url(2) url_status(3)
-        #                   last_online(4) threat(5) tags(6) urlhaus_link(7) reporter(8)
         reader = csv.reader(
             (line for line in io.StringIO(r.text) if not line.startswith("#"))
         )
