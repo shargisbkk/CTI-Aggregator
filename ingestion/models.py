@@ -15,3 +15,18 @@ class IndicatorOfCompromise(models.Model):
 
     def __str__(self):
         return f"{self.ioc_type}:{self.ioc_value}"
+
+class FeedSource(models.Model):
+    """
+    DB-stored credentials + enable/disable for API-backed feeds (OTX, ThreatFox, URLhaus, etc).
+    DB-first with optional .env fallback.
+    sets us up for reading sources from DB
+    """
+    name = models.CharField(max_length=64, unique=True)   # "otx", "threatfox", "urlhaus"
+    api_key = models.TextField(blank=True, default="")
+    is_enabled = models.BooleanField(default=True)
+    config = models.JSONField(blank=True, default=dict)   # optional per-source settings
+    updated_at = models.DateTimeField(auto_now=True)
+
+    def __str__(self) -> str:
+        return f"{self.name} (enabled={self.is_enabled})"
