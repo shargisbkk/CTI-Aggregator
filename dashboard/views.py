@@ -28,7 +28,7 @@ from .models import Indicator, ThreatFeed, IngestionLog
 @login_required
 def home(request):
     # Total indicators
-    total_indicators = Indicator.objects.count()
+    total_indicators = IndicatorOfCompromise.objects.count()
 
     # Safe feed count (0 if Feed model doesn't exist)
     try:
