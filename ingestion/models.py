@@ -23,6 +23,7 @@ class FeedSource(models.Model):
     sets us up for reading sources from DB
     """
     name = models.CharField(max_length=64, unique=True)   # "otx", "threatfox", "urlhaus"
+    requires_api_key = models.BooleanField(default=True)
     api_key = models.TextField(blank=True, default="")
     is_enabled = models.BooleanField(default=True)
     config = models.JSONField(blank=True, default=dict)   # optional per-source settings
