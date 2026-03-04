@@ -67,7 +67,7 @@ def indicators(request):
     all_records = IndicatorOfCompromise.objects.all()
     paginator_25 = Paginator(all_records, 25)
     page_obj = paginator_25.get_page(request.GET.get('page'))
-    return render(request, "dashboard/dindicators.html", {'records': page_obj})
+    return render(request, "dashboard/indicators.html", {'records': page_obj})
 
     """
     query = Indicator.objects.select_related(
