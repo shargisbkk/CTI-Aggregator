@@ -117,8 +117,8 @@
                         <td>{{ row.ioc_type }}</td>
                         <td>{{ row.ioc_value }}</td>
                         <td>{{ row.confidence }}</td>
-                        <td>{{ row.labels }}%</td>
-                        <td>{{ row.sources }}</td>
+                        <td>{{ row.labels|join:", " }}</td>
+                        <td>{{ row.sources|join:", " }}</td>
                         <td>{{ row.first_seen }}</td>
                         <td>{{ row.last_seen }}</td>
                     </tr>
