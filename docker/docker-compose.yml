@@ -25,7 +25,9 @@ services:
     env_file:
       - ../.env
     volumes:
-      - ..:/src
+      - ..:/app
+    entrypoint:
+      ["bash", "/app/docker/entrypoint.sh"]
     ports:
       - "8000:8000"
 
