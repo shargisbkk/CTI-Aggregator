@@ -64,10 +64,17 @@ def home(request):
 @login_required
 def indicators(request):
 
+    # Pulls all records from the IndicatorsOfCompromise table in cti_db and uses the model from 
+    # ingestion.models.py.
     all_records = IndicatorOfCompromise.objects.all()
+
+    # Creates a paginator for storing all_records into an object that displays 25 at a time
     paginator_25 = Paginator(all_records, 25)
+    # Stores a single page of the paginator object at a time
     page_obj = paginator_25.get_page(request.GET.get('page'))
-    return render(request, "dashboard/indicators.html", {'records': page_obj})
+
+    
+    return render(request, "dashboard/indicators.html", {'page_obj': page_obj})
 
     """
     query = Indicator.objects.select_related(
