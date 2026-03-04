@@ -1,5 +1,5 @@
 import requests
-from django.conf import settings
+
 
 from ingestion.adapters.base import FeedAdapter
 from ingestion.adapters.registry import FeedRegistry
@@ -11,11 +11,11 @@ THREATFOX_API_URL = "https://threatfox-api.abuse.ch/api/v1/"
 class ThreatFoxAdapter(FeedAdapter):
     source_name = "threatfox"
 
-    def __init__(self, days: int = 7):
-        api_key = getattr(settings, "THREATFOX_API_KEY", "")
-        if not api_key:
-            raise RuntimeError("THREATFOX_API_KEY is not set.")
-        self._api_key = api_key
+    def __init__(self, api_key: str = "", max_pages: int = 500, days: int = 7):
+        self._api_key = (api_key or "").strip()
+        if not self._api_key:
+            raise RuntimeError("Missing API key for threatfox (configure FeedSource 'otx' in DB or enable env fallback).")
+        self._max_pages = max_pages
         self._days = days
 
     def fetch_raw(self) -> list[dict]:
