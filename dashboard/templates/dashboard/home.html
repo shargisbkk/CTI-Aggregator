@@ -37,18 +37,18 @@
     <div class="col-md-12">
         <div class="card shadow-sm p-4">
 
-            <h4 class="mb-3">Recent Indicators</h4>
+            <h4 class="mb-3">Top Threat Feeds</h4>
 
             <table class="table table-sm table-hover">
                 <thead>
                     <tr>
-                        <th>STIX ID</th>
-                        <th>Type</th>
-                        <th>Spec Version</th>
-                        <th>Created</th>
-                        <th>Modified</th>
                         <th>Source</th>
-                        <th>Collection ID</th>
+                        <th>Source Type</th>
+                        <th>Total Threats</th>
+                        <th>New in Last Year</th>
+                        <th>New in Last Month</th>
+                        <th>New in Last Week</th>
+                        <th>Source</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -64,7 +64,7 @@
                     </tr>
                     {% empty %}
                     <tr>
-                        <td colspan="7" class="text-center text-muted">No indicators yet.</td>
+                        <td colspan="7" class="text-center text-muted">No sources yet.</td>
                     </tr>
                     {% endfor %}
                 </tbody>
