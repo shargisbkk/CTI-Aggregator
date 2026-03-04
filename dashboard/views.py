@@ -11,6 +11,7 @@ from django.http import JsonResponse
 from django.core.management import call_command
 from datetime import timedelta
 from dashboard.models import Indicator, ThreatFeed, IngestionLog
+from ingestion.models import IndicatorOfCompromise
 from io import StringIO
 
 
@@ -63,6 +64,12 @@ def home(request):
 @login_required
 def indicators(request):
 
+    all_records = IndicatorOfCompromise.objects.all()
+    paginator_25 = Paginator(all_records, 25)
+    page_obj = paginator_25.get_page(request.GET.get('page'))
+    return render(request, "dashboard/dindicators.html", {'records': page_obj})
+
+    """
     query = Indicator.objects.select_related(
         "source_feed"
     ).all()
@@ -111,6 +118,7 @@ def indicators(request):
         "dashboard/indicators.html",
         context
     )
+    """
 
 
 # ======================================================

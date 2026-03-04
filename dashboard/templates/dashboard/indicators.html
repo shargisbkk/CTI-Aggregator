@@ -100,8 +100,9 @@
                 <tr>
                     <th>Type</th>
                     <th>Value</th>
-                    <th>Source</th>
                     <th>Confidence</th>
+                    <th>Labels</th>
+                    <th>Source</th>
                     <th>First Seen</th>
                     <th>Last Seen</th>
                 </tr>
@@ -110,15 +111,16 @@
             <!-- Table body -->
             <tbody>
 
-                {% for indicator in page_obj %}
+                {% for row in records %}
 
                     <tr>
-                        <td>{{ indicator.get_type_display }}</td>
-                        <td>{{ indicator.value }}</td>
-                        <td>{{ indicator.source_feed.name }}</td>
-                        <td>{{ indicator.confidence }}%</td>
-                        <td>{{ indicator.first_seen }}</td>
-                        <td>{{ indicator.last_seen }}</td>
+                        <td>{{ row.ioc_type }}</td>
+                        <td>{{ row.ioc_value }}</td>
+                        <td>{{ row.confidence }}</td>
+                        <td>{{ row.labels }}%</td>
+                        <td>{{ row.sources }}</td>
+                        <td>{{ row.first_seen }}</td>
+                        <td>{{ row.last_seen }}</td>
                     </tr>
 
                 {% empty %}

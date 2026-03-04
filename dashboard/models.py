@@ -1,4 +1,5 @@
 from django.db import models
+from ingestion.models import *
 
 
 class ThreatFeed(models.Model):
