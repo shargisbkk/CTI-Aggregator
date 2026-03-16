@@ -11,6 +11,7 @@ from django.http import JsonResponse
 from django.core.management import call_command
 from datetime import timedelta
 from dashboard.models import Indicator, ThreatFeed, IngestionLog
+from ingestion.models import IndicatorOfCompromise
 from io import StringIO
 
 
@@ -27,7 +28,7 @@ from .models import Indicator, ThreatFeed, IngestionLog
 @login_required
 def home(request):
     # Total indicators
-    total_indicators = Indicator.objects.count()
+    total_indicators = IndicatorOfCompromise.objects.count()
 
     # Safe feed count (0 if Feed model doesn't exist)
     try:
@@ -63,6 +64,19 @@ def home(request):
 @login_required
 def indicators(request):
 
+    # Pulls all records from the IndicatorsOfCompromise table in cti_db and uses the model from 
+    # ingestion.models.py.
+    all_records = IndicatorOfCompromise.objects.all()
+
+    # Creates a paginator for storing all_records into an object that displays 25 at a time
+    paginator_25 = Paginator(all_records, 25)
+    # Stores a single page of the paginator object at a time
+    page_obj = paginator_25.get_page(request.GET.get('page'))
+
+    
+    return render(request, "dashboard/indicators.html", {'page_obj': page_obj})
+
+    """
     query = Indicator.objects.select_related(
         "source_feed"
     ).all()
@@ -111,6 +125,7 @@ def indicators(request):
         "dashboard/indicators.html",
         context
     )
+    """
 
 
 # ======================================================

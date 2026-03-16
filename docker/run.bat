@@ -10,9 +10,9 @@ if %errorlevel% neq 0 (
   exit /b
 )
 
-if not exist .env (
+if not exist ..\.env (
   echo Creating .env from .env.example...
-  copy .env.example .env >nul
+  copy ..\.env.example ..\.env >nul
 )
 
 echo Starting CTI-Aggregator...
