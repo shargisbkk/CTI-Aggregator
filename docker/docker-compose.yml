@@ -16,9 +16,7 @@ services:
       retries: 10
 
   web:
-    build:
-      context: ..
-      dockerfile: docker/Dockerfile
+    image: plaguedoctor131/cti-aggregator-web:latest
     depends_on:
       db:
         condition: service_healthy
@@ -26,8 +24,7 @@ services:
       - ../.env
     volumes:
       - ..:/app
-    entrypoint:
-      ["bash", "/app/docker/entrypoint.sh"]
+    entrypoint: ["bash", "/app/docker/entrypoint.sh"]
     ports:
       - "8000:8000"
 
