@@ -2,7 +2,7 @@ import csv
 import io
 
 import requests
-
+from django.conf import settings
 from ingestion.adapters.base import FeedAdapter
 from ingestion.adapters.registry import FeedRegistry
 
@@ -13,6 +13,10 @@ URLHAUS_CSV_URL = "https://urlhaus.abuse.ch/downloads/csv_recent/"
 class URLhausAdapter(FeedAdapter):
     source_name = "urlhaus"
 
+    def __init__(self, api_key: str = "", *args, **kwargs):
+        # URLhaus typically doesn't require a key; accept it for consistency.
+        self._api_key = api_key or getattr(settings, "URLHAUS_API_KEY", "")
+        # no validation / no RuntimeError
     def fetch_raw(self) -> list[dict]:
         r = requests.get(URLHAUS_CSV_URL, timeout=120)
         r.raise_for_status()

@@ -1,6 +1,6 @@
 import logging
 
-from django.conf import settings
+
 
 from ingestion.adapters.base import FeedAdapter
 from ingestion.adapters.http import request_with_retry
@@ -30,9 +30,9 @@ class OTXAdapter(FeedAdapter):
     source_name = "otx"
 
     def __init__(self, api_key: str = "", max_pages: int = 500, days: int = 365):
-        self._api_key = api_key or getattr(settings, "OTX_API_KEY", "")
+        self._api_key = (api_key or "").strip()
         if not self._api_key:
-            raise RuntimeError("OTX_API_KEY is not set. Pass it via CLI or settings.")
+            raise RuntimeError("Missing API key for otx (configure FeedSource 'otx' in DB or enable env fallback).")
         self._max_pages = max_pages
         self._days = days
 
