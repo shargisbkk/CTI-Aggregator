@@ -69,10 +69,13 @@
     
     <!-- Navbar -->
     <nav class="navbar navbar-dark navbar-custom px-3">
-        <span class="navbar-brand">CTI Aggregator</span>
+        <div>
+            <span class="navbar-brand">CTI Aggregator</span>
+        </div>
 
         <!-- Check if user is authenticated -->
         <div class="d-flex align-items-center gap-2">
+            <a href="{% url 'admin:index' %}" class="text-white text-decoration-none">Admin Settings</a>
             <button id="darkModeToggle" class="btn btn-outline-light btn-sm" type="button">Dark Mode</button>
             {% if user.is_authenticated %}
                 <span class="text-white me-3">Hello, {{ user.username }}</span>
@@ -108,7 +111,7 @@
                 document.body.classList.toggle('dark-mode', isDark);
                 localStorage.setItem('theme', isDark ? 'dark' : 'light');
                 document.cookie = `theme=${isDark ? 'dark' : 'light'}; path=/; max-age=31536000`;
-                toggleButton.textContent = isDark ? '☀️ Light Mode' : '🌙 Dark Mode';
+                toggleButton.textContent = isDark ? 'Light Mode' : 'Dark Mode';
             }
 
             const savedTheme = localStorage.getItem('theme');
