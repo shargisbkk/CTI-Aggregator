@@ -9,18 +9,24 @@
 
     <!-- Custom CSS for sidebar and layout -->
     <style>
+        :root {
+            --navbar-height: 56px;
+        }
+
         body {
             overflow-x: hidden;
         }
         .sidebar {
             width: 240px;
-            height: 100vh;
+            height: calc(100vh - var(--navbar-height));
             position: fixed;
-            top: 0;
+            top: var(--navbar-height);
             left: 0;
             background: #1f2937;
             color: white;
-            padding-top: 60px;
+            padding-top: 12px;
+            z-index: 1020;
+            overflow-y: auto;
         }
         .sidebar a {
             color: #d1d5db;
@@ -40,10 +46,22 @@
         .content {
             margin-left: 240px;
             padding: 20px;
+            padding-top: calc(var(--navbar-height) + 20px);
         }
         .navbar-custom {
-            margin-left: 240px;
             background: #111827;
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            min-height: 56px;
+            height: auto;
+            display: flex;
+            align-items: center;
+            z-index: 1030;
+        }
+        .navbar-custom .navbar-brand {
+            margin-bottom: 0;
         }
         .dark-mode {
         background-color: #1f2937;
@@ -68,7 +86,7 @@
 <body class="{% if request.COOKIES.theme|default:'' == 'dark' %}dark-mode{% endif %}">
     
     <!-- Navbar -->
-    <nav class="navbar navbar-dark navbar-custom px-3">
+    <nav class="navbar navbar-dark navbar-custom px-3 flex-wrap gap-2">
         <div>
             <span class="navbar-brand">CTI Aggregator</span>
         </div>
@@ -92,7 +110,7 @@
         <a href="{% url 'dashboard:dashboard-indicators' %}" class="{% if '/indicators' in request.path %}active{% endif %}">Indicators</a>
         <a href="{% url 'dashboard:dashboard-threat-feeds' %}" class="{% if '/feeds' in request.path %}active{% endif %}">Threat Feeds</a>
         <a href="{% url 'dashboard:dashboard-analytics' %}" class="{% if '/analytics' in request.path %}active{% endif %}">Analytics</a>
-        <a href="{% url 'dashboard:dashboard-settings' %}" class="{% if '/settings' in request.path %}active{% endif %}">Settings</a>
+        <!-- <a href="{% url 'dashboard:dashboard-settings' %}" class="{% if '/settings' in request.path %}active{% endif %}">Settings</a> -->
     </div>
 
 
@@ -106,6 +124,13 @@
     <script>
         (function () {
             const toggleButton = document.getElementById('darkModeToggle');
+            const navbar = document.querySelector('.navbar-custom');
+
+            function syncNavbarHeight() {
+                if (!navbar) return;
+                const navbarHeight = navbar.offsetHeight;
+                document.documentElement.style.setProperty('--navbar-height', `${navbarHeight}px`);
+            }
 
             function setTheme(isDark) {
                 document.body.classList.toggle('dark-mode', isDark);
@@ -120,6 +145,9 @@
             } else {
                 setTheme(document.body.classList.contains('dark-mode'));
             }
+
+            syncNavbarHeight();
+            window.addEventListener('resize', syncNavbarHeight);
 
             toggleButton.addEventListener('click', function () {
                 const isDark = !document.body.classList.contains('dark-mode');
