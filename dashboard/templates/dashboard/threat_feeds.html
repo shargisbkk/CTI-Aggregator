@@ -23,7 +23,7 @@
         <h2 class="fw-bold">Threat Feeds</h2>
 
         <!-- Placeholder for future feed creation -->
-        <a href="#" class="btn btn-primary">
+        <a href="{% url 'admin:ingestion_feedsource_add' %}" class="btn btn-primary">
             + Add Feed
         </a>
     </div>
@@ -59,11 +59,10 @@
             <thead>
                 <tr>
                     <th>Name</th>
-                    <th>Source</th>
+                    <th>Source Url</th>
                     <th>Status</th>
-                    <th>Last Run</th>
                     <th>Indicators Pulled</th>
-                    <th>Actions</th>
+                    <th>Last Pulled</th>
                 </tr>
             </thead>
 
@@ -96,6 +95,11 @@
                             {% endif %}
                         </td>
 
+                        <!-- Number of indicators pulled -->
+                        <td>
+                            {{ feed.last_count }}
+                        </td>
+                        
                         <!-- Last ingestion run -->
                         <td>
                             {% if feed.last_run %}
@@ -103,26 +107,6 @@
                             {% else %}
                                 <span class="text-muted">Never</span>
                             {% endif %}
-                        </td>
-
-
-                        <!-- Number of indicators pulled -->
-                        <td>
-                            {{ feed.last_count }}
-                        </td>
-
-                        <!-- Manual run action -->
-                        <td>
-
-                            <form method="post"
-                                  action="{% url 'run_feed' feed.id %}">
-                                {% csrf_token %}
-
-                                <button class="btn btn-sm btn-outline-secondary">
-                                    Run Now
-                                </button>
-                            </form>
-
                         </td>
                     </tr>
 
