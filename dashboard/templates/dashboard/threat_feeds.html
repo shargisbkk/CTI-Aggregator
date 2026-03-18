@@ -144,41 +144,6 @@
 
     </div>
 
-
-    <!-- ==================================================
-         INGESTION LOGS PANEL
-         Shows recent ingestion activity
-    =================================================== -->
-
-    <div class="card shadow-sm p-4">
-
-        <h5 class="fw-bold mb-3">
-            Recent Ingestion Logs
-        </h5>
-
-        <div class="bg-light rounded p-3 text-muted"
-             style="height: 200px; overflow-y: auto;">
-
-            {% for log in logs %}
-
-                <div class="mb-1">
-                    <small class="text-muted">
-                        {{ log.timestamp }}
-                    </small>
-                    —
-                    {{ log.message }}
-                </div>
-
-            {% empty %}
-
-                No logs yet.
-
-            {% endfor %}
-
-        </div>
-
-    </div>
-
 </div>
 
 <!-- JavaScript for Update All Feeds button
