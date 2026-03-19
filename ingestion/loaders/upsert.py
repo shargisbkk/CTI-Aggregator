@@ -1,9 +1,12 @@
 import json
+import logging
 import math
 import pandas as pd
 from django.db import connection
 
 from ingestion.models import IndicatorOfCompromise
+
+logger = logging.getLogger(__name__)
 
 BATCH_SIZE = 1000
 
@@ -86,6 +89,9 @@ def upsert_indicators(normalized_records: list[dict], source_name: str = "") -> 
 
     if batch:
         created += _upsert_batch(batch)
+
+    logger.info("upsert: %d records → %d new (source: %s)",
+                len(normalized_records), created, source_name or "unknown")
 
     return created
 

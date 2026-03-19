@@ -27,6 +27,7 @@ class FeedSource(models.Model):
     api_key = models.TextField(blank=True, default="")
     is_enabled = models.BooleanField(default=True)
     config = models.JSONField(blank=True, default=dict)   # optional per-source settings
+    last_pulled = models.DateTimeField(null=True, blank=True)  # tracks when we last pulled so cron only grabs new data
     updated_at = models.DateTimeField(auto_now=True)
 
     def __str__(self) -> str:

@@ -29,21 +29,28 @@ class OTXAdapter(FeedAdapter):
 
     source_name = "otx"
 
-    def __init__(self, api_key: str = "", max_pages: int = 500, days: int = 365):
-        self._api_key = (api_key or "").strip()
+    DEFAULT_URL = "https://otx.alienvault.com/api/v1/pulses/subscribed"
+
+    # days=30 for initial pull, since overrides days when set by ingest_all
+    def __init__(self, api_key: str = "", max_pages: int = 500, days: int = 30, since=None, config=None):
+        super().__init__(api_key, since, config)
         if not self._api_key:
             raise RuntimeError("Missing API key for otx (configure FeedSource 'otx' in DB or enable env fallback).")
         self._max_pages = max_pages
         self._days = days
+        self._url = self.config.get("url", self.DEFAULT_URL)
 
     def fetch_raw(self) -> list[dict]:
         """Paginate through all subscribed OTX pulses and extract indicators."""
         headers = {"X-OTX-API-KEY": self._api_key}
-        base_url = "https://otx.alienvault.com/api/v1/pulses/subscribed"
+        base_url = self._url
 
         params = {"limit": 50}
-        if self._days > 0:
-            from datetime import datetime, timedelta, timezone
+        from datetime import datetime, timedelta, timezone
+        # use last_pulled timestamp if we have one, otherwise fall back to days window
+        if self.since:
+            params["modified_since"] = self.since.strftime("%Y-%m-%dT%H:%M:%SZ")
+        elif self._days > 0:
             cutoff = datetime.now(timezone.utc) - timedelta(days=self._days)
             params["modified_since"] = cutoff.strftime("%Y-%m-%dT%H:%M:%SZ")
 

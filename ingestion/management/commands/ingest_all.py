@@ -1,9 +1,10 @@
 import ingestion.adapters  # noqa: F401 -- triggers @FeedRegistry.register decorators
 from django.core.management.base import BaseCommand
+from django.utils import timezone
 from ingestion.adapters.registry import FeedRegistry
 from ingestion.loaders.upsert import upsert_indicators
+from ingestion.models import FeedSource
 from processors.dedup import dedup
-from django.core.management import call_command
 from ingestion.source_config import get_api_key, is_enabled
 
 class Command(BaseCommand):
@@ -12,20 +13,25 @@ class Command(BaseCommand):
     def handle(self, *args, **opts):
         total = 0
         for name, adapter_class in FeedRegistry.all().items():
-            api_key = get_api_key(name, fallback_to_env=True)
-            adapter = adapter_class(api_key=api_key)
-            # 1) DB-driven enable/disable
+            # skip disabled feeds
             if not is_enabled(name):
                 self.stdout.write(self.style.WARNING(f"Skipping {name}: disabled in DB"))
                 continue
 
-            # 2) DB-first API key (fallback to env for now)
+            # grab API key from DB first, fall back to .env
             api_key = get_api_key(name, fallback_to_env=True)
 
-            self.stdout.write(f"Fetching {name}...")
+            # None on first run means adapter falls back to default 30 day window
+            source, _ = FeedSource.objects.get_or_create(name=name)
+            since = source.last_pulled
+
+            if since:
+                self.stdout.write(f"Fetching {name} (since {since.isoformat()})...")
+            else:
+                self.stdout.write(f"Fetching {name} (initial pull)...")
+
             try:
-                # Convention: adapters accept api_key (or ignore it)
-                adapter = adapter_class(api_key=api_key)
+                adapter = adapter_class(api_key=api_key, since=since, config=source.config)
 
                 iocs = adapter.ingest()
                 if not iocs:
@@ -39,6 +45,10 @@ class Command(BaseCommand):
                     f"  {name}: saved {count} new indicators ({len(iocs)} raw, {len(deduped)} after dedup)"
                 )
                 total += count
+
+                # only stamp last_pulled after success so failures retry from same point
+                source.last_pulled = timezone.now()
+                source.save(update_fields=["last_pulled"])
 
             except RuntimeError as e:
                 self.stdout.write(self.style.WARNING(f"  {name} skipped: {e}"))

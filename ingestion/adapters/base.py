@@ -1,5 +1,6 @@
 import logging
 from abc import ABC, abstractmethod
+from datetime import datetime
 from typing import Optional
 
 from ingestion.type_map import TYPE_MAP
@@ -47,6 +48,12 @@ class FeedAdapter(ABC):
 """
 
     source_name: str = ""
+
+    def __init__(self, api_key: str = "", since: Optional[datetime] = None, config: Optional[dict] = None):
+        # shared setup so subclasses don't repeat themselves
+        self._api_key = (api_key or "").strip()
+        self.since = since
+        self.config = config or {}
 
     def normalize_record(self, raw: dict) -> dict:
         """
