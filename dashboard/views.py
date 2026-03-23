@@ -189,12 +189,33 @@ def analytics(request):
     # Summary stats
     # ----------------------------
 
-    total_indicators = Indicator.objects.count()
+    # Pulls all records from the IndicatorsOfCompromise table in cti_db and uses the model from 
+    # ingestion.models.py.
+    count_records = IndicatorOfCompromise.objects.count()
+    # Queryable records variable
+    all_records = IndicatorOfCompromise.objects.all()
 
-    high_confidence = Indicator.objects.filter(
+    # Confidence level, set to 75
+    high_confidence = IndicatorOfCompromise.objects.filter(
         confidence__gte=75
     ).count()
 
+    # Recent this week, wait for timestamp
+    # new_this_week = IndicatorOfCompromise.objects.filter().count()
+    last_seen_this_week = (IndicatorOfCompromise.objects
+                           .filter(last_seen__gte=timezone.now() - timedelta(days=7))
+                           .count()
+    )
+
+    active_feeds = "Not Implemented"
+
+    top_sources = (IndicatorOfCompromise.objects
+                   .values("sources")
+                   .annotate(count=Count("sources"))
+                   .order_by("-count")[:10]
+    )
+
+    '''
     new_this_week = Indicator.objects.filter(
         created__gte=timezone.now() - timedelta(days=7)
     ).count()
@@ -216,16 +237,6 @@ def analytics(request):
         .order_by("day")
     )
 
-    # ----------------------------
-    # Top sources by indicator count
-    # ----------------------------
-
-    top_sources = (
-        ThreatFeed.objects
-        .annotate(count=Count("indicators"))
-        .order_by("-count")[:10]
-    )
-
     context = {
         "total_indicators": total_indicators,
         "high_confidence": high_confidence,
@@ -233,6 +244,14 @@ def analytics(request):
         "active_feeds": active_feeds,
         "volume_over_time": volume_over_time,
         "top_sources": top_sources,
+    }
+    '''
+    context = {
+        "total_indicators" : count_records,
+        "high_confidence" : high_confidence,
+        "last_seen_this_week" : last_seen_this_week,
+        "active_feeds" : active_feeds,
+        "top_sources" : top_sources
     }
 
     return render(
