@@ -28,6 +28,7 @@ class FeedSource(models.Model):
     is_enabled = models.BooleanField(default=True)
     config = models.JSONField(blank=True, default=dict)   # optional per-source settings
     updated_at = models.DateTimeField(auto_now=True)
+    sourceurl = models.CharField(blank=True)
 
     def __str__(self) -> str:
         return f"{self.name} (enabled={self.is_enabled})"

@@ -7,7 +7,6 @@ class ThreatFeed(models.Model):
     name = models.CharField(max_length=255)
     url = models.URLField()
     active = models.BooleanField(default=True)
-
     last_run = models.DateTimeField(null=True, blank=True)
     
     def __str__(self):

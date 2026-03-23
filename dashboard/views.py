@@ -10,9 +10,10 @@ from django.utils import timezone
 from django.http import JsonResponse
 from django.core.management import call_command
 from datetime import timedelta
-from dashboard.models import Indicator, ThreatFeed, IngestionLog
+from dashboard.models import Indicator, ThreatFeed, IngestionLog, FeedSource
 from ingestion.models import IndicatorOfCompromise
 from io import StringIO
+
 
 
 from datetime import timedelta
@@ -135,15 +136,25 @@ def indicators(request):
 
 @login_required
 def threat_feeds(request):
-    # Get all feeds ordered by name
-    feeds = ThreatFeed.objects.all().order_by('name')
+    sources = FeedSource.objects.all().order_by("name")
+    logs = IngestionLog.objects.order_by("-timestamp")[:20]
 
-    # Get recent ingestion logs (latest 20)
-    logs = IngestionLog.objects.order_by('-timestamp')[:20]
+    feeds = []
+    for source in sources:
+        config = source.config or {}
+
+        feeds.append({
+            "id": source.id,
+            "name": source.name,
+            "url": config.get("url", ""),
+            "active": source.is_enabled,
+            "last_run": source.updated_at,
+            "last_count": config.get("last_count", 0),
+        })
 
     context = {
         "feeds": feeds,
-        "logs": logs
+        "logs": logs,
     }
     return render(request, "dashboard/threat_feeds.html", context)
 
