@@ -208,7 +208,7 @@ def analytics(request):
 
     # Confidence level, set to 75
     high_confidence = IndicatorOfCompromise.objects.filter(
-        confidence__gte=75
+        confidence__gte=95
     ).count()
 
     # Recent this week, wait for timestamp
