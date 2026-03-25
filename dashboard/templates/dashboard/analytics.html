@@ -56,15 +56,16 @@
         <div class="col-md-3">
             <div class="card shadow-sm p-3">
                 <h6 class="text-muted">
-                    New This Week
+                    Last Seen This Week
                 </h6>
                 <h2 class="fw-bold">
-                    {{ new_this_week }}
+                    {{ last_seen_this_week }}
                 </h2>
             </div>
         </div>
 
-        <!-- Active feeds -->
+        <!-- Active feeds *MAY REMOVE* -->
+        <!--
         <div class="col-md-3">
             <div class="card shadow-sm p-3">
                 <h6 class="text-muted">
@@ -75,6 +76,7 @@
                 </h2>
             </div>
         </div>
+        -->
 
     </div>
 
@@ -101,20 +103,20 @@
 
             <tbody>
 
-                {% for feed in top_sources %}
+                {% for source in top_sources %}
 
                     <tr>
-                        <td>{{ feed.name }}</td>
+                        <td>{{ source.sources }}</td>
 
                         <td>
-                            <a href="{{ feed.url }}"
+                            <a href="#"
                                target="_blank">
-                                {{ feed.url }}
+                                Feed URLs
                             </a>
                         </td>
 
                         <td>
-                            {{ feed.count }}
+                            {{ source.count }}
                         </td>
                     </tr>
 

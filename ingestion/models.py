@@ -54,6 +54,7 @@ class FeedSource(models.Model):
     config = models.JSONField(blank=True, default=dict)
     last_pulled = models.DateTimeField(null=True, blank=True)
     updated_at = models.DateTimeField(auto_now=True)
+    sourceurl = models.CharField(blank=True)
 
     def __str__(self) -> str:
         return self.name
