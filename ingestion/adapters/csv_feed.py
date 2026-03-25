@@ -95,7 +95,7 @@ class CsvFeedAdapter(FeedAdapter):
                     else:
                         parts = [cell] if cell else []
                     for part in parts:
-                        if part and part not in labels:
+                        if part and part.lower() != "none" and part not in labels:
                             labels.append(part)
 
             indicators.append({

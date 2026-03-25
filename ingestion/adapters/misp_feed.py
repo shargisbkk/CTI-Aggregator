@@ -113,12 +113,16 @@ class MispFeedAdapter(FeedAdapter):
 
             # Handle both {"Event": {...}} and bare event dict
             event = event_data.get("Event", event_data)
-            event_info = event.get("info", "")
-            event_tags = [
-                t.get("name", "").strip().lower()
-                for t in event.get("Tag", [])
-                if t.get("name")
-            ]
+
+            # Extract event info as a label — this carries the actual threat
+            # context (e.g. "Dridex Ransomware", "Turla Backdoor").
+            event_label = (event.get("info") or "").strip()
+            # Strip common "OSINT" / "OSINT -" / "OSINT:" prefixes
+            for prefix in ("OSINT -", "OSINT:", "OSINT"):
+                if event_label.upper().startswith(prefix.upper()):
+                    event_label = event_label[len(prefix):].strip()
+                    break
+            event_label = event_label.lower() if event_label else ""
 
             for attr in event.get("Attribute", []):
                 if filter_to_ids and not attr.get("to_ids", False):
@@ -139,8 +143,12 @@ class MispFeedAdapter(FeedAdapter):
 
                 ioc_type = MISP_TYPE_MAP.get(misp_type, misp_type)
 
-                # Build labels from event tags + attribute category
-                labels = event_tags[:]
+                # Use attribute category as the label (e.g. "network activity",
+                # "payload installation").  Event-level tags are MISP metadata
+                # (tlp:white, type:OSINT) — same on every event, so skip them.
+                labels = list(self.config.get("static_labels", []))
+                if event_label and event_label not in labels:
+                    labels.append(event_label)
                 category = (attr.get("category") or "").strip().lower()
                 if category and category not in labels:
                     labels.append(category)

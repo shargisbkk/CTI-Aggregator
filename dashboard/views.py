@@ -82,6 +82,11 @@ def indicators(request):
     if source_filter:
         query = query.filter(sources__contains=[source_filter])
 
+    # Label filter
+    label_filter = request.GET.get("label", "").strip()
+    if label_filter:
+        query = query.filter(labels__contains=[label_filter])
+
     # Confidence level filter (high/medium/low/none)
     conf = request.GET.get("confidence", "").strip()
     if conf == "high":
@@ -120,6 +125,7 @@ def indicators(request):
         "current_type": type_filter,
         "current_source": source_filter,
         "current_confidence": conf,
+        "current_label": label_filter,
     }
 
     return render(request, "dashboard/indicators.html", context)
