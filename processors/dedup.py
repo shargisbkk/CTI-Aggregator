@@ -1,4 +1,8 @@
+import logging
+
 import pandas as pd
+
+logger = logging.getLogger(__name__)
 
 
 def dedup(records: list[dict]) -> list[dict]:
@@ -15,7 +19,11 @@ def dedup(records: list[dict]) -> list[dict]:
     for col in ("first_seen", "last_seen"):
         df[col] = pd.to_datetime(df[col], utc=True, errors="coerce")
 
+    before = len(df)
     df = df.sort_values("last_seen", ascending=False)
     df = df.drop_duplicates(subset=["ioc_type", "ioc_value"], keep="first")
+    after = len(df)
+
+    logger.info("dedup: %d → %d (removed %d duplicates)", before, after, before - after)
 
     return df.reset_index(drop=True).to_dict("records")

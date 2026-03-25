@@ -1,40 +1,43 @@
-import os
-from typing import Optional
+"""
+The database (FeedSource table) is the single source of truth for all
+feed configuration. No hardcoded defaults — everything lives in the
+FeedSource.config JSONField, managed through the Django admin.
+"""
+
+import importlib
+
 from ingestion.models import FeedSource
 
-ENV_FALLBACK = {
-    "otx": "OTX_API_KEY",
-    "threatfox": "THREATFOX_API_KEY",
-    "urlhaus": "URLHAUS_API_KEY",
+# Maps adapter_type choices to their fully-qualified class paths.
+# Adding a new transport pattern = adding one entry here + one adapter file.
+ADAPTER_TYPES = {
+    "json": "ingestion.adapters.json_feed.JsonFeedAdapter",
+    "csv": "ingestion.adapters.csv_feed.CsvFeedAdapter",
+    "text": "ingestion.adapters.text_feed.TextFeedAdapter",
+    "misp": "ingestion.adapters.misp_feed.MispFeedAdapter",
+    "taxii": "ingestion.adapters.taxii.TaxiiFeedAdapter",
 }
 
-def get_api_key(source: str, *, fallback_to_env: bool = True) -> str:
-    """
-    DB-first API key lookup.
-    If missing/disabled in DB, optionally fallback to .env.
-    """
-    source = source.lower().strip()
 
+def get_adapter_class(adapter_type: str):
+    """
+    Map an adapter_type string (from FeedSource.adapter_type) to the
+    corresponding generic adapter class. Returns None if unknown.
+    """
+    path = ADAPTER_TYPES.get(adapter_type)
+    if not path:
+        return None
+    module_path, class_name = path.rsplit(".", 1)
+    module = importlib.import_module(module_path)
+    return getattr(module, class_name)
+
+
+def get_api_key(source_name: str) -> str:
+    """Look up the API key for a feed from the FeedSource table."""
     try:
-        row: Optional[FeedSource] = FeedSource.objects.get(name=source)
+        row = FeedSource.objects.get(name=source_name.lower().strip())
         if not row.is_enabled:
             return ""
-        key = (row.api_key or "").strip()
-        if key:
-            return key
+        return (row.api_key or "").strip()
     except FeedSource.DoesNotExist:
-        pass
-
-    if not fallback_to_env:
         return ""
-
-    env_name = ENV_FALLBACK.get(source)
-    return (os.environ.get(env_name, "") if env_name else "").strip()
-
-def is_enabled(source: str) -> bool:
-    source = source.lower().strip()
-    try:
-        row = FeedSource.objects.get(name=source)
-        return bool(row.is_enabled)
-    except FeedSource.DoesNotExist:
-        return True  # default to enabled if not configured

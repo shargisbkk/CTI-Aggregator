@@ -1,28 +1,20 @@
 """
-Feed adapters for CTI ingestion.
-
-Importing this package:
-  - Exposes FeedAdapter and FeedRegistry for external use.
-  - Imports OTXAdapter, ThreatFoxAdapter, and URLhausAdapter, which triggers
-    their @FeedRegistry.register decorators, making them discoverable by ingest_all.
-
-STIXAdapter and TAXIIAdapter are NOT imported here because they require
-runtime parameters (folder path / server URL) and are invoked directly by
-their own management commands.
+Generic transport adapters — one per data format.
+Source-specific config lives in FeedSource.config (DB).
 """
 
 from ingestion.adapters.base import FeedAdapter
-from ingestion.adapters.registry import FeedRegistry
-
-# Trigger registration of API-backed adapters
-from ingestion.adapters.otx import OTXAdapter
-from ingestion.adapters.threatfox import ThreatFoxAdapter
-from ingestion.adapters.urlhaus import URLhausAdapter
+from ingestion.adapters.json_feed import JsonFeedAdapter
+from ingestion.adapters.csv_feed import CsvFeedAdapter
+from ingestion.adapters.text_feed import TextFeedAdapter
+from ingestion.adapters.misp_feed import MispFeedAdapter
+from ingestion.adapters.taxii import TaxiiFeedAdapter
 
 __all__ = [
     "FeedAdapter",
-    "FeedRegistry",
-    "OTXAdapter",
-    "ThreatFoxAdapter",
-    "URLhausAdapter",
+    "JsonFeedAdapter",
+    "CsvFeedAdapter",
+    "TextFeedAdapter",
+    "MispFeedAdapter",
+    "TaxiiFeedAdapter",
 ]
