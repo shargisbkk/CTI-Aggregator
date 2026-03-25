@@ -85,7 +85,7 @@ DATABASES = { #Anon db credentials
         "NAME": os.environ.get("POSTGRES_DB", "cti_db"),
         "USER": os.environ.get("POSTGRES_USER", "postgres"),
         "PASSWORD": os.environ.get("POSTGRES_PASSWORD", "password"),
-        "HOST": os.environ.get("POSTGRES_HOST", "db"),
+        "HOST": os.environ.get("POSTGRES_HOST", "localhost"),
         "PORT": os.environ.get("POSTGRES_PORT", "5432"),
     }
 }
@@ -136,12 +136,8 @@ LOGIN_URL = '/login/'
 LOGIN_REDIRECT_URL = '/'
 LOGOUT_REDIRECT_URL = '/login/'
 
-# Feed API keys — set these in your .env file (never commit the actual values)
-# Each adapter reads its own key directly; add a new line here when adding a
-# new API-backed feed adapter.
-OTX_API_KEY       = os.environ.get("OTX_API_KEY", "")
-THREATFOX_API_KEY = os.environ.get("THREATFOX_API_KEY", "")
-URLHAUS_API_KEY   = os.environ.get("URLHAUS_API_KEY", "")
+# Feed API keys are stored in the DB (FeedSource table), managed via the settings page.
+# No feed-related env vars needed — .env is only for infrastructure (DB, SECRET_KEY, DEBUG).
 
 # Logging Configuration
 # https://docs.djangoproject.com/en/5.2/topics/logging/

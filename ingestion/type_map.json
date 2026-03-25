@@ -42,6 +42,8 @@
     "mutex":                "mutex",
     "yara":                 "yara",
     "ssl_cert":             "ssl_cert",
+    "sslcertfingerprint":   "ssl_cert",
+    "ssl-cert-sha1":        "ssl_cert",
     "asn":                  "asn",
     "ja3":                  "ja3"
 }

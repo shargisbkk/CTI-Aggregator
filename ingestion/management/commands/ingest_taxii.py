@@ -2,7 +2,7 @@ from datetime import datetime, timedelta, timezone
 
 from django.core.management.base import BaseCommand
 
-from ingestion.adapters.taxii import TAXIIAdapter
+from ingestion.adapters.taxii import TaxiiFeedAdapter
 from ingestion.loaders.upsert import upsert_indicators
 from processors.dedup import dedup
 
@@ -27,19 +27,22 @@ class Command(BaseCommand):
         )
 
     def handle(self, *args, **opts):
-        days = opts["days"]
-        added_after = ""
-        if days > 0:
-            cutoff = datetime.now(timezone.utc) - timedelta(days=days)
-            added_after = cutoff.strftime("%Y-%m-%dT%H:%M:%SZ")
+        since = None
+        if opts["days"] > 0:
+            since = datetime.now(timezone.utc) - timedelta(days=opts["days"])
 
-        adapter = TAXIIAdapter(
-            discovery_url=opts["url"],
-            username=opts["username"],
-            password=opts["password"],
-            added_after=added_after,
+        config = {
+            "discovery_url": opts["url"],
+            "username": opts["username"],
+            "password": opts["password"],
+            "collection_id": opts["collection"],
+            "_source_name": "taxii",
+        }
+
+        adapter = TaxiiFeedAdapter(
             api_key=opts["api_key"],
-            collection_id=opts["collection"],
+            since=since,
+            config=config,
         )
 
         iocs = adapter.ingest()
