@@ -24,9 +24,9 @@ class IndicatorOfCompromise(models.Model):
 
     @property
     def confidence_level(self):
-        """Map numeric confidence to High / Medium / Low / Unknown."""
+        """Map numeric confidence to High / Medium / Low."""
         if self.confidence is None:
-            return "Unknown"
+            return "Low"
         for label, display, low, high in self.CONFIDENCE_LEVELS:
             if low <= self.confidence <= high:
                 return display

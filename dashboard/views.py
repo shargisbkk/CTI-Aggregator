@@ -82,14 +82,15 @@ def indicators(request):
     if source_filter:
         query = query.filter(sources__contains=[source_filter])
 
-    # Confidence level filter (high/medium/low)
+    # Confidence level filter (high/medium/low/none)
     conf = request.GET.get("confidence", "").strip()
     if conf == "high":
         query = query.filter(confidence__gte=95)
     elif conf == "medium":
         query = query.filter(confidence__gte=50, confidence__lt=95)
     elif conf == "low":
-        query = query.filter(confidence__gte=1, confidence__lt=50)
+        from django.db.models import Q
+        query = query.filter(Q(confidence__lt=50) | Q(confidence__isnull=True))
 
     query = query.order_by("-last_seen")
 
