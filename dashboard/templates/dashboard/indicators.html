@@ -145,7 +145,7 @@
                         </td>
                         <td>
                             {% for label in row.labels %}
-                                <a href="?label={{ label }}"
+                                <a href="?label={{ label|urlencode }}"
                                    class="badge text-decoration-none me-1"
                                    style="background-color: #d1ecf1; color: #0c5460;">{{ label }}</a>
                             {% endfor %}

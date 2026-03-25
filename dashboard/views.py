@@ -2,22 +2,16 @@ from django.contrib.auth.decorators import login_required
 from django.shortcuts import render, get_object_or_404, redirect
 from django.utils import timezone
 from django.core.paginator import Paginator
-from django.db.models import Q
-from django.views.decorators.http import require_POST
-from django.db.models import Count
+from django.db.models import Q, Count
 from django.db.models.functions import TruncDate
-from django.utils import timezone
+from django.views.decorators.http import require_POST
 from django.http import JsonResponse
 from django.core.management import call_command
 from datetime import timedelta
-from dashboard.models import Indicator, ThreatFeed, IngestionLog
-from ingestion.models import IndicatorOfCompromise
 from io import StringIO
 
-
-from datetime import timedelta
-
-from .models import Indicator, ThreatFeed, IngestionLog
+from dashboard.models import Indicator, ThreatFeed, IngestionLog
+from ingestion.models import IndicatorOfCompromise
 
 
 # ======================================================
@@ -94,7 +88,6 @@ def indicators(request):
     elif conf == "medium":
         query = query.filter(confidence__gte=50, confidence__lt=95)
     elif conf == "low":
-        from django.db.models import Q
         query = query.filter(Q(confidence__lt=50) | Q(confidence__isnull=True))
 
     query = query.order_by("-last_seen")
