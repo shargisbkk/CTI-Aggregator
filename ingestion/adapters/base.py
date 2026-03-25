@@ -38,29 +38,19 @@ def _clean_labels(raw_labels: list, ioc_type: str) -> list:
 
 
 class FeedAdapter(ABC):
-    """
-    Abstract base class for all feed adapters.
-
-    Subclasses set source_name and implement fetch_raw().
-    Type classification maps the source-provided type via TYPE_MAP.
-    The concrete ingest() handles parsing and error recovery so that
-    a single bad record never discards the entire batch.
-"""
+    """Base class for all feed adapters. Subclasses implement fetch_raw()."""
 
     source_name: str = ""
+    requires_api_key: bool = True
 
     def __init__(self, api_key: str = "", since: Optional[datetime] = None, config: Optional[dict] = None):
-        # shared setup so subclasses don't repeat themselves
+        # common init so subclasses don't repeat this
         self._api_key = (api_key or "").strip()
         self.since = since
         self.config = config or {}
 
     def normalize_record(self, raw: dict) -> dict:
-        """
-        Parse one raw source dict into a standardized indicator dict.
-
-        Maps the source-provided ioc_type to a canonical type via TYPE_MAP.
-        """
+        """Parse a raw dict into a standardized indicator, mapping types via TYPE_MAP."""
         raw_value = str(raw.get("ioc_value") or "").strip()
         raw_type = str(raw.get("ioc_type") or "").strip().lower()
 
@@ -86,18 +76,12 @@ class FeedAdapter(ABC):
         }
 
     def ingest(self) -> list[dict]:
-        """
-        Fetch raw records and parse each one safely.
-
-        Best-effort: if fetch_raw() raises, returns an empty list.
-        If a single record fails to parse, skips it and continues
-        so one bad record never discards the entire batch.
-        """
+        """Fetch and normalize records. Skips bad records so one failure won't drop the batch."""
         try:
             raw_records = self.fetch_raw()
         except Exception:
             logger.exception("%s: fetch_raw() failed", self.source_name)
-            return []
+            return None  # None = fetch failed (vs [] = no new data)
 
         indicators = []
         skipped = 0

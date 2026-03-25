@@ -1,58 +1,75 @@
-import ingestion.adapters  # noqa: F401 -- triggers @FeedRegistry.register decorators
 from django.core.management.base import BaseCommand
 from django.utils import timezone
-from ingestion.adapters.registry import FeedRegistry
+
 from ingestion.loaders.upsert import upsert_indicators
 from ingestion.models import FeedSource
+from ingestion.source_config import get_adapter_class
 from processors.dedup import dedup
-from ingestion.source_config import get_api_key, is_enabled
+
 
 class Command(BaseCommand):
-    help = "Run all registered API feed adapters."
+    help = "Run all enabled feed sources from the database."
 
     def handle(self, *args, **opts):
+        sources = FeedSource.objects.filter(is_enabled=True)
+
+        if not sources.exists():
+            self.stdout.write(self.style.WARNING("No enabled feed sources found."))
+            return
+
         total = 0
-        for name, adapter_class in FeedRegistry.all().items():
-            # skip disabled feeds
-            if not is_enabled(name):
-                self.stdout.write(self.style.WARNING(f"Skipping {name}: disabled in DB"))
+        for source in sources:
+            adapter_class = get_adapter_class(source.adapter_type)
+            if not adapter_class:
+                self.stderr.write(self.style.ERROR(
+                    f"  {source.name}: unknown adapter_type '{source.adapter_type}' — skipping"
+                ))
                 continue
 
-            # grab API key from DB first, fall back to .env
-            api_key = get_api_key(name, fallback_to_env=True)
-
-            # None on first run means adapter falls back to default 30 day window
-            source, _ = FeedSource.objects.get_or_create(name=name)
             since = source.last_pulled
+            config = source.config or {}
+            # Inject source name so generic adapters can use it for logging
+            config["_source_name"] = source.name
 
             if since:
-                self.stdout.write(f"Fetching {name} (since {since.isoformat()})...")
+                self.stdout.write(f"  {source.name}: fetching since {since.isoformat()}...")
             else:
-                self.stdout.write(f"Fetching {name} (initial pull)...")
+                self.stdout.write(f"  {source.name}: initial pull...")
 
             try:
-                adapter = adapter_class(api_key=api_key, since=since, config=source.config)
-
+                adapter = adapter_class(
+                    api_key=(source.api_key or "").strip(),
+                    since=since,
+                    config=config,
+                )
                 iocs = adapter.ingest()
-                if not iocs:
+
+                if iocs is None:
                     self.stdout.write(self.style.WARNING(
-                        f"  {name}: no indicators returned (check logs for errors)"))
+                        f"  {source.name}: fetch failed (check logs) — will retry from same point"
+                    ))
+                    continue
+
+                if not iocs:
+                    self.stdout.write(f"  {source.name}: no new indicators")
+                    source.last_pulled = timezone.now()
+                    source.save(update_fields=["last_pulled"])
                     continue
 
                 deduped = dedup(iocs)
-                count = upsert_indicators(deduped, source_name=name)
+                count = upsert_indicators(deduped, source_name=source.name)
                 self.stdout.write(
-                    f"  {name}: saved {count} new indicators ({len(iocs)} raw, {len(deduped)} after dedup)"
+                    f"  {source.name}: saved {count} new indicators "
+                    f"({len(iocs)} raw, {len(deduped)} after dedup)"
                 )
                 total += count
 
-                # only stamp last_pulled after success so failures retry from same point
                 source.last_pulled = timezone.now()
                 source.save(update_fields=["last_pulled"])
 
             except RuntimeError as e:
-                self.stdout.write(self.style.WARNING(f"  {name} skipped: {e}"))
+                self.stdout.write(self.style.WARNING(f"  {source.name} skipped: {e}"))
             except Exception as e:
-                self.stderr.write(self.style.ERROR(f"  {name} failed: {e}"))
+                self.stderr.write(self.style.ERROR(f"  {source.name} failed: {e}"))
 
         self.stdout.write(self.style.SUCCESS(f"\nDone. {total} total new indicators saved."))

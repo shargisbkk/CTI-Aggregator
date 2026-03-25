@@ -35,50 +35,54 @@
         <form method="get" class="row g-3">
 
             <!-- Search input -->
-            <div class="col-md-4">
+            <div class="col-md-3">
                 <input
                     type="text"
                     name="q"
-                    value="{{ request.GET.q }}"
+                    value="{{ current_q }}"
                     class="form-control"
                     placeholder="Search indicators..."
                 >
             </div>
 
             <!-- Indicator type dropdown -->
-            <div class="col-md-3">
+            <div class="col-md-2">
                 <select name="type" class="form-select">
-
                     <option value="">All Types</option>
-
-                    {% for value, label in indicator_types %}
-                        <option value="{{ value }}"
-                            {% if request.GET.type == value %}
-                                selected
-                            {% endif %}
-                        >
-                            {{ label }}
-                        </option>
+                    {% for t in ioc_types %}
+                        <option value="{{ t }}"
+                            {% if current_type == t %}selected{% endif %}
+                        >{{ t }}</option>
                     {% endfor %}
+                </select>
+            </div>
 
+            <!-- Source filter -->
+            <div class="col-md-2">
+                <select name="source" class="form-select">
+                    <option value="">All Sources</option>
+                    {% for s in source_names %}
+                        <option value="{{ s }}"
+                            {% if current_source == s %}selected{% endif %}
+                        >{{ s }}</option>
+                    {% endfor %}
                 </select>
             </div>
 
             <!-- Confidence level filter -->
-            <div class="col-md-3">
+            <div class="col-md-2">
                 <select name="confidence" class="form-select">
                     <option value="">All Confidence</option>
-                    <option value="high">High</option>
-                    <option value="medium">Medium</option>
-                    <option value="low">Low</option>
+                    <option value="high" {% if current_confidence == "high" %}selected{% endif %}>High (95+)</option>
+                    <option value="medium" {% if current_confidence == "medium" %}selected{% endif %}>Medium (50-94)</option>
+                    <option value="low" {% if current_confidence == "low" %}selected{% endif %}>Low (1-49)</option>
                 </select>
             </div>
 
-            <!-- Filter submit button -->
-            <div class="col-md-2">
-                <button class="btn btn-dark w-100">
-                    Filter
-                </button>
+            <!-- Filter buttons -->
+            <div class="col-md-3 d-flex gap-2">
+                <button class="btn btn-dark flex-grow-1">Filter</button>
+                <a href="{% url 'dashboard:dashboard-indicators' %}" class="btn btn-outline-secondary">Clear</a>
             </div>
 
         </form>
@@ -114,22 +118,33 @@
                 {% for row in page_obj %}
 
                     <tr>
-                        <td>{{ row.ioc_type }}</td>
-                        <td>{{ row.ioc_value }}</td>
-                        <td>{{ row.confidence }}</td>
+                        <td><span class="badge bg-secondary">{{ row.ioc_type }}</span></td>
+                        <td class="text-break" style="max-width: 300px;">{{ row.ioc_value }}</td>
+                        <td>
+                            {% if row.confidence_level == "High" %}
+                                <span class="badge bg-danger">High ({{ row.confidence }})</span>
+                            {% elif row.confidence_level == "Medium" %}
+                                <span class="badge bg-warning text-dark">Medium ({{ row.confidence }})</span>
+                            {% elif row.confidence_level == "Low" %}
+                                <span class="badge bg-success">Low ({{ row.confidence }})</span>
+                            {% else %}
+                                <span class="text-muted">—</span>
+                            {% endif %}
+                        </td>
                         <td>{{ row.labels|join:", " }}</td>
                         <td>{{ row.sources|join:", " }}</td>
-                        <td>{{ row.first_seen }}</td>
-                        <td>{{ row.last_seen }}</td>
+                        <td>{{ row.first_seen|date:"Y-m-d H:i" }}</td>
+                        <td>{{ row.last_seen|date:"Y-m-d H:i" }}</td>
                     </tr>
 
                 {% empty %}
 
                     <!-- Display when no indicators match filters -->
                     <tr>
-                        <td colspan="6" class="text-center text-muted">
+                        <td colspan="7" class="text-center text-muted">
                             No indicators found.
-                        </tr>
+                        </td>
+                    </tr>
 
                 {% endfor %}
 
@@ -143,37 +158,41 @@
              Navigate between result pages
         =============================================== -->
 
-        <nav>
-            <ul class="pagination justify-content-center">
+        <div class="d-flex justify-content-between align-items-center mt-3">
+            <small class="text-muted">
+                {{ page_obj.paginator.count }} indicator{{ page_obj.paginator.count|pluralize }} found
+            </small>
 
-                {% if page_obj.has_previous %}
-                    <li class="page-item">
-                        <a class="page-link"
-                           href="?page={{ page_obj.previous_page_number }}">
-                            Previous
-                        </a>
+            <nav>
+                <ul class="pagination mb-0">
+
+                    {% if page_obj.has_previous %}
+                        <li class="page-item">
+                            <a class="page-link"
+                               href="?page={{ page_obj.previous_page_number }}&q={{ current_q }}&type={{ current_type }}&source={{ current_source }}&confidence={{ current_confidence }}">
+                                Previous
+                            </a>
+                        </li>
+                    {% endif %}
+
+                    <li class="page-item disabled">
+                        <span class="page-link">
+                            Page {{ page_obj.number }} of {{ page_obj.paginator.num_pages }}
+                        </span>
                     </li>
-                {% endif %}
 
-                <li class="page-item disabled">
-                    <span class="page-link">
-                        Page {{ page_obj.number }}
-                        of
-                        {{ page_obj.paginator.num_pages }}
-                    </span>
-                </li>
+                    {% if page_obj.has_next %}
+                        <li class="page-item">
+                            <a class="page-link"
+                               href="?page={{ page_obj.next_page_number }}&q={{ current_q }}&type={{ current_type }}&source={{ current_source }}&confidence={{ current_confidence }}">
+                                Next
+                            </a>
+                        </li>
+                    {% endif %}
 
-                {% if page_obj.has_next %}
-                    <li class="page-item">
-                        <a class="page-link"
-                           href="?page={{ page_obj.next_page_number }}">
-                            Next
-                        </a>
-                    </li>
-                {% endif %}
-
-            </ul>
-        </nav>
+                </ul>
+            </nav>
+        </div>
 
     </div>
 

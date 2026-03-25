@@ -63,69 +63,65 @@ def home(request):
 
 @login_required
 def indicators(request):
+    query = IndicatorOfCompromise.objects.all()
 
-    # Pulls all records from the IndicatorsOfCompromise table in cti_db and uses the model from 
-    # ingestion.models.py.
-    all_records = IndicatorOfCompromise.objects.all()
-
-    # Creates a paginator for storing all_records into an object that displays 25 at a time
-    paginator_25 = Paginator(all_records, 25)
-    # Stores a single page of the paginator object at a time
-    page_obj = paginator_25.get_page(request.GET.get('page'))
-
-    
-    return render(request, "dashboard/indicators.html", {'page_obj': page_obj})
-
-    """
-    query = Indicator.objects.select_related(
-        "source_feed"
-    ).all()
-
-    # Search filter
-    q = request.GET.get("q")
+    # Search — matches on value, type, or labels
+    q = request.GET.get("q", "").strip()
     if q:
         query = query.filter(
-            Q(value__icontains=q)
+            Q(ioc_value__icontains=q) | Q(ioc_type__icontains=q)
         )
 
     # Type filter
-    type_filter = request.GET.get("type")
+    type_filter = request.GET.get("type", "").strip()
     if type_filter:
-        query = query.filter(type=type_filter)
+        query = query.filter(ioc_type=type_filter)
 
-    # Confidence filter
-    conf = request.GET.get("confidence")
+    # Source filter
+    source_filter = request.GET.get("source", "").strip()
+    if source_filter:
+        query = query.filter(sources__contains=[source_filter])
 
+    # Confidence level filter (high/medium/low)
+    conf = request.GET.get("confidence", "").strip()
     if conf == "high":
-        query = query.filter(confidence__gte=75)
-
+        query = query.filter(confidence__gte=95)
     elif conf == "medium":
-        query = query.filter(confidence__range=(40, 74))
-
+        query = query.filter(confidence__gte=50, confidence__lt=95)
     elif conf == "low":
-        query = query.filter(confidence__lt=40)
+        query = query.filter(confidence__gte=1, confidence__lt=50)
 
-    # Pagination
-    paginator = Paginator(
-        query.order_by("-last_seen"),
-        50
-    )
+    query = query.order_by("-last_seen")
 
-    page_obj = paginator.get_page(
-        request.GET.get("page")
+    paginator = Paginator(query, 50)
+    page_obj = paginator.get_page(request.GET.get("page"))
+
+    # Build dropdown choices from actual data in the DB
+    ioc_types = (
+        IndicatorOfCompromise.objects
+        .values_list("ioc_type", flat=True)
+        .distinct()
+        .order_by("ioc_type")
     )
+    source_names = (
+        IndicatorOfCompromise.objects
+        .values_list("sources", flat=True)
+        .distinct()
+    )
+    # Flatten the JSON arrays into a unique sorted list
+    all_sources = sorted({s for row in source_names if row for s in row})
 
     context = {
         "page_obj": page_obj,
-        "indicator_types": Indicator.INDICATOR_TYPES,
+        "ioc_types": ioc_types,
+        "source_names": all_sources,
+        "current_q": q,
+        "current_type": type_filter,
+        "current_source": source_filter,
+        "current_confidence": conf,
     }
 
-    return render(
-        request,
-        "dashboard/indicators.html",
-        context
-    )
-    """
+    return render(request, "dashboard/indicators.html", context)
 
 
 # ======================================================

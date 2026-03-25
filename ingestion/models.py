@@ -1,6 +1,12 @@
 from django.db import models
 
 class IndicatorOfCompromise(models.Model):
+    CONFIDENCE_LEVELS = [
+        ("high", "High", 95, 100),
+        ("medium", "Medium", 50, 94),
+        ("low", "Low", 1, 49),
+    ]
+
     ioc_type     = models.CharField(max_length=50, db_index=True)
     ioc_value    = models.CharField(max_length=500, db_index=True)
     confidence   = models.IntegerField(null=True, blank=True)
@@ -16,19 +22,38 @@ class IndicatorOfCompromise(models.Model):
     def __str__(self):
         return f"{self.ioc_type}:{self.ioc_value}"
 
+    @property
+    def confidence_level(self):
+        """Map numeric confidence to High / Medium / Low / Unknown."""
+        if self.confidence is None:
+            return "Unknown"
+        for label, display, low, high in self.CONFIDENCE_LEVELS:
+            if low <= self.confidence <= high:
+                return display
+        return "Unknown"
+
 class FeedSource(models.Model):
     """
-    DB-stored credentials + enable/disable for API-backed feeds (OTX, ThreatFox, URLhaus, etc).
-    DB-first with optional .env fallback.
-    sets us up for reading sources from DB
+    DB-stored credentials + config for all feed sources.
+    The adapter_type dropdown selects the generic transport adapter.
+    The config JSONField holds source-specific settings (url, field_map, etc.).
     """
-    name = models.CharField(max_length=64, unique=True)   # "otx", "threatfox", "urlhaus"
+    ADAPTER_CHOICES = [
+        ("json", "JSON API"),
+        ("csv", "CSV/TSV File"),
+        ("text", "Plain Text List"),
+        ("misp", "MISP Feed"),
+        ("taxii", "TAXII 2.1 Server"),
+    ]
+
+    name = models.CharField(max_length=64, unique=True)
+    adapter_type = models.CharField(max_length=16, choices=ADAPTER_CHOICES, default="json")
     requires_api_key = models.BooleanField(default=True)
     api_key = models.TextField(blank=True, default="")
     is_enabled = models.BooleanField(default=True)
-    config = models.JSONField(blank=True, default=dict)   # optional per-source settings
-    last_pulled = models.DateTimeField(null=True, blank=True)  # tracks when we last pulled so cron only grabs new data
+    config = models.JSONField(blank=True, default=dict)
+    last_pulled = models.DateTimeField(null=True, blank=True)
     updated_at = models.DateTimeField(auto_now=True)
 
     def __str__(self) -> str:
-        return f"{self.name} (enabled={self.is_enabled})"
+        return self.name
