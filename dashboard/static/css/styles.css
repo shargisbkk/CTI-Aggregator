@@ -1,0 +1,308 @@
+/* ====================================
+    Root with custom vars
+==================================== */
+
+:root {
+    --navbar-height: 56px;
+
+    /** Base colors */
+
+    --clr-dark-a0: #000000;
+    --clr-light-a0: #ffffff;
+
+    /* Dark Mode Scheme =======================*/
+
+    /** Theme primary colors */
+    --clr-dark-primary-a0: #4770b0;
+    --clr-dark-primary-a10: #5e7fb9;
+    --clr-dark-primary-a20: #738ec2;
+    --clr-dark-primary-a30: #889dca;
+    --clr-dark-primary-a40: #9cadd3;
+    --clr-dark-primary-a50: #b0bddc;
+
+    /** Theme surface colors */
+    --clr-dark-surface-a0: #121212;
+    --clr-dark-surface-a10: #282828;
+    --clr-dark-surface-a20: #3f3f3f;
+    --clr-dark-surface-a30: #575757;
+    --clr-dark-surface-a40: #717171;
+
+    /** Theme tonal surface colors */
+    --clr-dark-surface-tonal-a0: #1e232e;
+    --clr-dark-surface-tonal-a10: #333742;
+    --clr-dark-surface-tonal-a20: #494d57;
+    --clr-dark-surface-tonal-a30: #61646d;
+    --clr-dark-surface-tonal-a40: #797c84;
+
+    /** Success colors */
+    --clr-dark-success-a0: #22946e;
+    --clr-dark-success-a10: #47d5a6;
+    --clr-dark-success-a20: #9ae8ce;
+
+    /** Warning colors */
+    --clr-dark-warning-a0: #a87a2a;
+    --clr-dark-warning-a10: #d7ac61;
+    --clr-dark-warning-a20: #ecd7b2;
+
+    /** Danger colors */
+    --clr-dark-danger-a0: #9c2121;
+    --clr-dark-danger-a10: #d94a4a;
+    --clr-dark-danger-a20: #eb9e9e;
+
+    /** Info colors */
+    --clr-dark-info-a0: #21498a;
+    --clr-dark-info-a10: #4077d1;
+    --clr-dark-info-a20: #92b2e5;
+
+    /* Light Mode Theme =======================*/
+
+    /** Theme primary colors */
+    --clr-light-primary-a0: #4770b0;
+    --clr-light-primary-a10: #40639b;
+    --clr-light-primary-a20: #395686;
+    --clr-light-primary-a30: #334a72;
+    --clr-light-primary-a40: #2c3e5e;
+    --clr-light-primary-a50: #25324b;
+
+    /** Theme surface colors */
+    --clr-light-surface-a0: #ffffff;
+    --clr-light-surface-a10: #f0f0f0;
+    --clr-light-surface-a20: #e1e1e1;
+    --clr-light-surface-a30: #d3d3d3;
+    --clr-light-surface-a40: #c5c5c5;
+
+    /** Theme tonal surface colors */
+    --clr-light-surface-tonal-a0: #edf0f7;
+    --clr-light-surface-tonal-a10: #e0e3e9;
+    --clr-light-surface-tonal-a20: #d4d6db;
+    --clr-light-surface-tonal-a30: #c7c9ce;
+    --clr-light-surface-tonal-a40: #bbbdc0;
+
+    /** Success colors */
+    --clr-light-success-a0: #1b7f5c;
+    --clr-light-success-a10: #28be8a;
+    --clr-light-success-a20: #58dbad;
+
+    /** Warning colors */
+    --clr-light-warning-a0: #b8871f;
+    --clr-light-warning-a10: #dfae44;
+    --clr-light-warning-a20: #ebca85;
+
+    /** Danger colors */
+    --clr-light-danger-a0: #b13535;
+    --clr-light-danger-a10: #d06262;
+    --clr-light-danger-a20: #e29d9d;
+
+    /** Info colors */
+    --clr-light-info-a0: #1e56a3;
+    --clr-light-info-a10: #347ada;
+    --clr-light-info-a20: #74a4e6;
+
+}
+
+/* ====================================
+    Content and Body Elements
+==================================== */
+
+body {
+    overflow-x: hidden;
+    background-color: var(--clr-light-surface-a10);
+}
+
+body.dark-mode {
+    overflow-x: hidden;
+    background-color: var(--clr-dark-surface-tonal-a0);
+}
+
+.content {
+    margin-left: 240px;
+    padding: 20px;
+    padding-top: calc(var(--navbar-height) + 20px);
+    background-color: var(--clr-primary-a60);
+    color: var(--clr-surface-tonal-a0);
+}
+
+.dark-mode .content {
+    color: var(--clr-dark-primary-a50);
+    background-color: var(--clr-dark-surface-tonal-a0);
+}
+
+/* ====================================
+    Navbar Elements
+==================================== */
+
+.navbar-custom {
+    /*background: #111827;*/
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    min-height: 56px;
+    height: auto;
+    display: flex;
+    align-items: center;
+    z-index: 1030;
+}
+
+.navbar-custom .navbar-brand {
+    font-weight: bold;
+    font-size: 1.5rem;
+    margin-bottom: 0;
+    padding-left: 1rem;
+    color: var(--clr-light-primary-a0);
+}
+
+.dark-mode .navbar-custom .navbar-brand {
+    color: var(--clr-dark-primary-a0);
+}
+
+.navbar {
+    color: var(--clr-light-primary-a0);
+    background-color: var(--clr-light-surface-a30);
+}
+
+.dark-mode .navbar {
+    color: var(--clr-dark-primary-a0);
+    background-color: var(--clr-dark-surface-a10);
+}
+
+.nav-text {
+    color: var(--clr-dark-a0)
+}
+
+.dark-mode .nav-text {
+    color: var(--clr-light-a0)
+}
+
+.btn-outline-light {
+    background-color: var(--clr-light-primary-a0);
+    border-color: var(--clr-light-primary-a30);
+}
+
+.dark-mode .btn-outline-light {
+    background-color: var(--clr-light-primary-a0);
+    border-color: var(--clr-dark-primary-a30);
+}
+
+/* ====================================
+    Sidebar Elements
+==================================== */
+
+.sidebar {
+    width: 240px;
+    height: calc(100vh - var(--navbar-height));
+    position: fixed;
+    top: var(--navbar-height);
+    left: 0;
+    padding-top: 12px;
+    z-index: 1020;
+    overflow-y: auto;
+    background-color: var(--clr-light-surface-a20);
+}
+
+.sidebar a {
+    text-decoration: none;
+    display: block;
+    padding: 12px 20px;
+    color: var(--clr-dark-a0);
+}
+
+.sidebar a:hover {
+    background: var(--clr-light-primary-a10);
+    color: var(--clr-dark-a0);
+}
+
+.sidebar a.active {
+    background: var(--clr-light-primary-a0);
+    color: var(--clr-dark-a0);
+    font-weight: bold;
+}
+
+.dark-mode .sidebar {
+    width: 240px;
+    height: calc(100vh - var(--navbar-height));
+    position: fixed;
+    top: var(--navbar-height);
+    left: 0;
+    padding-top: 12px;
+    z-index: 1020;
+    overflow-y: auto;
+    background-color: var(--clr-dark-surface-a20);
+}
+
+.dark-mode .sidebar a {
+    text-decoration: none;
+    display: block;
+    padding: 12px 20px;
+    color: var(--clr-light-a0);
+}
+
+.dark-mode .sidebar a:hover {
+    background: var(--clr-dark-surface-a10);
+    color: var(--clr-light-a0);
+}
+
+.dark-mode .sidebar a.active {
+    background: var(--clr-dark-surface-a0);
+    color: var(--clr-dark-primary-a0);
+    font-weight: bold;
+}
+
+/* ====================================
+    Cards
+==================================== */
+
+.card {
+    color: var(--clr-dark-surface-a50);
+    background-color: var(--clr-light-surface-tonal-a10);
+    border-color: var(--clr-light-surface-a30);
+}
+
+.card .card-title {
+    color: var(--clr-dark-surface-a40);
+    font-size: 1.2rem;
+}
+
+.dark-mode .card {
+    color: var(--clr-light-a0);
+    background-color: var(--clr-dark-surface-tonal-a10);
+    border-color: var(--clr-dark-surface-a30);
+}
+
+.dark-mode .card .card-title {
+    color: var(--clr-light-a0);
+    font-size: 1.2rem;
+}
+
+.btn-primary {
+    background-color: var(--clr-light-primary-a0);
+}
+
+.btn-success {
+    background-color: var(--clr-light-success-a0);
+}
+
+.table-custom th {
+    background-color: var(--clr-light-primary-a0);
+}
+
+.table-custom td {
+    background-color: var(--clr-light-surface-tonal-a10);
+}
+
+.dark-mode .table-custom th {
+    background-color: var(--clr-dark-surface-a0);
+    color: var(--clr-dark-primary-a0);
+    border-color: var(--clr-dark-surface-tonal-a0);
+}
+
+.dark-mode .table-custom td {
+    background-color: var(--clr-dark-surface-tonal-a10);
+    color: var(--clr-light-a0);
+    border-color: var(--clr-dark-surface-tonal-a0);
+}
+
+/*
+    Primary - #4770b0
+    Surface - #121212
+*/

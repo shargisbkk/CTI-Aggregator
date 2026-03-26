@@ -8,14 +8,14 @@
 
     <div class="col-md-4">
         <div class="card shadow-sm p-3">
-            <h5>Total Indicators</h5>
+            <h5 class="card-title">Total Indicators</h5>
             <p class="display-6">{{ total_indicators }}</p>
         </div>
     </div>
 
     <div class="col-md-4">
         <div class="card shadow-sm p-3">
-            <h5>Active Threat Feeds</h5>
+            <h5 class="card-title">Active Threat Feeds</h5>
             <p class="display-6">{{ feed_count }}</p>
             {% if feed_count == 0 %}
             <small class="text-muted">No feeds configured yet</small>
@@ -26,7 +26,7 @@
 
     <div class="col-md-4">
         <div class="card shadow-sm p-3">
-            <h5>New in Last 24h</h5>
+            <h5 class="card-title">New in Last 24h</h5>
             <p class="display-6">{{ new_last_24h }}</p>
         </div>
     </div>
@@ -37,7 +37,7 @@
     <div class="col-md-12">
         <div class="card shadow-sm p-4">
 
-            <h4 class="mb-3">Top Threat Feeds</h4>
+            <h4 class="card-title mb-3">Top Threat Feeds</h4>
 
             <table class="table table-sm table-hover">
                 <thead>
