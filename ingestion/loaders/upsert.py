@@ -78,7 +78,7 @@ def upsert_indicators(normalized_records: list[dict], source_name: str = "") -> 
             r["ioc_value"],
             _clean_conf(r["confidence"]),
             json.dumps(_clean_list(r.get("labels"))),
-            json.dumps([source_name] if source_name else []),
+            json.dumps([source_name.lower().strip()] if source_name else []),
             _clean_ts(r["first_seen"]),
             _clean_ts(r["last_seen"]),
         ))
@@ -90,12 +90,11 @@ def upsert_indicators(normalized_records: list[dict], source_name: str = "") -> 
     if batch:
         created += _upsert_batch(batch)
 
-    logger.info("upsert: %d records → %d new (source: %s)",
+    logger.info("upsert: %d records -> %d new (source: %s)",
                 len(normalized_records), created, source_name or "unknown")
 
     return created
 
-#Commenting done by Claude - but what this does in essence is prevents an issue with nullable labels in the DB
 def _clean_list(value):
     # None -> []
     if value is None:

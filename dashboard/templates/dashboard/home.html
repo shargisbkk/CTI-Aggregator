@@ -57,8 +57,8 @@
                         <td>{{ indicator.stix_id }}</td>
                         <td>{{ indicator.stix_type }}</td>
                         <td>{{ indicator.spec_version }}</td>
-                        <td>{{ indicator.created }}</td>
-                        <td>{{ indicator.modified }}</td>
+                        <td>{{ indicator.created|date:"M d, Y g:i A" }}</td>
+                        <td>{{ indicator.modified|date:"M d, Y g:i A" }}</td>
                         <td>{{ indicator.source_name }}</td>
                         <td>{{ indicator.collection_id }}</td>
                     </tr>

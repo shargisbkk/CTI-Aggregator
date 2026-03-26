@@ -6,6 +6,7 @@ from django.core.management.base import BaseCommand
 from ingestion.adapters.stix import extract_indicators
 from ingestion.loaders.upsert import upsert_indicators
 from processors.dedup import dedup
+from processors.normalize import normalize_records
 
 
 class Command(BaseCommand):
@@ -48,20 +49,11 @@ class Command(BaseCommand):
 
         self.stdout.write(f"Fetched {len(raw)} raw indicators from STIX source.")
 
-        # Normalize through a minimal adapter to get type classification
-        from ingestion.adapters.base import FeedAdapter
-
-        class _InlineAdapter(FeedAdapter):
-            source_name = "stix"
-            def fetch_raw(self):
-                return raw
-
-        adapter = _InlineAdapter()
-        iocs = adapter.ingest()
-        if not iocs:
+        normalized = normalize_records(raw)
+        if not normalized:
             self.stdout.write("No indicators after normalization.")
             return
 
-        deduped = dedup(iocs)
+        deduped = dedup(normalized)
         count = upsert_indicators(deduped, source_name="stix")
         self.stdout.write(self.style.SUCCESS(f"Saved {count} new STIX indicators."))

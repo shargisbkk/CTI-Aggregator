@@ -93,7 +93,7 @@
         {% if current_label %}
             <div class="mt-3 pt-2 border-top">
                 Filtering by label:
-                <span class="badge bg-info text-dark">{{ current_label }}</span>
+                <span class="badge text-decoration-none" style="background-color: #d1ecf1; color: #0c5460;">{{ current_label }}</span>
                 <a href="?q={{ current_q }}&type={{ current_type }}&source={{ current_source }}&confidence={{ current_confidence }}"
                    class="ms-2 small">Remove</a>
             </div>
@@ -151,8 +151,8 @@
                             {% endfor %}
                         </td>
                         <td>{{ row.sources|join:", " }}</td>
-                        <td>{{ row.first_seen|date:"Y-m-d H:i" }}</td>
-                        <td>{{ row.last_seen|date:"Y-m-d H:i" }}</td>
+                        <td>{{ row.first_seen|date:"M d, Y g:i A" }}</td>
+                        <td>{{ row.last_seen|date:"M d, Y g:i A" }}</td>
                     </tr>
 
                 {% empty %}

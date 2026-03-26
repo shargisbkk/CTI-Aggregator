@@ -4,6 +4,7 @@ from ingestion.loaders.upsert import upsert_indicators
 from ingestion.models import FeedSource
 from ingestion.source_config import get_adapter_class
 from processors.dedup import dedup
+from processors.normalize import normalize_records
 
 
 class Command(BaseCommand):
@@ -47,11 +48,12 @@ class Command(BaseCommand):
             self.stderr.write(str(e))
             return
 
-        iocs = adapter.ingest()
-        if not iocs:
+        raw = adapter.fetch_raw()
+        if not raw:
             self.stdout.write("No indicators returned.")
             return
 
-        deduped = dedup(iocs)
+        normalized = normalize_records(raw)
+        deduped = dedup(normalized)
         count = upsert_indicators(deduped, source_name=source_name)
         self.stdout.write(self.style.SUCCESS(f"Saved {count} new OTX indicators."))
