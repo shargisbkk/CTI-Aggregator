@@ -26,53 +26,13 @@
 
     <div class="col-md-4">
         <div class="card shadow-sm p-3">
-            <h5>New in Last 24h</h5>
-            <p class="display-6">{{ new_last_24h }}</p>
+            <h5>Last Updated</h5>
+            <p class="display-6">{{ last_updated|date:"d-M-Y"|default:"Never" }}</p>
         </div>
     </div>
 
-</div>
+    
 
-<div class="row mt-5">
-    <div class="col-md-12">
-        <div class="card shadow-sm p-4">
-
-            <h4 class="mb-3">Top Threat Feeds</h4>
-
-            <table class="table table-sm table-hover">
-                <thead>
-                    <tr>
-                        <th>Source</th>
-                        <th>Source Type</th>
-                        <th>Total Threats</th>
-                        <th>New in Last Year</th>
-                        <th>New in Last Month</th>
-                        <th>New in Last Week</th>
-                        <th>Source</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {% for indicator in recent_indicators %}
-                    <tr>
-                        <td>{{ indicator.stix_id }}</td>
-                        <td>{{ indicator.stix_type }}</td>
-                        <td>{{ indicator.spec_version }}</td>
-                        <td>{{ indicator.created }}</td>
-                        <td>{{ indicator.modified }}</td>
-                        <td>{{ indicator.source_name }}</td>
-                        <td>{{ indicator.collection_id }}</td>
-                    </tr>
-                    {% empty %}
-                    <tr>
-                        <td colspan="7" class="text-center text-muted">No sources yet.</td>
-                    </tr>
-                    {% endfor %}
-                </tbody>
-            </table>
-
-
-        </div>
-    </div>
 </div>
 
 {% endblock %}
