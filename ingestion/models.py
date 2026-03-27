@@ -58,7 +58,7 @@ class FeedSource(models.Model):
     sourceurl = models.CharField(blank=True)
 
     def save(self, *args, **kwargs):
-        self.name = self.name.strip().lower()
+        self.name = self.name.strip()
         super().save(*args, **kwargs)
 
     def __str__(self) -> str:

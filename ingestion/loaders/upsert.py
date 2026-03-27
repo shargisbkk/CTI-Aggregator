@@ -1,6 +1,5 @@
 import json
 import logging
-import math
 import pandas as pd
 from django.db import connection
 
@@ -78,7 +77,7 @@ def upsert_indicators(normalized_records: list[dict], source_name: str = "") -> 
             r["ioc_value"],
             _clean_conf(r["confidence"]),
             json.dumps(_clean_list(r.get("labels"))),
-            json.dumps([source_name.lower().strip()] if source_name else []),
+            json.dumps([source_name.strip()] if source_name else []),
             _clean_ts(r["first_seen"]),
             _clean_ts(r["last_seen"]),
         ))
@@ -96,17 +95,13 @@ def upsert_indicators(normalized_records: list[dict], source_name: str = "") -> 
     return created
 
 def _clean_list(value):
-    # None -> []
     if value is None:
         return []
-    # pandas/float NaN -> []
+    if isinstance(value, (list, tuple, set)):
+        return list(value)
     try:
         if pd.isna(value):
             return []
-    except Exception:
+    except (TypeError, ValueError):
         pass
-    # already list-like
-    if isinstance(value, (list, tuple, set)):
-        return list(value)
-    # if something weird slips in, coerce to a single string label
     return [str(value)]

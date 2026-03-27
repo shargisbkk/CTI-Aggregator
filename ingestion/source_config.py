@@ -43,7 +43,7 @@ def get_adapter_defaults(adapter_type: str) -> dict:
 def get_api_key(source_name: str) -> str:
     """Look up the API key for a feed from the FeedSource table."""
     try:
-        row = FeedSource.objects.get(name=source_name.lower().strip())
+        row = FeedSource.objects.get(name=source_name.strip())
         if not row.is_enabled:
             return ""
         return (row.api_key or "").strip()

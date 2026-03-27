@@ -196,9 +196,9 @@ class JsonFeedAdapter(FeedAdapter):
         while next_url:
             try:
                 r = request_with_retry(method, next_url, **kwargs)
+                data = r.json()
                 # clear params after first page (pagination uses next URL)
                 kwargs.pop("params", None)
-                data = r.json()
             except Exception:
                 logger.warning("%s: page %d failed, returning %d indicators collected so far",
                                self.source_name, page + 1, len(indicators))
