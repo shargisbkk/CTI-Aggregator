@@ -186,6 +186,21 @@ def update_all_feeds(request):
 # ANALYTICS VIEW
 # ======================================================
 
+# Function to grab data for charts in analytics view 
+@login_required
+def threat_confidence_chart_data(request):
+    # Pull data query for confidence
+    data = (
+        IndicatorOfCompromise.objects
+        .values('confidence')
+        .annotate(value=Count('confidence'))
+        .order_by('-confidence')
+    )
+    # Format used by ECharts (json)
+    chart_data = [{"value": item["value"], "name": item["confidence"]} for item in data]
+    return JsonResponse(chart_data, safe=False)
+
+# Actual Analytics view
 @login_required
 def analytics(request):
 

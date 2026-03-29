@@ -1,4 +1,5 @@
 {% extends "dashboard/base.html" %}
+{% load static %}
 
 {% block title %}
 Analytics
@@ -204,9 +205,21 @@ Analytics
          FUTURE CHART PLACEHOLDERS
          (Ready for Chart.js)
     =================================================== -->
-
+    <div class="row">
+        <div class="col-md-3">
+            <div class="card shadow-sm p-4 mb-4">
+                <div style="position: relative; width: 100%; padding-top: 100%;">
+                    <div id="threat-confidence-chart"
+                        style="position: absolute; top: 0; left: 0; width: 100%; height: 100%;"></div>
+                </div>
+            </div>
+        </div>
+    </div>
 
 
 </div>
+
+<script src="https://cdn.jsdelivr.net/npm/echarts/dist/echarts.min.js"></script>
+<script src="{% static 'js/threat-confidence-donut-chart.js' %}" type="module"></script>
 
 {% endblock %}
