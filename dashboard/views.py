@@ -2,7 +2,7 @@ from django.contrib.auth.decorators import login_required
 from django.shortcuts import render, get_object_or_404, redirect
 from django.utils import timezone
 from django.core.paginator import Paginator
-from django.db.models import Q, Count
+from django.db.models import Q, Count, Max
 from django.db.models.functions import TruncDate
 from django.views.decorators.http import require_POST
 from django.http import JsonResponse
@@ -22,25 +22,29 @@ def home(request):
     # Total indicators
     total_indicators = IndicatorOfCompromise.objects.count()
 
-    # Safe feed count (0 if Feed model doesn't exist)
-    try:
-        from dashboard.models import Feed
-        feed_count = ThreatFeed.objects.count()
-    except ImportError:
-        feed_count = 0
+    # Count only enabled feed sources from ingestion_feedsource
+    feed_count = FeedSource.objects.filter(is_enabled=True).count()
 
     # New indicators in the last 24 hours
-    new_last_24h = Indicator.objects.filter(
-        created__gte=timezone.now() - timedelta(days=1)
-    ).count()
+    new_last_24h = (IndicatorOfCompromise
+                    .objects
+                    .filter(last_seen__gte=timezone.now() - timedelta(days=1))
+                    .count()
+                    )
 
     # Most recent 50 indicators
-    recent_indicators = Indicator.objects.order_by('-created')[:50]
+    recent_indicators = IndicatorOfCompromise.objects.order_by('-last_seen')[:50]
+
+    # Last time IOC records were updated
+    last_updated = IndicatorOfCompromise.objects.aggregate(
+        last_updated=Max("last_seen")
+    )["last_updated"]
 
     context = {
         "total_indicators": total_indicators,
         "feed_count": feed_count,
         "new_last_24h": new_last_24h,
+        "last_updated": last_updated,
         "recent_indicators": recent_indicators,
     }
 
