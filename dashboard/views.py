@@ -190,6 +190,21 @@ def update_all_feeds(request):
 # ANALYTICS VIEW
 # ======================================================
 
+# Function to grab data for charts in analytics view 
+@login_required
+def threat_confidence_chart_data(request):
+    # Pull data query for confidence
+    data = (
+        IndicatorOfCompromise.objects
+        .values('confidence')
+        .annotate(value=Count('confidence'))
+        .order_by('-confidence')
+    )
+    # Format used by ECharts (json)
+    chart_data = [{"value": item["value"], "name": item["confidence"]} for item in data]
+    return JsonResponse(chart_data, safe=False)
+
+# Actual Analytics view
 @login_required
 def analytics(request):
 
@@ -223,43 +238,20 @@ def analytics(request):
                    .order_by("-count")[:10]
     )
 
-    '''
-    new_this_week = Indicator.objects.filter(
-        created__gte=timezone.now() - timedelta(days=7)
-    ).count()
-
-    active_feeds = ThreatFeed.objects.filter(
-        active=True
-    ).count()
-
-    # ----------------------------
-    # Indicator volume over time
-    # (last 14 days)
-    # ----------------------------
-
-    volume_over_time = (
-        Indicator.objects
-        .annotate(day=TruncDate("created"))
-        .values("day")
-        .annotate(count=Count("id"))
-        .order_by("day")
+    top_ioc_types = (
+        IndicatorOfCompromise.objects
+        .values("ioc_type")
+        .annotate(count=Count("ioc_type"))
+        .order_by("-count")
     )
 
-    context = {
-        "total_indicators": total_indicators,
-        "high_confidence": high_confidence,
-        "new_this_week": new_this_week,
-        "active_feeds": active_feeds,
-        "volume_over_time": volume_over_time,
-        "top_sources": top_sources,
-    }
-    '''
     context = {
         "total_indicators" : count_records,
         "high_confidence" : high_confidence,
         "last_seen_this_week" : last_seen_this_week,
         "active_feeds" : active_feeds,
-        "top_sources" : top_sources
+        "top_sources" : top_sources,
+        "top_ioc_types" : top_ioc_types
     }
 
     return render(
