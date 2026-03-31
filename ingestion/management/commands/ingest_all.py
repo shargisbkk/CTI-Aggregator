@@ -5,6 +5,7 @@ from ingestion.loaders.upsert import upsert_indicators
 from ingestion.models import FeedSource
 from ingestion.source_config import get_adapter_class
 from processors.dedup import dedup
+from processors.normalize import normalize_records
 
 
 class Command(BaseCommand):
@@ -28,7 +29,6 @@ class Command(BaseCommand):
 
             since = source.last_pulled
             config = source.config or {}
-            # Inject source name so generic adapters can use it for logging
             config["_source_name"] = source.name
 
             if since:
@@ -42,25 +42,20 @@ class Command(BaseCommand):
                     since=since,
                     config=config,
                 )
-                iocs = adapter.ingest()
+                raw = adapter.fetch_raw()
 
-                if iocs is None:
-                    self.stdout.write(self.style.WARNING(
-                        f"  {source.name}: fetch failed (check logs) — will retry from same point"
-                    ))
-                    continue
-
-                if not iocs:
+                if not raw:
                     self.stdout.write(f"  {source.name}: no new indicators")
                     source.last_pulled = timezone.now()
                     source.save(update_fields=["last_pulled"])
                     continue
 
-                deduped = dedup(iocs)
+                normalized = normalize_records(raw)
+                deduped = dedup(normalized)
                 count = upsert_indicators(deduped, source_name=source.name)
                 self.stdout.write(
                     f"  {source.name}: saved {count} new indicators "
-                    f"({len(iocs)} raw, {len(deduped)} after dedup)"
+                    f"({len(raw)} raw, {len(normalized)} normalized, {len(deduped)} after dedup)"
                 )
                 total += count
 

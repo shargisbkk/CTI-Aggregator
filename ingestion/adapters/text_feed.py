@@ -18,24 +18,22 @@ from ingestion.adapters.base import FeedAdapter
 
 
 class TextFeedAdapter(FeedAdapter):
-    source_name = ""
     requires_api_key = False
-
-    def __init__(self, api_key="", since=None, config=None):
-        super().__init__(api_key, since, config)
-        self.source_name = self.config.get("_source_name", "text")
+    DEFAULT_CONFIG = {
+        "timeout": 120,
+        "comment_char": "#",
+        "ioc_type": "ip",
+        "static_labels": [],
+    }
 
     def fetch_raw(self) -> list[dict]:
         url = self.config["url"]
-        timeout = self.config.get("timeout", 120)
-        comment_char = self.config.get("comment_char", "#")
-        ioc_type = self.config.get("ioc_type", "ip")
-        static_labels = list(self.config.get("static_labels", []))
+        timeout = self.config["timeout"]
+        comment_char = self.config["comment_char"]
+        ioc_type = self.config["ioc_type"]
+        static_labels = list(self.config["static_labels"])
 
-        headers = {}
-        auth_header = self.config.get("auth_header")
-        if auth_header and self._api_key:
-            headers[auth_header] = self._api_key
+        headers = self._build_auth_headers()
 
         r = requests.get(url, headers=headers, timeout=timeout)
         r.raise_for_status()

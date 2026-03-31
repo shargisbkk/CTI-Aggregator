@@ -8,18 +8,20 @@ from ingestion.adapters.taxii_client import fetch_taxii_raw
 
 
 class TaxiiFeedAdapter(FeedAdapter):
-    source_name = ""
     requires_api_key = False
-
-    def __init__(self, api_key="", since=None, config=None):
-        super().__init__(api_key, since, config)
-        self.source_name = self.config.get("_source_name", "taxii")
+    DEFAULT_CONFIG = {
+        "discovery_url": "",
+        "username": "",
+        "password": "",
+        "collection_id": "",
+        "static_labels": [],
+    }
 
     def fetch_raw(self) -> list[dict]:
-        discovery_url = self.config.get("discovery_url", "")
-        username = self.config.get("username", "")
-        password = self.config.get("password", "")
-        collection_id = self.config.get("collection_id", "")
+        discovery_url = self.config["discovery_url"]
+        username = self.config["username"]
+        password = self.config["password"]
+        collection_id = self.config["collection_id"]
 
         added_after = None
         if self.since:

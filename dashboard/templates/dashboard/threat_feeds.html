@@ -103,7 +103,7 @@
                         <!-- Last ingestion run -->
                         <td>
                             {% if feed.last_run %}
-                                {{ feed.last_run|date:"Y-m-d H:i" }}
+                                {{ feed.last_run|date:"M d, Y g:i A" }}
                             {% else %}
                                 <span class="text-muted">Never</span>
                             {% endif %}

@@ -32,10 +32,18 @@ def get_adapter_class(adapter_type: str):
     return getattr(module, class_name)
 
 
+def get_adapter_defaults(adapter_type: str) -> dict:
+    """Return the DEFAULT_CONFIG for the given adapter type, or {} if unknown."""
+    cls = get_adapter_class(adapter_type)
+    if cls is None:
+        return {}
+    return dict(cls.DEFAULT_CONFIG)
+
+
 def get_api_key(source_name: str) -> str:
     """Look up the API key for a feed from the FeedSource table."""
     try:
-        row = FeedSource.objects.get(name=source_name.lower().strip())
+        row = FeedSource.objects.get(name=source_name.strip())
         if not row.is_enabled:
             return ""
         return (row.api_key or "").strip()

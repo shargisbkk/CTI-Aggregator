@@ -73,16 +73,16 @@ python manage.py createsuperuser
 
 ## Ingesting Intelligence
 
+### API Keys
 
-API Keys:
+API keys are stored in the database and managed through the Django admin:
 
-Create a `.env` file in the venv folder. This file is gitignored and should never be committed.
+1. Go to `http://localhost:8000/admin/` → **Feed Sources**
+2. Click on a feed source (e.g., `otx`)
+3. Enter your API key in the **API Key** field
+4. Save
 
-```
-OTX_API_KEY=your_otx_key_here
-THREATFOX_API_KEY=your_threatfox_key_here
-```
-
+Not all feeds require API keys — open feeds like URLhaus work without one.
 
 ### Options
 

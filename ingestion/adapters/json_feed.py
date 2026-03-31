@@ -33,16 +33,23 @@ def _prepare_body(template, days):
     if isinstance(template, list):
         return [_prepare_body(v, days) for v in template]
     if isinstance(template, str) and "{days}" in template:
+        if template == "{days}":
+            return days
         return template.replace("{days}", str(days))
     return template
 
 
 class JsonFeedAdapter(FeedAdapter):
-    source_name = ""
-
-    def __init__(self, api_key="", since=None, config=None):
-        super().__init__(api_key, since, config)
-        self.source_name = self.config.get("_source_name", "json")
+    DEFAULT_CONFIG = {
+        "method": "GET",
+        "timeout": 60,
+        "days": 180,
+        "max_pages": 0,
+        "page_size": 0,
+        "data_path": "data",
+        "string_array": False,
+        "static_labels": [],
+    }
 
     def _build_labels(self, entry, parent=None):
         """Pull labels from entry fields and optionally from its parent."""
@@ -140,7 +147,7 @@ class JsonFeedAdapter(FeedAdapter):
 
     def _compute_days(self):
         """Get lookback days from since timestamp or config default."""
-        days = self.config.get("days", 0)
+        days = self.config["days"]
         if self.since:
             delta = datetime.now(timezone.utc) - self.since
             days = delta.days + 1
@@ -148,21 +155,18 @@ class JsonFeedAdapter(FeedAdapter):
 
     def fetch_raw(self) -> list[dict]:
         url = self.config["url"]
-        method = self.config.get("method", "GET").upper()
-        timeout = self.config.get("timeout", 60)
-        max_pages = self.config.get("max_pages", 0)
-        page_size = self.config.get("page_size", 0)
-        data_path = self.config.get("data_path", "data")
+        method = self.config["method"].upper()
+        timeout = self.config["timeout"]
+        max_pages = self.config["max_pages"]
+        page_size = self.config["page_size"]
+        data_path = self.config["data_path"]
         next_page_path = self.config.get("next_page_path")
         status_field = self.config.get("status_field")
         status_value = self.config.get("status_value")
         nested_path = self.config.get("nested_path")
-        string_array = self.config.get("string_array", False)
+        string_array = self.config["string_array"]
 
-        headers = {}
-        auth_header = self.config.get("auth_header")
-        if auth_header and self._api_key:
-            headers[auth_header] = self._api_key
+        headers = self._build_auth_headers()
 
         days = self._compute_days()
 
@@ -192,9 +196,9 @@ class JsonFeedAdapter(FeedAdapter):
         while next_url:
             try:
                 r = request_with_retry(method, next_url, **kwargs)
+                data = r.json()
                 # clear params after first page (pagination uses next URL)
                 kwargs.pop("params", None)
-                data = r.json()
             except Exception:
                 logger.warning("%s: page %d failed, returning %d indicators collected so far",
                                self.source_name, page + 1, len(indicators))

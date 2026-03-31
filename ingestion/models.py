@@ -1,5 +1,6 @@
 from django.db import models
 
+
 class IndicatorOfCompromise(models.Model):
     CONFIDENCE_LEVELS = [
         ("high", "High", 95, 100),
@@ -55,6 +56,10 @@ class FeedSource(models.Model):
     last_pulled = models.DateTimeField(null=True, blank=True)
     updated_at = models.DateTimeField(auto_now=True)
     sourceurl = models.CharField(blank=True)
+
+    def save(self, *args, **kwargs):
+        self.name = self.name.strip()
+        super().save(*args, **kwargs)
 
     def __str__(self) -> str:
         return self.name

@@ -115,11 +115,16 @@ AUTH_PASSWORD_VALIDATORS = [
 
 LANGUAGE_CODE = 'en-us'
 
-TIME_ZONE = 'UTC'
+TIME_ZONE = 'America/New_York'
 
 USE_I18N = True
+USE_L10N = False
 
 USE_TZ = True
+
+DATETIME_FORMAT = "M d, Y g:i A"
+DATE_FORMAT = "M d, Y"
+TIME_FORMAT = "g:i A"
 
 
 # Static files (CSS, JavaScript, Images)
@@ -144,6 +149,9 @@ LOGOUT_REDIRECT_URL = '/login/'
 
 # Logging Configuration
 # https://docs.djangoproject.com/en/5.2/topics/logging/
+LOG_DIR = BASE_DIR / "logs"
+LOG_DIR.mkdir(exist_ok=True)
+
 LOGGING = {
     "version": 1,
     "disable_existing_loggers": False,
@@ -158,9 +166,14 @@ LOGGING = {
             "class": "logging.StreamHandler",
             "formatter": "verbose",
         },
+        "file": {
+            "class": "logging.FileHandler",
+            "filename": str(LOG_DIR / "ingestion.txt"),
+            "formatter": "verbose",
+        },
     },
     "root": {
-        "handlers": ["console"],
+        "handlers": ["console", "file"],
         "level": "INFO",
     },
 }

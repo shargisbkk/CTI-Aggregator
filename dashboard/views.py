@@ -104,13 +104,9 @@ def indicators(request):
         .distinct()
         .order_by("ioc_type")
     )
-    source_names = (
-        IndicatorOfCompromise.objects
-        .values_list("sources", flat=True)
-        .distinct()
-    )
-    # Flatten the JSON arrays into a unique sorted list
-    all_sources = sorted({s for row in source_names if row for s in row})
+    # Source filter shows only currently configured feeds
+    from ingestion.models import FeedSource
+    all_sources = sorted(FeedSource.objects.values_list("name", flat=True))
 
     context = {
         "page_obj": page_obj,
@@ -145,7 +141,7 @@ def threat_feeds(request):
             "name": source.name,
             "url": config.get("url", ""),
             "active": source.is_enabled,
-            "last_run": source.updated_at,
+            "last_run": source.last_pulled,
             "last_count": config.get("last_count", 0),
         })
 

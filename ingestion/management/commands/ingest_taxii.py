@@ -5,6 +5,7 @@ from django.core.management.base import BaseCommand
 from ingestion.adapters.taxii import TaxiiFeedAdapter
 from ingestion.loaders.upsert import upsert_indicators
 from processors.dedup import dedup
+from processors.normalize import normalize_records
 
 
 class Command(BaseCommand):
@@ -45,13 +46,14 @@ class Command(BaseCommand):
             config=config,
         )
 
-        iocs = adapter.ingest()
-        if not iocs:
+        raw = adapter.fetch_raw()
+        if not raw:
             self.stdout.write("No indicators returned.")
             return
 
-        self.stdout.write(f"Fetched {len(iocs)} raw indicators from TAXII source.")
+        self.stdout.write(f"Fetched {len(raw)} raw indicators from TAXII source.")
 
-        deduped = dedup(iocs)
+        normalized = normalize_records(raw)
+        deduped = dedup(normalized)
         count = upsert_indicators(deduped, source_name="taxii")
         self.stdout.write(self.style.SUCCESS(f"Saved {count} new TAXII indicators."))
