@@ -2,7 +2,7 @@ from django.contrib.auth.decorators import login_required
 from django.shortcuts import render, get_object_or_404, redirect
 from django.utils import timezone
 from django.core.paginator import Paginator
-from django.db.models import Q, Count
+from django.db.models import Q, Count, Max
 from django.db.models.functions import TruncDate
 from django.views.decorators.http import require_POST
 from django.http import JsonResponse
@@ -22,25 +22,29 @@ def home(request):
     # Total indicators
     total_indicators = IndicatorOfCompromise.objects.count()
 
-    # Safe feed count (0 if Feed model doesn't exist)
-    try:
-        from dashboard.models import Feed
-        feed_count = ThreatFeed.objects.count()
-    except ImportError:
-        feed_count = 0
+    # Count only enabled feed sources from ingestion_feedsource
+    feed_count = FeedSource.objects.filter(is_enabled=True).count()
 
     # New indicators in the last 24 hours
-    new_last_24h = Indicator.objects.filter(
-        created__gte=timezone.now() - timedelta(days=1)
-    ).count()
+    new_last_24h = (IndicatorOfCompromise
+                    .objects
+                    .filter(last_seen__gte=timezone.now() - timedelta(days=1))
+                    .count()
+                    )
 
     # Most recent 50 indicators
-    recent_indicators = Indicator.objects.order_by('-created')[:50]
+    recent_indicators = IndicatorOfCompromise.objects.order_by('-last_seen')[:50]
+
+    # Last time IOC records were updated
+    last_updated = IndicatorOfCompromise.objects.aggregate(
+        last_updated=Max("last_seen")
+    )["last_updated"]
 
     context = {
         "total_indicators": total_indicators,
         "feed_count": feed_count,
         "new_last_24h": new_last_24h,
+        "last_updated": last_updated,
         "recent_indicators": recent_indicators,
     }
 
@@ -182,6 +186,21 @@ def update_all_feeds(request):
 # ANALYTICS VIEW
 # ======================================================
 
+# Function to grab data for charts in analytics view 
+@login_required
+def threat_confidence_chart_data(request):
+    # Pull data query for confidence
+    data = (
+        IndicatorOfCompromise.objects
+        .values('confidence')
+        .annotate(value=Count('confidence'))
+        .order_by('-confidence')
+    )
+    # Format used by ECharts (json)
+    chart_data = [{"value": item["value"], "name": item["confidence"]} for item in data]
+    return JsonResponse(chart_data, safe=False)
+
+# Actual Analytics view
 @login_required
 def analytics(request):
 
@@ -215,43 +234,20 @@ def analytics(request):
                    .order_by("-count")[:10]
     )
 
-    '''
-    new_this_week = Indicator.objects.filter(
-        created__gte=timezone.now() - timedelta(days=7)
-    ).count()
-
-    active_feeds = ThreatFeed.objects.filter(
-        active=True
-    ).count()
-
-    # ----------------------------
-    # Indicator volume over time
-    # (last 14 days)
-    # ----------------------------
-
-    volume_over_time = (
-        Indicator.objects
-        .annotate(day=TruncDate("created"))
-        .values("day")
-        .annotate(count=Count("id"))
-        .order_by("day")
+    top_ioc_types = (
+        IndicatorOfCompromise.objects
+        .values("ioc_type")
+        .annotate(count=Count("ioc_type"))
+        .order_by("-count")
     )
 
-    context = {
-        "total_indicators": total_indicators,
-        "high_confidence": high_confidence,
-        "new_this_week": new_this_week,
-        "active_feeds": active_feeds,
-        "volume_over_time": volume_over_time,
-        "top_sources": top_sources,
-    }
-    '''
     context = {
         "total_indicators" : count_records,
         "high_confidence" : high_confidence,
         "last_seen_this_week" : last_seen_this_week,
         "active_feeds" : active_feeds,
-        "top_sources" : top_sources
+        "top_sources" : top_sources,
+        "top_ioc_types" : top_ioc_types
     }
 
     return render(
