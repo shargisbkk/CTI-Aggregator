@@ -15,6 +15,7 @@
     "domain":               "domain",
     "domain-name":          "domain",
     "hostname":             "domain",
+    "wildcard":             "domain",
 
     "url":                  "url",
     "uri":                  "url",
@@ -45,6 +46,7 @@
     "ssdeep":               "hash",
     "imphash":              "hash",
     "tlsh":                 "hash",
+    "pehash":               "hash",
 
     "filename":             "file",
     "filepath":             "file",
@@ -64,11 +66,13 @@
     "ssl-cert-sha1":        "ssl_cert",
     "asn":                  "asn",
     "as":                   "asn",
+    "autonomous-system":    "asn",
     "ja3":                  "ja3",
     "ja3s":                 "ja3",
     "ja3-fingerprint-md5":  "ja3",
 
     "bitcoin-address":      "crypto",
+    "bitcoinaddress":       "crypto",
     "btc":                  "crypto",
     "xmr":                  "crypto",
     "dash":                 "crypto",
@@ -77,6 +81,9 @@
     "x509-fingerprint-sha1":    "ssl_cert",
     "x509-fingerprint-sha256":  "ssl_cert",
     "x509-fingerprint-md5":     "ssl_cert",
+
+    "mac-address":          "mac",
+    "mac address":          "mac",
 
     "user-agent":           "user-agent",
 
