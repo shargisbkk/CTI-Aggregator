@@ -40,7 +40,7 @@ def _clean_labels(raw_labels: list, ioc_type: str) -> list:
     return out
 
 
-def _normalize_one(raw: dict) -> Optional[dict]:
+def normalize_one(raw: dict) -> Optional[dict]:
     """Normalize a single raw indicator dict into the canonical schema."""
     raw_value = str(raw.get("ioc_value") or "").strip()
     raw_type = str(raw.get("ioc_type") or "").strip().lower()
@@ -78,7 +78,7 @@ def normalize_records(raw_records: list[dict]) -> list[dict]:
     skipped = 0
     for raw in raw_records:
         try:
-            rec = _normalize_one(raw)
+            rec = normalize_one(raw)
             if rec is not None:
                 indicators.append(rec)
         except Exception:
