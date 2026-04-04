@@ -90,7 +90,7 @@ def upsert_indicators(normalized_records: list[dict], source_name: str = "") -> 
     if batch:
         created += _upsert_batch(batch)
 
-    logger.info("upsert: %d records → %d new (source: %s)",
+    logger.info("upsert: %d records -> %d new (source: %s)",
                 len(normalized_records), created, source_name or "unknown")
 
     return created
