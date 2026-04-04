@@ -69,3 +69,4 @@ Thumbs.db
 
 # PyCharm
 .idea/
+logs/
