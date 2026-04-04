@@ -126,7 +126,7 @@
 
     <div class="card shadow-sm p-3">
 
-        <table class="table table-hover align-middle">
+        <table class="table table-hover align-middle table-custom">
 
             <!-- Table header -->
             <thead>
@@ -169,8 +169,8 @@
                             {% endfor %}
                         </td>
                         <td>{{ row.sources|join:", " }}</td>
-                        <td>{{ row.first_seen|date:"Y-m-d H:i" }}</td>
-                        <td>{{ row.last_seen|date:"Y-m-d H:i" }}</td>
+                        <td>{{ row.first_seen|date:"M d, Y g:i A" }}</td>
+                        <td>{{ row.last_seen|date:"M d, Y g:i A" }}</td>
                     </tr>
 
                 {% empty %}

@@ -49,11 +49,11 @@
 
     <div class="card shadow-sm p-4 mb-4">
 
-        <h5 class="fw-bold mb-3">
+        <h5 class="card-title mb-3">
             Active Feeds
         </h5>
 
-        <table class="table table-hover align-middle">
+        <table class="table table-hover align-middle table-custom">
 
             <!-- Table header -->
             <thead>
@@ -103,7 +103,7 @@
                         <!-- Last ingestion run -->
                         <td>
                             {% if feed.last_run %}
-                                {{ feed.last_run|date:"Y-m-d H:i" }}
+                                {{ feed.last_run|date:"M d, Y g:i A" }}
                             {% else %}
                                 <span class="text-muted">Never</span>
                             {% endif %}
