@@ -9,7 +9,6 @@ from ingestion.adapters.taxii_client import fetch_taxii_raw
 
 class TaxiiFeedAdapter(FeedAdapter):
     source_name = ""
-    requires_api_key = False
 
     def __init__(self, api_key="", since=None, config=None):
         super().__init__(api_key, since, config)

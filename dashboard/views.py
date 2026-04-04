@@ -1,12 +1,13 @@
 from django.contrib.auth.decorators import login_required
-from django.shortcuts import render, get_object_or_404, redirect
+from django.shortcuts import render, redirect
 from django.utils import timezone
 from django.core.paginator import Paginator
-from django.db.models import Q, Count
-from django.db.models.functions import TruncDate
+from django.db.models import Q
 from django.views.decorators.http import require_POST
 from django.http import JsonResponse
 from django.core.management import call_command
+from django.db import connection
+from urllib.parse import urlencode
 from datetime import timedelta
 from dashboard.models import Indicator, ThreatFeed, IngestionLog, FeedSource
 from ingestion.models import IndicatorOfCompromise
@@ -61,7 +62,9 @@ def indicators(request):
     q = request.GET.get("q", "").strip()
     if q:
         query = query.filter(
-            Q(ioc_value__icontains=q) | Q(ioc_type__icontains=q)
+            Q(ioc_value__icontains=q) |
+            Q(ioc_type__icontains=q) |
+            Q(labels__icontains=q)
         )
 
     # Type filter
@@ -74,10 +77,10 @@ def indicators(request):
     if source_filter:
         query = query.filter(sources__contains=[source_filter])
 
-    # Label filter
-    label_filter = request.GET.get("label", "").strip()
-    if label_filter:
-        query = query.filter(labels__contains=[label_filter])
+    # Label filter — multiple values, AND logic (each label must be present)
+    label_filters = [l.strip() for l in request.GET.getlist("label") if l.strip()]
+    for lf in label_filters:
+        query = query.filter(labels__contains=[lf])
 
     # Confidence level filter (high/medium/low/none)
     conf = request.GET.get("confidence", "").strip()
@@ -105,18 +108,29 @@ def indicators(request):
         .values_list("sources", flat=True)
         .distinct()
     )
-    # Flatten the JSON arrays into a unique sorted list
+    # Flatten the JSON arrays into unique sorted lists
     all_sources = sorted({s for row in source_names if row for s in row})
 
+    # Build a reusable query string for pagination links (preserves all active filters)
+    filter_params = []
+    if q:            filter_params.append(("q", q))
+    if type_filter:  filter_params.append(("type", type_filter))
+    if source_filter: filter_params.append(("source", source_filter))
+    if conf:         filter_params.append(("confidence", conf))
+    for lf in label_filters:
+        filter_params.append(("label", lf))
+    filter_qs = urlencode(filter_params)
+
     context = {
-        "page_obj": page_obj,
-        "ioc_types": ioc_types,
-        "source_names": all_sources,
-        "current_q": q,
-        "current_type": type_filter,
+        "page_obj":       page_obj,
+        "ioc_types":      ioc_types,
+        "source_names":   all_sources,
+        "current_q":      q,
+        "current_type":   type_filter,
         "current_source": source_filter,
         "current_confidence": conf,
-        "current_label": label_filter,
+        "current_labels": label_filters,
+        "filter_qs":      filter_qs,
     }
 
     return render(request, "dashboard/indicators.html", context)
@@ -130,26 +144,23 @@ def indicators(request):
 @login_required
 def threat_feeds(request):
     sources = FeedSource.objects.all().order_by("name")
-    logs = IngestionLog.objects.order_by("-timestamp")[:20]
+    logs    = IngestionLog.objects.order_by("-timestamp")[:20]
 
-    feeds = []
-    for source in sources:
-        config = source.config or {}
+    feeds = [
+        {
+            "id":           source.id,
+            "name":         source.name,
+            "adapter_type": source.get_adapter_type_display(),
+            "url":          source.url,
+            "active":       source.is_enabled,
+            "last_run":     source.last_pulled,
+        }
+        for source in sources
+    ]
 
-        feeds.append({
-            "id": source.id,
-            "name": source.name,
-            "url": config.get("url", ""),
-            "active": source.is_enabled,
-            "last_run": source.updated_at,
-            "last_count": config.get("last_count", 0),
-        })
+    return render(request, "dashboard/threat_feeds.html", {"feeds": feeds, "logs": logs})
 
-    context = {
-        "feeds": feeds,
-        "logs": logs,
-    }
-    return render(request, "dashboard/threat_feeds.html", context)
+
 
 # ======================================================
 # UPDATE ALL FEEDS VIEW
@@ -213,49 +224,34 @@ def analytics(request):
 
     active_feeds = "Not Implemented"
 
-    top_sources = (IndicatorOfCompromise.objects
-                   .values("sources")
-                   .annotate(count=Count("sources"))
-                   .order_by("-count")[:10]
-    )
+    # Unnest the JSONB sources array to count per source name
+    with connection.cursor() as cur:
+        cur.execute("""
+            SELECT elem AS source_name, COUNT(*) AS count
+            FROM indicators_of_compromise,
+                 jsonb_array_elements_text(sources) AS elem
+            GROUP BY elem
+            ORDER BY count DESC
+            LIMIT 10
+        """)
+        top_sources = [
+            {"source_name": row[0], "count": row[1]}
+            for row in cur.fetchall()
+        ]
 
-    '''
-    new_this_week = Indicator.objects.filter(
-        created__gte=timezone.now() - timedelta(days=7)
-    ).count()
-
-    active_feeds = ThreatFeed.objects.filter(
-        active=True
-    ).count()
-
-    # ----------------------------
-    # Indicator volume over time
-    # (last 14 days)
-    # ----------------------------
-
-    volume_over_time = (
-        Indicator.objects
-        .annotate(day=TruncDate("created"))
-        .values("day")
-        .annotate(count=Count("id"))
-        .order_by("day")
-    )
+    with connection.cursor() as cur:
+        cur.execute(
+            "SELECT COUNT(*) FROM indicators_of_compromise WHERE jsonb_array_length(sources) > 1"
+        )
+        multi_source_count = cur.fetchone()[0]
 
     context = {
-        "total_indicators": total_indicators,
-        "high_confidence": high_confidence,
-        "new_this_week": new_this_week,
-        "active_feeds": active_feeds,
-        "volume_over_time": volume_over_time,
-        "top_sources": top_sources,
-    }
-    '''
-    context = {
-        "total_indicators" : count_records,
-        "high_confidence" : high_confidence,
-        "last_seen_this_week" : last_seen_this_week,
-        "active_feeds" : active_feeds,
-        "top_sources" : top_sources
+        "total_indicators":    count_records,
+        "high_confidence":     high_confidence,
+        "last_seen_this_week": last_seen_this_week,
+        "active_feeds":        active_feeds,
+        "top_sources":         top_sources,
+        "multi_source_count":  multi_source_count,
     }
 
     return render(

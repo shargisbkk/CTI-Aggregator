@@ -41,13 +41,20 @@ class FeedAdapter(ABC):
     """Base class for all feed adapters. Subclasses implement fetch_raw()."""
 
     source_name: str = ""
-    requires_api_key: bool = True
 
     def __init__(self, api_key: str = "", since: Optional[datetime] = None, config: Optional[dict] = None):
         # common init so subclasses don't repeat this
         self._api_key = (api_key or "").strip()
         self.since = since
         self.config = config or {}
+
+    def _build_auth_headers(self) -> dict:
+        """Return HTTP headers dict with API key injected, if configured."""
+        headers = {}
+        auth_header = self.config.get("auth_header")
+        if auth_header and self._api_key:
+            headers[auth_header] = self._api_key
+        return headers
 
     def normalize_record(self, raw: dict) -> dict:
         """Parse a raw dict into a standardized indicator, mapping types via TYPE_MAP."""

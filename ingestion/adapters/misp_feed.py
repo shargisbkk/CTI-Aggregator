@@ -19,13 +19,12 @@ Config keys (FeedSource.config):
 import logging
 from datetime import datetime, timedelta, timezone
 
-import requests
-
 from ingestion.adapters.base import FeedAdapter
+from ingestion.adapters.http import request_with_retry
 
 logger = logging.getLogger(__name__)
 
-# MISP attribute type → raw ioc_type hint (base class _detect_type handles final classification)
+# MISP attribute type → canonical ioc_type passed to normalize_record via TYPE_MAP
 MISP_TYPE_MAP = {
     "ip-src": "ip", "ip-dst": "ip",
     "ip-src|port": "ip", "ip-dst|port": "ip",
@@ -44,7 +43,6 @@ MISP_TYPE_MAP = {
 
 class MispFeedAdapter(FeedAdapter):
     source_name = ""
-    requires_api_key = False
 
     def __init__(self, api_key="", since=None, config=None):
         super().__init__(api_key, since, config)
@@ -53,15 +51,13 @@ class MispFeedAdapter(FeedAdapter):
     def _fetch_manifest(self, base_url, headers, timeout):
         """Fetch and return the MISP feed manifest (uuid → event metadata)."""
         manifest_url = base_url.rstrip("/") + "/manifest.json"
-        r = requests.get(manifest_url, headers=headers, timeout=timeout)
-        r.raise_for_status()
+        r = request_with_retry("GET", manifest_url, headers=headers, timeout=timeout)
         return r.json()
 
     def _fetch_event(self, base_url, uuid, headers, timeout):
         """Fetch a single MISP event by UUID."""
         event_url = base_url.rstrip("/") + f"/{uuid}.json"
-        r = requests.get(event_url, headers=headers, timeout=timeout)
-        r.raise_for_status()
+        r = request_with_retry("GET", event_url, headers=headers, timeout=timeout)
         return r.json()
 
     def fetch_raw(self) -> list[dict]:
@@ -71,10 +67,7 @@ class MispFeedAdapter(FeedAdapter):
         filter_to_ids = self.config.get("filter_to_ids", True)
         max_events = self.config.get("max_events", 200)
 
-        headers = {}
-        auth_header = self.config.get("auth_header")
-        if auth_header and self._api_key:
-            headers[auth_header] = self._api_key
+        headers = self._build_auth_headers()
 
         # Determine time cutoff
         if self.since:
@@ -153,13 +146,14 @@ class MispFeedAdapter(FeedAdapter):
                 if category and category not in labels:
                     labels.append(category)
 
+                ts = attr.get("timestamp")
                 indicators.append({
                     "ioc_type": ioc_type,
                     "ioc_value": value,
                     "labels": labels,
                     "confidence": None,
-                    "first_seen": attr.get("first_seen") or attr.get("timestamp"),
-                    "last_seen": attr.get("last_seen") or attr.get("timestamp"),
+                    "first_seen": attr.get("first_seen") or ts,
+                    "last_seen": attr.get("last_seen"),
                 })
 
         return indicators

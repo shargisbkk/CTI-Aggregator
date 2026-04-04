@@ -1,40 +1,17 @@
 """
-Adapter for JSON API feeds (ThreatFox, OTX, AbuseIPDB, etc.).
-Supports flat, paginated, nested, and string-array responses via FeedSource.config.
+Generic adapter for simple JSON REST APIs.
+Handles flat GET and POST responses with optional pagination.
+For APIs with custom structures (OTX, ThreatFox), use their dedicated adapters.
+Minimum config: { "url": "..." }
 """
 
 import logging
-from datetime import datetime, timedelta, timezone
 
+from ingestion.adapters.autodetect import detect_json_layout, resolve_path
 from ingestion.adapters.base import FeedAdapter
 from ingestion.adapters.http import request_with_retry
 
 logger = logging.getLogger(__name__)
-
-
-def _resolve_path(data, path):
-    """Walk a dot-path into a dict, e.g. "data.results". Returns None if missing."""
-    if not path:
-        return data
-    for key in path.split("."):
-        if isinstance(data, dict):
-            data = data.get(key)
-        else:
-            return None
-    return data
-
-
-def _prepare_body(template, days):
-    """Deep-copy request body template, replacing '{days}' placeholders."""
-    if template is None:
-        return None
-    if isinstance(template, dict):
-        return {k: _prepare_body(v, days) for k, v in template.items()}
-    if isinstance(template, list):
-        return [_prepare_body(v, days) for v in template]
-    if isinstance(template, str) and "{days}" in template:
-        return template.replace("{days}", str(days))
-    return template
 
 
 class JsonFeedAdapter(FeedAdapter):
@@ -44,206 +21,93 @@ class JsonFeedAdapter(FeedAdapter):
         super().__init__(api_key, since, config)
         self.source_name = self.config.get("_source_name", "json")
 
-    def _build_labels(self, entry, parent=None):
-        """Pull labels from entry fields and optionally from its parent."""
+    def _get_labels(self, entry: dict) -> list:
         labels = list(self.config.get("static_labels", []))
-
-        # Labels from the entry itself
         for field in self.config.get("label_fields", []):
             val = entry.get(field)
             if isinstance(val, list):
-                for item in val:
-                    name = str(item).strip().lower()
-                    if name and "unknown" not in name and name not in labels:
-                        labels.append(name)
+                labels.extend(str(v).strip().lower() for v in val if v)
             elif val:
-                name = str(val).strip().lower()
-                if name and "unknown" not in name and name not in labels:
-                    labels.append(name)
-
-        # parent labels (for nested feeds like OTX pulses)
-        if parent:
-            for field in self.config.get("parent_label_fields", []):
-                val = parent.get(field)
-                if isinstance(val, list):
-                    for item in val:
-                        name = str(item).strip().lower()
-                        if name and name[0].isdigit():
-                            continue
-                        if name and name not in labels:
-                            labels.append(name)
-                elif val:
-                    name = str(val).strip().lower()
-                    if name and name not in labels:
-                        labels.append(name)
-
+                labels.append(str(val).strip().lower())
         return labels
 
-    def _extract_confidence(self, entry, parent=None):
-        """Get confidence from the entry, falling back to parent if nested."""
-        field_map = self.config.get("field_map", {})
-
-        # try entry-level confidence first
-        if "confidence" in field_map:
-            val = entry.get(field_map["confidence"])
-            if val is not None:
-                try:
-                    return int(val)
-                except (TypeError, ValueError):
-                    pass
-
-        # fall back to parent confidence (with optional multiplier)
-        if parent:
-            parent_field = self.config.get("parent_confidence_field")
-            if parent_field:
-                val = parent.get(parent_field)
-                if val is not None:
-                    try:
-                        multiplier = self.config.get("parent_confidence_multiplier", 1)
-                        return int(val) * multiplier
-                    except (TypeError, ValueError):
-                        pass
-
-        return None
-
-    def _map_entry(self, entry, parent=None):
-        """Convert one JSON entry into a raw indicator dict using field_map."""
-        field_map = self.config.get("field_map", {})
-
-        ioc_type = entry.get(field_map.get("ioc_type", "ioc_type"), "")
-        ioc_value = entry.get(field_map.get("ioc_value", "ioc_value"), "")
-
-        first_seen = entry.get(field_map.get("first_seen", "first_seen"))
-        last_seen = entry.get(field_map.get("last_seen", "last_seen"))
-
-        # last_seen fallback
-        if not last_seen:
-            fallback = self.config.get("last_seen_fallback")
-            if fallback:
-                last_seen = entry.get(fallback)
-
-        # try parent last_seen keys in order
-        if not last_seen and parent:
-            for key in self.config.get("parent_last_seen", []):
-                last_seen = parent.get(key)
-                if last_seen:
-                    break
-
-        return {
-            "ioc_type": ioc_type,
-            "ioc_value": ioc_value,
-            "labels": self._build_labels(entry, parent),
-            "confidence": self._extract_confidence(entry, parent),
-            "first_seen": first_seen,
-            "last_seen": last_seen,
-        }
-
-    def _compute_days(self):
-        """Get lookback days from since timestamp or config default."""
-        days = self.config.get("days", 0)
-        if self.since:
-            delta = datetime.now(timezone.utc) - self.since
-            days = delta.days + 1
-        return days
-
     def fetch_raw(self) -> list[dict]:
-        url = self.config["url"]
-        method = self.config.get("method", "GET").upper()
-        timeout = self.config.get("timeout", 60)
-        max_pages = self.config.get("max_pages", 0)
-        page_size = self.config.get("page_size", 0)
-        data_path = self.config.get("data_path", "data")
-        next_page_path = self.config.get("next_page_path")
-        status_field = self.config.get("status_field")
-        status_value = self.config.get("status_value")
-        nested_path = self.config.get("nested_path")
-        string_array = self.config.get("string_array", False)
+        url             = self.config["url"]
+        method          = self.config.get("method", "GET").upper()
+        static_ioc_type = self.config.get("ioc_type", "")
 
-        headers = {}
-        auth_header = self.config.get("auth_header")
-        if auth_header and self._api_key:
-            headers[auth_header] = self._api_key
+        headers = self._build_auth_headers()
+        # Some APIs pass the key as a URL param rather than a header (e.g. ?key=abc)
+        key_param   = self.config.get("key_param")
+        base_params = {key_param: self._api_key} if key_param and self._api_key else {}
 
-        days = self._compute_days()
+        field_map       = dict(self.config.get("field_map") or {})
+        data_path       = self.config.get("data_path")
+        next_page_path  = self.config.get("next_page_path")
+        max_pages       = self.config.get("max_pages", 0)
+        needs_detection = not field_map
 
-        # build request kwargs
-        kwargs = {"headers": headers, "timeout": timeout}
-
+        kwargs = {"headers": headers, "timeout": self.config.get("timeout", 60)}
         if method == "POST":
-            body = _prepare_body(self.config.get("request_body"), days)
-            kwargs["json"] = body
-        else:
-            params = {}
-            if page_size > 0:
-                params["limit"] = page_size
-            # Time-based filtering for GET APIs
-            if self.since:
-                params["modified_since"] = self.since.strftime("%Y-%m-%dT%H:%M:%SZ")
-            elif days > 0:
-                cutoff = datetime.now(timezone.utc) - timedelta(days=days)
-                params["modified_since"] = cutoff.strftime("%Y-%m-%dT%H:%M:%SZ")
-            if params:
-                kwargs["params"] = params
+            kwargs["json"] = self.config.get("request_body")
+        elif base_params:
+            kwargs["params"] = base_params
 
-        indicators = []
-        page = 0
-        next_url = url
+        indicators, page, next_url = [], 0, url
 
         while next_url:
             try:
-                r = request_with_retry(method, next_url, **kwargs)
-                # clear params after first page (pagination uses next URL)
+                r    = request_with_retry(method, next_url, **kwargs)
+                # Next page URLs are self-contained — don't carry over the first request's params
                 kwargs.pop("params", None)
                 data = r.json()
             except Exception:
-                logger.warning("%s: page %d failed, returning %d indicators collected so far",
+                logger.warning("%s: page %d failed, returning %d collected",
                                self.source_name, page + 1, len(indicators))
                 break
 
-            # check response status field if configured
-            if status_field and data.get(status_field) != status_value:
+            # If no field_map was provided, try to figure out the layout from the first page
+            if needs_detection and page == 0:
+                layout         = detect_json_layout(data)
+                field_map      = layout.field_map
+                data_path      = data_path if data_path is not None else layout.data_path
+                next_page_path = next_page_path if next_page_path is not None else layout.next_page_path
+                self.config.update({
+                    "field_map":    field_map,
+                    "data_path":    data_path if data_path is not None else "",
+                    "label_fields": layout.label_fields,
+                })
+                needs_detection = False
+
+            items = resolve_path(data, data_path if data_path is not None else "data")
+            if not items or not isinstance(items, list):
                 break
 
-            # string array mode (flat list of values, no field mapping)
-            if string_array:
-                items = data if isinstance(data, list) else _resolve_path(data, data_path) or []
-                ioc_type = self.config.get("ioc_type", "domain")
-                static_labels = list(self.config.get("static_labels", []))
-                for item in items:
+            fm = field_map
+            for entry in items:
+                # Some feeds return plain string arrays (e.g. domain blocklists)
+                if isinstance(entry, str):
                     indicators.append({
-                        "ioc_type": ioc_type,
-                        "ioc_value": str(item).strip(),
-                        "labels": static_labels[:],
-                        "confidence": None,
+                        "ioc_value":  entry,
+                        "ioc_type":   static_ioc_type,
                         "first_seen": None,
-                        "last_seen": None,
+                        "last_seen":  None,
+                        "confidence": None,
+                        "labels":     list(self.config.get("static_labels", [])),
                     })
-                break  # string arrays are single-request
+                    continue
+                indicators.append({
+                    "ioc_value":  entry.get(fm.get("ioc_value",  "ioc_value"), ""),
+                    "ioc_type":   entry.get(fm.get("ioc_type",   "ioc_type"),  "") or static_ioc_type,
+                    "first_seen": entry.get(fm.get("first_seen", "first_seen")),
+                    "last_seen":  entry.get(fm.get("last_seen",  "last_seen")),
+                    "confidence": entry.get(fm.get("confidence", "confidence")),
+                    "labels":     self._get_labels(entry),
+                })
 
-            # extract data array from response
-            items = _resolve_path(data, data_path)
-            if not items:
+            page     += 1
+            next_url  = data.get(next_page_path) if next_page_path else None
+            if max_pages and page >= max_pages:
                 break
-
-            if nested_path:
-                # nested: each parent contains a sub-array of indicators
-                for parent in items:
-                    children = parent.get(nested_path, [])
-                    for child in children:
-                        indicators.append(self._map_entry(child, parent))
-            else:
-                # flat: each item is an indicator
-                for entry in items:
-                    indicators.append(self._map_entry(entry))
-
-            page += 1
-            if max_pages > 0 and page >= max_pages:
-                break
-
-            # Cursor-based pagination
-            if next_page_path:
-                next_url = data.get(next_page_path)
-            else:
-                next_url = None
 
         return indicators

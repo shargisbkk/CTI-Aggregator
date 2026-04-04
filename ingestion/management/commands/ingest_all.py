@@ -27,9 +27,22 @@ class Command(BaseCommand):
                 continue
 
             since = source.last_pulled
-            config = source.config or {}
-            # Inject source name so generic adapters can use it for logging
+            # Build config from model fields so adapters never read the model directly.
+            config = dict(source.config or {})
+            # TAXII adapter expects discovery_url; all others use url
+            url_key = "discovery_url" if source.adapter_type == "taxii" else "url"
+            config[url_key] = source.url
             config["_source_name"] = source.name
+            if source.auth_header:
+                config.setdefault("auth_header", source.auth_header)
+            if source.collection_id:
+                config.setdefault("collection_id", source.collection_id)
+            if source.ioc_type:
+                config.setdefault("ioc_type", source.ioc_type)
+            if source.static_labels:
+                config.setdefault("static_labels", [
+                    l.strip() for l in source.static_labels.split(",") if l.strip()
+                ])
 
             if since:
                 self.stdout.write(f"  {source.name}: fetching since {since.isoformat()}...")

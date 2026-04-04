@@ -95,7 +95,7 @@ def upsert_indicators(normalized_records: list[dict], source_name: str = "") -> 
 
     return created
 
-#Commenting done by Claude - but what this does in essence is prevents an issue with nullable labels in the DB
+# Prevents nullable labels from breaking the jsonb_agg merge in the upsert
 def _clean_list(value):
     # None -> []
     if value is None:

@@ -1,20 +1,26 @@
 """
 Adapter for CSV/TSV feeds (URLhaus, Feodo Tracker, DShield, etc.).
-Column mapping and filtering are driven by FeedSource.config.
+
+If the FeedSource config includes a field_map, it is used directly (manual mode).
+If field_map is absent, the adapter auto-detects columns via autodetect.detect_csv_layout,
+which inspects the header row (if present) or scans sample values with regex heuristics.
+Minimum required config: { "url": "..." }
 """
 
 import csv
 import io
+import logging
 from datetime import datetime, timezone
 
-import requests
-
+from ingestion.adapters.autodetect import detect_csv_layout
 from ingestion.adapters.base import FeedAdapter
+from ingestion.adapters.http import request_with_retry
+
+logger = logging.getLogger(__name__)
 
 
 class CsvFeedAdapter(FeedAdapter):
     source_name = ""
-    requires_api_key = False
 
     def __init__(self, api_key="", since=None, config=None):
         super().__init__(api_key, since, config)
@@ -26,34 +32,48 @@ class CsvFeedAdapter(FeedAdapter):
         comment_char = self.config.get("comment_char", "#")
         delimiter = self.config.get("delimiter", ",")
         min_columns = self.config.get("min_columns", 1)
-        ioc_type = self.config.get("ioc_type", "unknown")
-        field_map = self.config.get("field_map", {})
+        field_map = dict(self.config.get("field_map") or {})
+        ioc_type = self.config.get("ioc_type", "")
         last_seen_fallback_col = self.config.get("last_seen_fallback_col")
         label_columns = self.config.get("label_columns", [])
         label_separator = self.config.get("label_separator", ",")
         static_labels = list(self.config.get("static_labels", []))
         first_seen_format = self.config.get("first_seen_format")
 
-        headers = {}
-        auth_header = self.config.get("auth_header")
-        if auth_header and self._api_key:
-            headers[auth_header] = self._api_key
+        headers = self._build_auth_headers()
 
-        r = requests.get(url, headers=headers, timeout=timeout)
-        r.raise_for_status()
+        r = request_with_retry("GET", url, headers=headers, timeout=timeout)
 
-        lines = (
+        raw_lines = [
             line for line in io.StringIO(r.text)
             if not (comment_char and line.startswith(comment_char))
-        )
-        reader = csv.reader(lines, delimiter=delimiter)
+        ]
+        all_rows = list(csv.reader(raw_lines, delimiter=delimiter))
+
+        # Auto-detect columns when no field_map is configured
+        skip_header = False
+        if not field_map:
+            layout = detect_csv_layout(all_rows)
+            field_map     = layout.field_map
+            ioc_type      = ioc_type or layout.ioc_type
+            label_columns = label_columns or layout.label_columns
+            skip_header   = layout.skip_header
+            logger.info(
+                "%s: auto-detected ioc_type=%r field_map=%r label_columns=%r header_skipped=%s",
+                self.source_name, ioc_type, field_map, label_columns, skip_header,
+            )
+
+        # Explicit config always wins over auto-detected skip_header
+        if "skip_header" in self.config:
+            skip_header = bool(self.config["skip_header"])
+
+        rows = all_rows[1:] if skip_header else all_rows
 
         indicators = []
-        for row in reader:
+        for row in rows:
             if len(row) < min_columns:
                 continue
 
-            # pull fields by column index from field_map
             ioc_value_col = field_map.get("ioc_value", 0)
             ioc_value = row[ioc_value_col].strip() if ioc_value_col < len(row) else ""
             if not ioc_value:
@@ -75,7 +95,6 @@ class CsvFeedAdapter(FeedAdapter):
                 last_seen = row[last_seen_fallback_col].strip() if last_seen_fallback_col < len(row) else None
                 last_seen = last_seen or None
 
-            # skip rows older than since (client-side filter)
             if self.since and first_seen and first_seen_format:
                 try:
                     row_time = datetime.strptime(first_seen, first_seen_format)
@@ -85,7 +104,6 @@ class CsvFeedAdapter(FeedAdapter):
                 except ValueError:
                     pass
 
-            # build labels from configured columns
             labels = static_labels[:]
             for col_idx in label_columns:
                 if col_idx < len(row):

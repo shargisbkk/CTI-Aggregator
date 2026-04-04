@@ -7,10 +7,13 @@ Supports two pagination styles:
                    the next added_after value (e.g. MITRE ATT&CK)
 """
 
+import logging
 from urllib.parse import urljoin
 
 from ingestion.adapters.http import request_with_retry
 from ingestion.adapters.stix import extract_indicators
+
+logger = logging.getLogger(__name__)
 
 TAXII_ACCEPT = "application/taxii+json; version=2.1"
 TAXII_HEADERS = {"Accept": TAXII_ACCEPT}
@@ -75,7 +78,8 @@ def get_objects(api_root_url: str, collection_id: str, auth: tuple[str, str] | N
         try:
             r = request_with_retry("GET", url, headers=TAXII_HEADERS, auth=auth,
                                    params=params, timeout=120)
-        except Exception:
+        except Exception as e:
+            logger.warning("TAXII fetch failed for collection %s: %s", collection_id, e)
             break
         if r.status_code == 404:
             break
@@ -134,14 +138,16 @@ def fetch_taxii_raw(
     # Auto-discover API roots and iterate all readable collections
     try:
         api_roots = discover_api_roots(discovery_url, auth, api_key)
-    except Exception:
+    except Exception as e:
+        logger.warning("TAXII discovery failed, falling back to discovery URL: %s", e)
         api_roots = [discovery_url.rstrip("/")]
 
     all_indicators = []
     for api_root_url in api_roots:
         try:
             collections = list_collections(api_root_url, auth, api_key)
-        except Exception:
+        except Exception as e:
+            logger.warning("TAXII collection listing failed for %s: %s", api_root_url, e)
             continue
 
         for col in collections:
@@ -152,7 +158,8 @@ def fetch_taxii_raw(
                 for env in get_objects(api_root_url, col_id, auth, added_after, api_key):
                     objects = env.get("objects", [])
                     all_indicators.extend(extract_indicators(objects))
-            except Exception:
+            except Exception as e:
+                logger.warning("TAXII object fetch failed for collection %s: %s", col_id, e)
                 continue
 
     return all_indicators

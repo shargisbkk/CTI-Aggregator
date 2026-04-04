@@ -32,9 +32,9 @@
 
     <div class="card shadow-sm p-3 mb-4">
 
-        <form method="get" class="row g-3">
+        <form method="get" id="filterForm" class="row g-3">
 
-            <!-- Search input -->
+            <!-- Search input (matches value, type, and labels) -->
             <div class="col-md-3">
                 <input
                     type="text"
@@ -79,25 +79,42 @@
                 </select>
             </div>
 
-            <!-- Hidden label filter (set when clicking a label badge) -->
-            <input type="hidden" name="label" value="{{ current_label }}">
-
-            <!-- Filter buttons -->
+            <!-- Filter / Clear buttons -->
             <div class="col-md-3 d-flex gap-2">
                 <button class="btn btn-dark flex-grow-1">Filter</button>
                 <a href="{% url 'dashboard:dashboard-indicators' %}" class="btn btn-outline-secondary">Clear</a>
             </div>
 
-        </form>
+            <!-- Hidden inputs for currently active labels (preserved on form submit) -->
+            {% for l in current_labels %}
+                <input type="hidden" name="label" value="{{ l }}">
+            {% endfor %}
 
-        {% if current_label %}
-            <div class="mt-3 pt-2 border-top">
-                Filtering by label:
-                <span class="badge bg-info text-dark">{{ current_label }}</span>
-                <a href="?q={{ current_q }}&type={{ current_type }}&source={{ current_source }}&confidence={{ current_confidence }}"
-                   class="ms-2 small">Remove</a>
+            <!-- Label input — same width as search box -->
+            <div class="col-md-3">
+                <input type="text" id="labelInput"
+                       class="form-control"
+                       placeholder="Search labels..."
+                       onkeydown="if(event.key==='Enter'){event.preventDefault();addLabel();}">
             </div>
-        {% endif %}
+
+            <!-- Active label chips + clear -->
+            <div class="col d-flex flex-wrap align-items-center gap-2">
+                {% for l in current_labels %}
+                    <span class="badge d-flex align-items-center gap-1"
+                          style="background-color:#d1ecf1; color:#0c5460; font-size:.85rem;">
+                        {{ l }}
+                        <button type="button"
+                                class="btn-close btn-close-sm ms-1"
+                                style="filter:invert(0.4);"
+                                onclick="removeLabel('{{ l|escapejs }}')"></button>
+                    </span>
+                {% endfor %}
+                <a href="?q={{ current_q }}&type={{ current_type }}&source={{ current_source }}&confidence={{ current_confidence }}"
+                   class="btn btn-outline-secondary btn-sm">Clear</a>
+            </div>
+
+        </form>
 
     </div>
 
@@ -145,7 +162,8 @@
                         </td>
                         <td>
                             {% for label in row.labels %}
-                                <a href="?label={{ label|urlencode }}"
+                                <a href="#"
+                                   onclick="appendLabelFilter('{{ label|escapejs }}'); return false;"
                                    class="badge text-decoration-none me-1"
                                    style="background-color: #d1ecf1; color: #0c5460;">{{ label }}</a>
                             {% endfor %}
@@ -187,7 +205,7 @@
                     {% if page_obj.has_previous %}
                         <li class="page-item">
                             <a class="page-link"
-                               href="?page={{ page_obj.previous_page_number }}&q={{ current_q }}&type={{ current_type }}&source={{ current_source }}&confidence={{ current_confidence }}&label={{ current_label }}">
+                               href="?page={{ page_obj.previous_page_number }}&{{ filter_qs }}">
                                 Previous
                             </a>
                         </li>
@@ -202,7 +220,7 @@
                     {% if page_obj.has_next %}
                         <li class="page-item">
                             <a class="page-link"
-                               href="?page={{ page_obj.next_page_number }}&q={{ current_q }}&type={{ current_type }}&source={{ current_source }}&confidence={{ current_confidence }}&label={{ current_label }}">
+                               href="?page={{ page_obj.next_page_number }}&{{ filter_qs }}">
                                 Next
                             </a>
                         </li>
@@ -215,5 +233,43 @@
     </div>
 
 </div>
+
+<script>
+// Add the typed label to the active filter set and resubmit
+function addLabel() {
+    const input = document.getElementById('labelInput');
+    const val = input.value.trim();
+    if (!val) return;
+
+    const params = new URLSearchParams(window.location.search);
+    const existing = params.getAll('label');
+    if (!existing.includes(val)) {
+        params.append('label', val);
+    }
+    params.delete('page');
+    window.location.search = params.toString();
+}
+
+// Clicking a label badge in the table appends it to the active label set
+function appendLabelFilter(label) {
+    const params = new URLSearchParams(window.location.search);
+    const existing = params.getAll('label');
+    if (!existing.includes(label)) {
+        params.append('label', label);
+    }
+    params.delete('page');
+    window.location.search = params.toString();
+}
+
+// Remove a single label from the active filter set
+function removeLabel(label) {
+    const params = new URLSearchParams(window.location.search);
+    const remaining = params.getAll('label').filter(l => l !== label);
+    params.delete('label');
+    remaining.forEach(l => params.append('label', l));
+    params.delete('page');
+    window.location.search = params.toString();
+}
+</script>
 
 {% endblock %}
