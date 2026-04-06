@@ -204,7 +204,6 @@ def _detect_csv_from_values(data_rows: list[list[str]]) -> tuple[dict, str, list
             best_type = dominant
 
     # Detect an explicit ioc_type column — values that are largely TYPE_MAP keys
-    # (e.g. ThreatFox column 3: "url", "ip:port", "domain", "md5_hash")
     from ingestion.type_map import TYPE_MAP
     type_map_keys = set(TYPE_MAP.keys())
     type_col = None
