@@ -116,11 +116,20 @@ class CsvFeedAdapter(FeedAdapter):
                         if part and part.lower() != "none" and part not in labels:
                             labels.append(part)
 
+            confidence = None
+            if "confidence" in field_map:
+                col = field_map["confidence"]
+                raw_conf = row[col].strip() if col < len(row) else None
+                try:
+                    confidence = int(raw_conf) if raw_conf else None
+                except (ValueError, TypeError):
+                    confidence = None
+
             indicators.append({
                 "ioc_type": ioc_type,
                 "ioc_value": ioc_value,
                 "labels": labels,
-                "confidence": None,
+                "confidence": confidence,
                 "first_seen": first_seen,
                 "last_seen": last_seen,
             })

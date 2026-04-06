@@ -1,6 +1,6 @@
 """
 STIX 2.x parsing utilities — extracts IOC dicts from STIX pattern strings.
-Shared by TaxiiFeedAdapter and MispFeedAdapter. Does not fetch anything.
+Shared by TaxiiFeedAdapter. Does not fetch anything.
 """
 
 import logging
@@ -10,21 +10,26 @@ from stix2 import parse
 
 logger = logging.getLogger(__name__)
 
+# Matches :value = 'x' (simple types) and :ref.value = 'x' (reference paths).
+# Covers: ipv4-addr, domain-name, url, email-addr, network-traffic:dst_ref.value, etc.
+_VALUE_RE = re.compile(r"([\w-]+):(?:[\w.]+\.)?value\s*=\s*'([^']+)'")
+
+# Matches file:hashes.MD5 = 'x' and file:hashes.'SHA-256' = 'x'
+_HASH_RE = re.compile(r"file:hashes(?:\.\w+|\.'[^']+')\s*=\s*'([^']+)'", re.IGNORECASE)
+
 
 def _parse_pattern(pattern: str) -> list[tuple[str, str]]:
-    """Extract (type, value) pairs from a STIX pattern string."""
+    """
+    Extract (stix_object_type, value) pairs from a STIX pattern string.
+
+    Handles simple patterns, compound AND/OR patterns, reference paths,
+    and file hash patterns. Only extracts actual observable values —
+    not type hints or property references.
+    """
     if not pattern:
         return []
-
-    matches = re.findall(
-        r"([\w-]+):([\w.'\"\\-]+)\s*=\s*(?:'([^']+)'|(\S+))", pattern
-    )
-
-    results = []
-    for obj_type, prop_path, quoted_val, unquoted_val in matches:
-        value = quoted_val or unquoted_val.rstrip("]")
-        results.append((obj_type, value))
-
+    results = [(m.group(1), m.group(2)) for m in _VALUE_RE.finditer(pattern)]
+    results += [("file", m.group(1)) for m in _HASH_RE.finditer(pattern)]
     return results
 
 
@@ -54,17 +59,14 @@ def extract_indicators(raw_objects: list[dict]) -> list[dict]:
             first_seen = o.get("valid_from") or o.get("created")
             last_seen  = o.get("modified")
 
-        observables = _parse_pattern(pattern)
-        for ioc_type, ioc_value in observables:
+        for ioc_type, ioc_value in _parse_pattern(pattern):
             out.append({
-                "ioc_type":     ioc_type,
-                "ioc_value":    ioc_value,
-                "labels":       labels,
-                "confidence":   confidence,
-                "first_seen":   first_seen,
-                "last_seen":    last_seen,
+                "ioc_type":   ioc_type,
+                "ioc_value":  ioc_value,
+                "labels":     labels,
+                "confidence": confidence,
+                "first_seen": first_seen,
+                "last_seen":  last_seen,
             })
 
     return out
-
-

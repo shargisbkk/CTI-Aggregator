@@ -1,3 +1,5 @@
+from datetime import timedelta
+
 from django.core.management.base import BaseCommand
 from django.utils import timezone
 
@@ -5,6 +7,9 @@ from ingestion.loaders.upsert import upsert_indicators
 from ingestion.models import FeedSource
 from ingestion.source_config import get_adapter_class
 from processors.dedup import dedup
+from processors.enrich import geo_enrich_batch
+
+DEFAULT_LOOKBACK_DAYS = 180
 
 
 class Command(BaseCommand):
@@ -26,28 +31,21 @@ class Command(BaseCommand):
                 ))
                 continue
 
-            since = source.last_pulled
+            since = source.last_pulled or (timezone.now() - timedelta(days=DEFAULT_LOOKBACK_DAYS))
             # Build config from model fields so adapters never read the model directly.
             config = dict(source.config or {})
-            # TAXII adapter expects discovery_url; all others use url
-            url_key = "discovery_url" if source.adapter_type == "taxii" else "url"
-            config[url_key] = source.url
+            config["url"]          = source.url
             config["_source_name"] = source.name
             if source.auth_header:
                 config.setdefault("auth_header", source.auth_header)
+            if source.username:
+                config.setdefault("username", source.username)
+            if source.password:
+                config.setdefault("password", source.password)
             if source.collection_id:
                 config.setdefault("collection_id", source.collection_id)
-            if source.ioc_type:
-                config.setdefault("ioc_type", source.ioc_type)
-            if source.static_labels:
-                config.setdefault("static_labels", [
-                    l.strip() for l in source.static_labels.split(",") if l.strip()
-                ])
 
-            if since:
-                self.stdout.write(f"  {source.name}: fetching since {since.isoformat()}...")
-            else:
-                self.stdout.write(f"  {source.name}: initial pull...")
+            self.stdout.write(f"  {source.name}: fetching since {since.isoformat()}...")
 
             try:
                 adapter = adapter_class(
@@ -71,9 +69,10 @@ class Command(BaseCommand):
 
                 deduped = dedup(iocs)
                 count = upsert_indicators(deduped, source_name=source.name)
+                geo_count = geo_enrich_batch(deduped)
                 self.stdout.write(
                     f"  {source.name}: saved {count} new indicators "
-                    f"({len(iocs)} raw, {len(deduped)} after dedup)"
+                    f"({len(iocs)} raw, {len(deduped)} after dedup, {geo_count} IPs geo-enriched)"
                 )
                 total += count
 

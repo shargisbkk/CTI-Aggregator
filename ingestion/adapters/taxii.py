@@ -15,10 +15,16 @@ class TaxiiFeedAdapter(FeedAdapter):
         self.source_name = self.config.get("_source_name", "taxii")
 
     def fetch_raw(self) -> list[dict]:
-        discovery_url = self.config.get("discovery_url", "")
-        username = self.config.get("username", "")
-        password = self.config.get("password", "")
+        # Accept "url" (standard pipeline key) or legacy "discovery_url"
+        discovery_url = self.config.get("url") or self.config.get("discovery_url", "")
+        username      = self.config.get("username", "")
+        password      = self.config.get("password", "")
         collection_id = self.config.get("collection_id", "")
+
+        # When auth_header is configured, send the key as a custom header rather
+        # than a query param so servers like OTX (X-OTX-API-KEY) work correctly.
+        extra_headers = self._build_auth_headers()
+        api_key       = "" if extra_headers else self._api_key
 
         added_after = None
         if self.since:
@@ -29,6 +35,7 @@ class TaxiiFeedAdapter(FeedAdapter):
             username=username,
             password=password,
             added_after=added_after,
-            api_key=self._api_key,
+            api_key=api_key,
             collection_id=collection_id,
+            extra_headers=extra_headers or None,
         )

@@ -38,7 +38,7 @@ def restore_to_config(apps, schema_editor):
 class Migration(migrations.Migration):
 
     dependencies = [
-        ("ingestion", "0008_simplify_seed_configs"),
+        ("ingestion", "0007_merge_0004_feedsource_sourceurl_0006_seed_sources"),
     ]
 
     operations = [

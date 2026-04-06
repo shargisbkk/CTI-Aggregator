@@ -155,6 +155,8 @@ def _detect_csv_from_headers(
             target = _HEADER_DATE[col]
             if target not in field_map:
                 field_map[target] = i
+        elif col in _CONFIDENCE_FIELD_NAMES and "confidence" not in field_map:
+            field_map["confidence"] = i
         elif col in _HEADER_LABEL:
             label_columns.append(i)
 
@@ -227,6 +229,11 @@ _COMMON_DATA_PATHS = [
 _LABEL_FIELD_NAMES = {
     "tags", "labels", "category", "threat_type", "malware",
     "classification", "tag", "threat", "family", "malware_families",
+}
+
+_CONFIDENCE_FIELD_NAMES = {
+    "confidence", "confidence_level", "confidence_score",
+    "certainty", "risk_score", "score",
 }
 
 _PAGINATION_FIELDS = {"next", "next_page", "cursor", "after"}
@@ -304,6 +311,7 @@ def detect_json_layout(data) -> DetectedLayout:
     - next_page_path not detected if first response has "next": null
     - Double-nested JSON (>1 level deep) not detected
     - Mixed-type IOC columns classified by plurality type
+    - Confidence only detected for numeric fields with known names
     """
     layout = DetectedLayout()
 
@@ -402,14 +410,25 @@ def detect_json_layout(data) -> DetectedLayout:
                 layout.field_map["last_seen"] = field_name
                 break
 
-    # --- Step 6: Find label fields ---
+    # --- Step 6: Find confidence field ---
+    for field_name in (k for item in sample for k in item):
+        if field_name in layout.field_map.values():
+            continue
+        if _normalize_key(field_name) not in _CONFIDENCE_FIELD_NAMES:
+            continue
+        values = [item.get(field_name) for item in sample if item.get(field_name) is not None]
+        if values and all(isinstance(v, (int, float)) for v in values):
+            layout.field_map["confidence"] = field_name
+            break
+
+    # --- Step 7: Find label fields ---
     if sample:
         layout.label_fields = [
             k for k in sample[0]
             if _normalize_key(k) in _LABEL_FIELD_NAMES
         ]
 
-    # --- Step 7: Find next_page_path (top-level response only) ---
+    # --- Step 8: Find next_page_path (top-level response only) ---
     if isinstance(data, dict):
         for key in _PAGINATION_FIELDS:
             val = data.get(key)

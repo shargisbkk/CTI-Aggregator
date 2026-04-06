@@ -101,8 +101,8 @@
             <!-- Active label chips + clear -->
             <div class="col d-flex flex-wrap align-items-center gap-2">
                 {% for l in current_labels %}
-                    <span class="badge d-flex align-items-center gap-1"
-                          style="background-color:#d1ecf1; color:#0c5460; font-size:.85rem;">
+                    <span class="badge label-chip d-flex align-items-center gap-1"
+                          style="font-size:.85rem;">
                         {{ l }}
                         <button type="button"
                                 class="btn-close btn-close-sm ms-1"
@@ -164,8 +164,7 @@
                             {% for label in row.labels %}
                                 <a href="#"
                                    onclick="appendLabelFilter('{{ label|escapejs }}'); return false;"
-                                   class="badge text-decoration-none me-1"
-                                   style="background-color: #d1ecf1; color: #0c5460;">{{ label }}</a>
+                                   class="badge label-chip text-decoration-none me-1">{{ label }}</a>
                             {% endfor %}
                         </td>
                         <td>{{ row.sources|join:", " }}</td>

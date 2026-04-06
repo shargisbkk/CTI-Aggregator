@@ -2,7 +2,7 @@ from django.contrib.auth.decorators import login_required
 from django.shortcuts import render, redirect
 from django.utils import timezone
 from django.core.paginator import Paginator
-from django.db.models import Q, Count
+from django.db.models import Q, Count, Max
 from django.views.decorators.http import require_POST
 from django.http import JsonResponse
 from django.core.management import call_command
@@ -153,6 +153,9 @@ def threat_feeds(request):
             "url":          source.url,
             "active":       source.is_enabled,
             "last_run":     source.last_pulled,
+            "last_count":   IndicatorOfCompromise.objects.filter(
+                                sources__contains=[source.name]
+                            ).count(),
         }
         for source in sources
     ]

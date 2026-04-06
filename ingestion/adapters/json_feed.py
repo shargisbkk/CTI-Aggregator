@@ -1,7 +1,7 @@
 """
-Generic adapter for simple JSON REST APIs.
-Handles flat GET and POST responses with optional pagination.
-For APIs with custom structures (OTX, ThreatFox), use their dedicated adapters.
+Generic adapter for JSON REST APIs (GET and POST).
+Field layout and data path are auto-detected from the first response;
+set method + request_body on the FeedSource for POST-based APIs.
 Minimum config: { "url": "..." }
 """
 

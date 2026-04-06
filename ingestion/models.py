@@ -33,12 +33,36 @@ class IndicatorOfCompromise(models.Model):
                 return display
         return "Unknown"
 
+class GeoEnrichment(models.Model):
+    """
+    Geo-location data for IP-type indicators, populated at ingestion time
+    using the local DB-IP Lite database. One row per indicator (OneToOne).
+    """
+    indicator    = models.OneToOneField(
+        IndicatorOfCompromise,
+        on_delete=models.CASCADE,
+        related_name="geo",
+    )
+    country        = models.CharField(max_length=100, blank=True, default="")
+    country_code   = models.CharField(max_length=4, blank=True, default="")
+    continent_code = models.CharField(max_length=2, blank=True, default="")
+    city           = models.CharField(max_length=100, blank=True, default="")
+    latitude       = models.FloatField(null=True, blank=True)
+    longitude      = models.FloatField(null=True, blank=True)
+    enriched_at    = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        db_table = "geo_enrichments"
+
+    def __str__(self):
+        return f"{self.indicator} in {self.country_code or '??'}"
+
+
 class FeedSource(models.Model):
     """
-    One row per feed source. The adapter_type field selects which generic
-    transport adapter handles it. All user-facing settings are explicit model
-    fields — the config JSONField is internal-only (auto-detection cache,
-    POST bodies, source-specific pagination settings).
+    Represents a single threat intelligence feed (e.g. OTX, URLhaus).
+    Add and configure feeds through the Django admin — no code changes needed.
+    adapter_type controls which ingestion adapter fetches and parses the feed.
     """
     ADAPTER_CHOICES = [
         ("text",  "Plain Text List"),
@@ -54,18 +78,17 @@ class FeedSource(models.Model):
                        help_text="Feed URL. For TAXII, use the discovery endpoint URL.")
     api_key      = models.TextField(blank=True, default="")
     auth_header  = models.CharField(max_length=64, blank=True, default="",
-                       help_text="HTTP header name for the API key, e.g. 'Key' or 'X-OTX-API-KEY'. "
+                       help_text="HTTP header name for the API key, e.g. 'Auth-Key' or 'X-OTX-API-KEY'. "
                                  "Leave blank if no authentication is needed.")
+    username     = models.CharField(max_length=256, blank=True, default="",
+                       help_text="TAXII basic-auth username. Leave blank if not using basic auth.")
+    password     = models.CharField(max_length=256, blank=True, default="",
+                       help_text="TAXII basic-auth password.")
     collection_id = models.CharField(max_length=256, blank=True, default="",
                        help_text="TAXII collection ID. Leave blank for all other adapter types.")
-    ioc_type     = models.CharField(max_length=32, blank=True, default="",
-                       help_text="IOC type for all indicators from this feed "
-                                 "(e.g. ip, domain, url, hash). Leave blank to auto-detect per value.")
-    static_labels = models.CharField(max_length=256, blank=True, default="",
-                       help_text="Comma-separated labels applied to every indicator "
-                                 "(e.g. phishing, malware).")
     is_enabled   = models.BooleanField(default=True)
-    config       = models.JSONField(blank=True, default=dict)
+    config       = models.JSONField(blank=True, default=dict,
+                       help_text="Internal auto-detection cache. Do not edit manually.")
     last_pulled  = models.DateTimeField(null=True, blank=True)
     updated_at   = models.DateTimeField(auto_now=True)
 

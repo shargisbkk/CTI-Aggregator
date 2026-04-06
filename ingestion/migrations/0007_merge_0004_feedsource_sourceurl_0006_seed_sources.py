@@ -7,7 +7,7 @@ class Migration(migrations.Migration):
 
     dependencies = [
         ('ingestion', '0004_feedsource_sourceurl'),
-        ('ingestion', '0006_seed_sources'),
+        ('ingestion', '0005_add_adapter_type'),
     ]
 
     operations = [

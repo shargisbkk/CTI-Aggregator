@@ -357,3 +357,36 @@ body.dark-mode {
     Primary - #4770b0
     Surface - #121212
 */
+
+/* ====================================
+    Dark mode overrides for Bootstrap
+==================================== */
+
+.dark-mode .text-muted {
+    color: var(--clr-dark-surface-a40) !important;
+}
+
+.dark-mode .form-control,
+.dark-mode .form-select {
+    background-color: var(--clr-dark-surface-a20);
+    color: var(--clr-light-a0);
+    border-color: var(--clr-dark-surface-a30);
+}
+
+.dark-mode .form-control::placeholder {
+    color: var(--clr-dark-surface-a40);
+}
+
+/* ====================================
+    Label chips (indicators page)
+==================================== */
+
+.label-chip {
+    background-color: #d1ecf1;
+    color: #0c5460;
+}
+
+.dark-mode .label-chip {
+    background-color: var(--clr-dark-info-a0);
+    color: var(--clr-dark-info-a20);
+}

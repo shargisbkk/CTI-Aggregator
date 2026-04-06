@@ -36,10 +36,18 @@ def _build_params(extra: dict | None = None, api_key: str = "") -> dict:
     return params
 
 
-def discover_api_roots(discovery_url: str, auth: tuple[str, str] | None, api_key: str = "") -> list[str]:
+def _merge_headers(extra: dict | None) -> dict:
+    """Merge extra auth headers into the standard TAXII Accept header."""
+    if not extra:
+        return TAXII_HEADERS
+    return {**TAXII_HEADERS, **extra}
+
+
+def discover_api_roots(discovery_url: str, auth: tuple[str, str] | None,
+                       api_key: str = "", extra_headers: dict | None = None) -> list[str]:
     """GET the discovery endpoint and return the list of API root URLs."""
-    r = request_with_retry("GET", discovery_url, headers=TAXII_HEADERS, auth=auth,
-                           params=_build_params(api_key=api_key), timeout=60)
+    r = request_with_retry("GET", discovery_url, headers=_merge_headers(extra_headers),
+                           auth=auth, params=_build_params(api_key=api_key), timeout=60)
     data = r.json()
 
     roots = data.get("api_roots", [])
@@ -50,16 +58,18 @@ def discover_api_roots(discovery_url: str, auth: tuple[str, str] | None, api_key
     return [_resolve_url(discovery_url, root) for root in roots]
 
 
-def list_collections(api_root_url: str, auth: tuple[str, str] | None, api_key: str = "") -> list[dict]:
+def list_collections(api_root_url: str, auth: tuple[str, str] | None,
+                     api_key: str = "", extra_headers: dict | None = None) -> list[dict]:
     """List all collections at an API root."""
     url = api_root_url.rstrip("/") + "/collections/"
-    r = request_with_retry("GET", url, headers=TAXII_HEADERS, auth=auth,
+    r = request_with_retry("GET", url, headers=_merge_headers(extra_headers), auth=auth,
                            params=_build_params(api_key=api_key), timeout=60)
     return r.json().get("collections", [])
 
 
 def get_objects(api_root_url: str, collection_id: str, auth: tuple[str, str] | None,
-                added_after: str | None, api_key: str = ""):
+                added_after: str | None, api_key: str = "",
+                extra_headers: dict | None = None):
     """
     Page through a TAXII collection, yielding one envelope at a time.
 
@@ -72,11 +82,12 @@ def get_objects(api_root_url: str, collection_id: str, auth: tuple[str, str] | N
     if added_after:
         base_extra["added_after"] = added_after
 
-    params = _build_params(base_extra, api_key)
+    params  = _build_params(base_extra, api_key)
+    headers = _merge_headers(extra_headers)
 
     while True:
         try:
-            r = request_with_retry("GET", url, headers=TAXII_HEADERS, auth=auth,
+            r = request_with_retry("GET", url, headers=headers, auth=auth,
                                    params=params, timeout=120)
         except Exception as e:
             logger.warning("TAXII fetch failed for collection %s: %s", collection_id, e)
@@ -113,6 +124,7 @@ def fetch_taxii_raw(
     added_after: str | None = None,
     api_key: str = "",
     collection_id: str = "",
+    extra_headers: dict | None = None,
 ) -> list[dict]:
     """
     Query a TAXII 2.1 server and return raw indicator dicts.
@@ -130,24 +142,27 @@ def fetch_taxii_raw(
     if collection_id:
         api_root_url = discovery_url.rstrip("/")
         all_indicators = []
-        for env in get_objects(api_root_url, collection_id, auth, added_after, api_key):
+        for env in get_objects(api_root_url, collection_id, auth, added_after, api_key,
+                               extra_headers):
             objects = env.get("objects", [])
             all_indicators.extend(extract_indicators(objects))
         return all_indicators
 
     # Auto-discover API roots and iterate all readable collections
     try:
-        api_roots = discover_api_roots(discovery_url, auth, api_key)
+        api_roots = discover_api_roots(discovery_url, auth, api_key, extra_headers)
     except Exception as e:
         logger.warning("TAXII discovery failed, falling back to discovery URL: %s", e)
         api_roots = [discovery_url.rstrip("/")]
 
     all_indicators = []
+    failed_roots = 0
     for api_root_url in api_roots:
         try:
-            collections = list_collections(api_root_url, auth, api_key)
+            collections = list_collections(api_root_url, auth, api_key, extra_headers)
         except Exception as e:
             logger.warning("TAXII collection listing failed for %s: %s", api_root_url, e)
+            failed_roots += 1
             continue
 
         for col in collections:
@@ -155,11 +170,18 @@ def fetch_taxii_raw(
                 continue
             col_id = col.get("id", "")
             try:
-                for env in get_objects(api_root_url, col_id, auth, added_after, api_key):
+                for env in get_objects(api_root_url, col_id, auth, added_after, api_key,
+                                       extra_headers):
                     objects = env.get("objects", [])
                     all_indicators.extend(extract_indicators(objects))
             except Exception as e:
                 logger.warning("TAXII object fetch failed for collection %s: %s", col_id, e)
                 continue
+
+    if failed_roots == len(api_roots):
+        raise RuntimeError(
+            f"TAXII: could not reach any collections at {discovery_url} — "
+            "check URL and credentials"
+        )
 
     return all_indicators

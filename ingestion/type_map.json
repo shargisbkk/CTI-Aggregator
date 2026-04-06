@@ -14,6 +14,7 @@
 
     "domain":               "domain",
     "domain-name":          "domain",
+    "fqdn":                 "domain",
     "hostname":             "domain",
     "wildcard":             "domain",
 

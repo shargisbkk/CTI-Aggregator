@@ -9,13 +9,11 @@ import importlib
 # Maps adapter_type choices to their fully-qualified class paths.
 # Adding a new transport pattern = adding one entry here + one adapter file.
 ADAPTER_TYPES = {
-    "text":      "ingestion.adapters.text_feed.TextFeedAdapter",
-    "csv":       "ingestion.adapters.csv_feed.CsvFeedAdapter",
-    "misp":      "ingestion.adapters.misp_feed.MispFeedAdapter",
-    "taxii":     "ingestion.adapters.taxii.TaxiiFeedAdapter",
-    "json":      "ingestion.adapters.json_feed.JsonFeedAdapter",
-    "otx":       "ingestion.adapters.otx.OtxAdapter",
-    "threatfox": "ingestion.adapters.threatfox.ThreatFoxAdapter",
+    "text":  "ingestion.adapters.text_feed.TextFeedAdapter",
+    "csv":   "ingestion.adapters.csv_feed.CsvFeedAdapter",
+    "misp":  "ingestion.adapters.misp_feed.MispFeedAdapter",
+    "taxii": "ingestion.adapters.taxii.TaxiiFeedAdapter",
+    "json":  "ingestion.adapters.json_feed.JsonFeedAdapter",
 }
 
 

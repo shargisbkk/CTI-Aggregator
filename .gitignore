@@ -54,6 +54,11 @@ dist/
 build/
 
 # ============================
+# GeoIP databases (binary, large — not committed)
+geoip/
+*.mmdb
+
+# ============================
 # PostgreSQL
 # ============================
 # Local dumps or exports
