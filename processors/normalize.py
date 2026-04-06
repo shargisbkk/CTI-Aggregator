@@ -65,28 +65,3 @@ def normalize_one(raw: dict) -> Optional[dict]:
         "first_seen":  raw.get("first_seen") or None,
         "last_seen":   raw.get("last_seen") or None,
     }
-
-
-def normalize_records(raw_records: list[dict]) -> list[dict]:
-    """
-    Normalize a list of raw indicator dicts.
-
-    Applies type mapping, case handling, label cleaning, and validation.
-    Skips invalid records without failing the batch.
-    """
-    indicators = []
-    skipped = 0
-    for raw in raw_records:
-        try:
-            rec = normalize_one(raw)
-            if rec is not None:
-                indicators.append(rec)
-        except Exception:
-            skipped += 1
-            continue
-
-    if skipped:
-        logger.warning("normalize: skipped %d bad records", skipped)
-    logger.info("normalize: %d indicators from %d raw records",
-                len(indicators), len(raw_records))
-    return indicators
