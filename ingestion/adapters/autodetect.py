@@ -126,6 +126,8 @@ _HEADER_LABEL = {
     "classification", "tag", "threat", "family", "threat_category",
 }
 
+_CSV_DATE_RE = re.compile(r'^\d{4}-\d{2}-\d{2}')
+
 
 def _normalize_header(h: str) -> str:
     return h.strip().lower().replace(" ", "_").replace("-", "_")
@@ -243,7 +245,40 @@ def _detect_csv_from_values(data_rows: list[list[str]]) -> tuple[dict, str, list
             best_type = "unknown"  # normalize_one will map per-row via the type column
 
     field_map["ioc_value"] = best_col
-    return field_map, best_type, []
+
+    # Detect label columns — unclaimed columns whose values look like short categorical strings
+    claimed = {field_map.get("ioc_value"), field_map.get("ioc_type")} - {None}
+    label_columns: list[int] = []
+    for col_idx in range(num_cols):
+        if col_idx in claimed:
+            continue
+        values = [row[col_idx].strip().lower() for row in sample if col_idx < len(row)]
+        values = [v for v in values if v]
+        # Skip if it looks like another ioc_type column (mostly TYPE_MAP keys)
+        if values and sum(1 for v in values if v in type_map_keys) >= len(values) * 0.6:
+            continue
+        if _is_label_like(values):
+            label_columns.append(col_idx)
+
+    return field_map, best_type, label_columns
+
+
+def _is_label_like(values: list[str]) -> bool:
+    """True if most values look like short categorical labels (not IOCs, dates, or numbers)."""
+    if not values:
+        return False
+    hits = 0
+    for v in values:
+        if len(v) > 80:
+            continue
+        if detect_ioc_type(v) != "unknown":
+            continue
+        if _CSV_DATE_RE.match(v):
+            continue
+        if v.replace(".", "").replace("-", "").replace("_", "").isdigit():
+            continue
+        hits += 1
+    return hits >= len(values) * 0.6
 
 
 def detect_csv_layout(rows: list[list[str]]) -> DetectedLayout:
@@ -459,19 +494,31 @@ def detect_json_layout(data) -> DetectedLayout:
             break
 
     # --- Step 5: Find date fields ---
-    for field_name in (k for item in sample for k in item):
-        if field_name in layout.field_map.values():
-            continue
-        values = [str(item.get(field_name, "")) for item in sample if item.get(field_name)]
-        if not values:
-            continue
-        hits = sum(1 for v in values if any(p.match(v) for p in _DATE_PATTERNS))
-        if hits >= len(values) * 0.7:
-            if "first_seen" not in layout.field_map:
-                layout.field_map["first_seen"] = field_name
-            elif "last_seen" not in layout.field_map:
-                layout.field_map["last_seen"] = field_name
-                break
+    # Pass 1: semantic names — "created" → first_seen, "modified" → last_seen, etc.
+    # This avoids ordering issues where a feed's JSON has modification date before creation date.
+    # Pass 2: positional fallback for any remaining date-like fields not in _HEADER_DATE.
+    all_field_names = list(dict.fromkeys(k for item in sample for k in item))
+    for _pass in (1, 2):
+        for field_name in all_field_names:
+            if field_name in layout.field_map.values():
+                continue
+            normalized = _normalize_header(field_name)
+            semantic_target = _HEADER_DATE.get(normalized)
+            if _pass == 1 and not semantic_target:
+                continue  # semantic pass only handles known names
+            if _pass == 2 and semantic_target:
+                continue  # already handled in pass 1
+            values = [str(item.get(field_name, "")) for item in sample if item.get(field_name)]
+            if not values:
+                continue
+            hits = sum(1 for v in values if any(p.match(v) for p in _DATE_PATTERNS))
+            if hits < len(values) * 0.7:
+                continue
+            target = semantic_target or ("first_seen" if "first_seen" not in layout.field_map else "last_seen")
+            if target not in layout.field_map:
+                layout.field_map[target] = field_name
+        if "first_seen" in layout.field_map and "last_seen" in layout.field_map:
+            break
 
     # --- Step 6: Find confidence field ---
     for field_name in (k for item in sample for k in item):

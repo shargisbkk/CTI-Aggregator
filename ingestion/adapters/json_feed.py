@@ -26,7 +26,13 @@ class JsonFeedAdapter(FeedAdapter):
         for field in self.config.get("label_fields", []):
             val = entry.get(field)
             if isinstance(val, list):
-                labels.extend(str(v).strip().lower() for v in val if v)
+                for v in val:
+                    if isinstance(v, dict):
+                        name = v.get("display_name") or v.get("name") or v.get("label") or v.get("value")
+                        if name:
+                            labels.append(str(name).strip().lower())
+                    elif v:
+                        labels.append(str(v).strip().lower())
             elif val:
                 labels.append(str(val).strip().lower())
         return labels
