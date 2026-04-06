@@ -48,7 +48,8 @@ class CsvFeedAdapter(FeedAdapter):
             line for line in io.StringIO(r.text)
             if not (comment_char and line.startswith(comment_char))
         ]
-        all_rows = list(csv.reader(raw_lines, delimiter=delimiter))
+        # skipinitialspace handles feeds like ThreatFox that use ", " as separator
+        all_rows = list(csv.reader(raw_lines, delimiter=delimiter, skipinitialspace=True))
 
         # Auto-detect columns when no field_map is configured
         skip_header = False
@@ -78,6 +79,14 @@ class CsvFeedAdapter(FeedAdapter):
             ioc_value = row[ioc_value_col].strip() if ioc_value_col < len(row) else ""
             if not ioc_value:
                 continue
+
+            # Per-row type — used when feed includes an explicit type column (e.g. ThreatFox)
+            row_ioc_type = ioc_type
+            if "ioc_type" in field_map:
+                col = field_map["ioc_type"]
+                raw_type = row[col].strip() if col < len(row) else ""
+                if raw_type:
+                    row_ioc_type = raw_type
 
             first_seen = None
             if "first_seen" in field_map:
@@ -126,7 +135,7 @@ class CsvFeedAdapter(FeedAdapter):
                     confidence = None
 
             indicators.append({
-                "ioc_type": ioc_type,
+                "ioc_type": row_ioc_type,
                 "ioc_value": ioc_value,
                 "labels": labels,
                 "confidence": confidence,

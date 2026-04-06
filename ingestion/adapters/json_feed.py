@@ -44,6 +44,7 @@ class JsonFeedAdapter(FeedAdapter):
         field_map       = dict(self.config.get("field_map") or {})
         data_path       = self.config.get("data_path")
         next_page_path  = self.config.get("next_page_path")
+        nested_path     = self.config.get("nested_path", "")
         max_pages       = self.config.get("max_pages", 0)
         needs_detection = not field_map
 
@@ -72,10 +73,12 @@ class JsonFeedAdapter(FeedAdapter):
                 field_map      = layout.field_map
                 data_path      = data_path if data_path is not None else layout.data_path
                 next_page_path = next_page_path if next_page_path is not None else layout.next_page_path
+                nested_path = layout.nested_path or nested_path
                 self.config.update({
                     "field_map":    field_map,
                     "data_path":    data_path if data_path is not None else "",
                     "label_fields": layout.label_fields,
+                    "nested_path":  nested_path,
                 })
                 needs_detection = False
 
@@ -96,14 +99,29 @@ class JsonFeedAdapter(FeedAdapter):
                         "labels":     list(self.config.get("static_labels", [])),
                     })
                     continue
-                indicators.append({
-                    "ioc_value":  entry.get(fm.get("ioc_value",  "ioc_value"), ""),
-                    "ioc_type":   entry.get(fm.get("ioc_type",   "ioc_type"),  "") or static_ioc_type,
-                    "first_seen": entry.get(fm.get("first_seen", "first_seen")),
-                    "last_seen":  entry.get(fm.get("last_seen",  "last_seen")),
-                    "confidence": entry.get(fm.get("confidence", "confidence")),
-                    "labels":     self._get_labels(entry),
-                })
+
+                # Flatten nested structure (e.g. OTX: each pulse contains an indicators array).
+                # Parent fields are merged into each sub-entry so labels/dates flow down.
+                if nested_path:
+                    parent_fields = {k: v for k, v in entry.items() if k != nested_path}
+                    to_process = []
+                    for sub in (entry.get(nested_path) or []):
+                        if isinstance(sub, dict):
+                            merged = dict(parent_fields)
+                            merged.update(sub)
+                            to_process.append(merged)
+                else:
+                    to_process = [entry]
+
+                for e in to_process:
+                    indicators.append({
+                        "ioc_value":  e.get(fm.get("ioc_value",  "ioc_value"), ""),
+                        "ioc_type":   e.get(fm.get("ioc_type",   "ioc_type"),  "") or static_ioc_type,
+                        "first_seen": e.get(fm.get("first_seen", "first_seen")),
+                        "last_seen":  e.get(fm.get("last_seen",  "last_seen")),
+                        "confidence": e.get(fm.get("confidence", "confidence")),
+                        "labels":     self._get_labels(e),
+                    })
 
             page     += 1
             next_url  = data.get(next_page_path) if next_page_path else None

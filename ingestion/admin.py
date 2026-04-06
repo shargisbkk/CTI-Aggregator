@@ -12,7 +12,7 @@ class FeedSourceForm(forms.ModelForm):
 
     class Meta:
         model  = FeedSource
-        fields = "__all__"
+        exclude = ("config", "last_pulled", "updated_at")
 
 
 @admin.register(FeedSource)

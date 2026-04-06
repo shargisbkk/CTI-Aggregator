@@ -134,6 +134,8 @@ def _normalize_header(h: str) -> str:
 def _looks_like_header(row: list[str]) -> bool:
     if not row:
         return False
+    if re.match(r'^\d{4}-\d{2}-\d{2}', row[0].strip()):
+        return False
     normalized = [_normalize_header(c) for c in row]
     return any(cell in _HEADER_IOC or cell in _HEADER_DATE or cell in _HEADER_LABEL
                for cell in normalized)
@@ -182,6 +184,9 @@ def _detect_csv_from_values(data_rows: list[list[str]]) -> tuple[dict, str, list
     sample = data_rows[:10]
     num_cols = max(len(r) for r in sample)
     best_col, best_type, best_score = 0, "unknown", 0
+    type_map_keys = None  # loaded lazily
+
+    field_map: dict = {}
 
     for col_idx in range(num_cols):
         values = [row[col_idx].strip() for row in sample if col_idx < len(row)]
@@ -196,7 +201,49 @@ def _detect_csv_from_values(data_rows: list[list[str]]) -> tuple[dict, str, list
             best_col = col_idx
             best_type = dominant
 
-    return {"ioc_value": best_col}, best_type, []
+    # Detect an explicit ioc_type column — values that are largely TYPE_MAP keys
+    # (e.g. ThreatFox column 3: "url", "ip:port", "domain", "md5_hash")
+    from ingestion.type_map import TYPE_MAP
+    type_map_keys = set(TYPE_MAP.keys())
+    type_col = None
+    for col_idx in range(num_cols):
+        if col_idx == best_col:
+            continue
+        values = [row[col_idx].strip().lower() for row in sample if col_idx < len(row)]
+        values = [v for v in values if v]
+        if not values:
+            continue
+        matches = sum(1 for v in values if v in type_map_keys)
+        if matches >= len(values) * 0.6:
+            type_col = col_idx
+            field_map["ioc_type"] = col_idx
+            break
+
+    # If we found an explicit type column, use it to cross-validate the ioc_value column.
+    # The correct ioc_value column's values should match the declared types — not just be
+    # any column that happens to contain URLs (e.g. a reference/report URL column).
+    if type_col is not None:
+        best_cross, best_cross_score = best_col, 0
+        for col_idx in range(num_cols):
+            if col_idx == type_col:
+                continue
+            score = 0
+            for row in sample:
+                if col_idx >= len(row) or type_col >= len(row):
+                    continue
+                declared = row[type_col].strip().lower()
+                canonical = TYPE_MAP.get(declared)
+                if canonical and detect_ioc_type(row[col_idx].strip()) == canonical:
+                    score += 1
+            if score > best_cross_score:
+                best_cross_score = score
+                best_cross = col_idx
+        if best_cross_score > 0:
+            best_col = best_cross
+            best_type = "unknown"  # normalize_one will map per-row via the type column
+
+    field_map["ioc_value"] = best_col
+    return field_map, best_type, []
 
 
 def detect_csv_layout(rows: list[list[str]]) -> DetectedLayout:
@@ -328,20 +375,36 @@ def detect_json_layout(data) -> DetectedLayout:
         return layout
 
     # --- Step 2: Detect nested structure ---
-    for field_name, field_val in sample[0].items():
-        if not isinstance(field_val, list):
-            continue
-        if not field_val or not isinstance(field_val[0], dict):
-            continue
-        sub_items = [
-            item
-            for parent in sample
-            for item in (parent.get(field_name) or [])
-            if isinstance(item, dict)
-        ][:10]
-        if sub_items and _sub_sample_has_ioc(sub_items):
-            layout.nested_path = field_name
-            sample = sub_items
+    # Scan all parents (not just sample[0]) — the first item may have an empty sub-array
+    seen_fields: set[str] = set()
+    for parent in sample:
+        for field_name, field_val in parent.items():
+            if field_name in seen_fields or not isinstance(field_val, list):
+                seen_fields.add(field_name)
+                continue
+            seen_fields.add(field_name)
+            sub_items = [
+                item
+                for p in sample
+                for item in (p.get(field_name) or [])
+                if isinstance(item, dict)
+            ][:10]
+            if sub_items and _sub_sample_has_ioc(sub_items):
+                layout.nested_path = field_name
+                # Merge parent fields into each sub-item so downstream steps
+                # (dates, labels, confidence) can see parent-level data.
+                # Sub-entry wins on key conflicts — its own fields take priority.
+                merged: list[dict] = []
+                for p in sample:
+                    parent_fields = {k: v for k, v in p.items() if k != field_name}
+                    for s in (p.get(field_name) or []):
+                        if isinstance(s, dict):
+                            m = dict(parent_fields)
+                            m.update(s)
+                            merged.append(m)
+                sample = merged[:10]
+                break
+        if layout.nested_path:
             break
 
     # --- Step 3: Find IOC value field ---

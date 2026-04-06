@@ -9,8 +9,7 @@ from django.core.management import call_command
 from django.db import connection
 from urllib.parse import urlencode
 from datetime import timedelta
-from dashboard.models import Indicator, ThreatFeed, IngestionLog, FeedSource
-from ingestion.models import IndicatorOfCompromise
+from ingestion.models import FeedSource, IndicatorOfCompromise
 from io import StringIO
 
 # ======================================================
@@ -143,7 +142,6 @@ def indicators(request):
 @login_required
 def threat_feeds(request):
     sources = FeedSource.objects.all().order_by("name")
-    logs    = IngestionLog.objects.order_by("-timestamp")[:20]
 
     feeds = [
         {
@@ -160,7 +158,7 @@ def threat_feeds(request):
         for source in sources
     ]
 
-    return render(request, "dashboard/threat_feeds.html", {"feeds": feeds, "logs": logs})
+    return render(request, "dashboard/threat_feeds.html", {"feeds": feeds})
 
 
 
@@ -177,16 +175,15 @@ def update_all_feeds(request):
     Returns JSON response with status and output.
     """
     try:
-        # Capture command output
         output = StringIO()
-        
-        # Run the ingest_all command
-        call_command('ingest_all', stdout=output)
-        
+        err_output = StringIO()
+        call_command('ingest_all', stdout=output, stderr=err_output)
+        full_output = output.getvalue() + err_output.getvalue()
+
         return JsonResponse({
             "status": "success",
             "message": "Database update completed successfully.",
-            "output": output.getvalue()
+            "output": full_output,
         })
     except Exception as e:
         return JsonResponse({
