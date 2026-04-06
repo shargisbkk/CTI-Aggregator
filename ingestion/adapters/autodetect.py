@@ -16,6 +16,12 @@ from ingestion.type_map import TYPE_MAP
 
 logger = logging.getLogger(__name__)
 
+# Shared across CSV and JSON detection
+_CONFIDENCE_FIELD_NAMES = {
+    "confidence", "confidence_level", "confidence_score",
+    "certainty", "risk_score", "score",
+}
+
 # ---------------------------------------------------------------------------
 # DetectedLayout — result type returned by all detect_*_layout functions
 # ---------------------------------------------------------------------------
@@ -107,7 +113,7 @@ _HEADER_IOC = {
     "sha512": "hash", "file_hash": "hash", "filehash": "hash", "checksum": "hash",
     "email": "email", "email_address": "email",
     "cve": "cve", "vulnerability": "cve",
-    "indicator": None, "ioc": None, "value": None, "indicator_value": None,
+    "indicator": None, "ioc": None, "value": None, "indicator_value": None, "ioc_value": None,
 }
 
 _HEADER_DATE = {
@@ -116,7 +122,7 @@ _HEADER_DATE = {
     "dateadded": "first_seen",        # URLhaus
     "first_seen_utc": "first_seen",   # Feodo Tracker
     "last_seen": "last_seen", "updated": "last_seen", "modified": "last_seen",
-    "last_updated": "last_seen",
+    "last_updated": "last_seen", "last_seen_utc": "last_seen",
     "last_online": "last_seen",       # Feodo Tracker, URLhaus
     "last_online_utc": "last_seen",
 }
@@ -124,7 +130,11 @@ _HEADER_DATE = {
 _HEADER_LABEL = {
     "tags", "labels", "category", "type", "threat_type", "malware",
     "classification", "tag", "threat", "family", "threat_category",
+    "malware_printable", "malware_alias", "malware_family", "alias",
 }
+
+# Header names that identify an explicit IOC-type column (distinct from the IOC value column).
+_HEADER_IOC_TYPE_COL = {"ioc_type", "indicator_type"}
 
 _CSV_DATE_RE = re.compile(r'^\d{4}-\d{2}-\d{2}')
 
@@ -155,6 +165,8 @@ def _detect_csv_from_headers(
         if col in _HEADER_IOC and "ioc_value" not in field_map:
             field_map["ioc_value"] = i
             ioc_type = _HEADER_IOC[col] or "unknown"
+        elif col in _HEADER_IOC_TYPE_COL and "ioc_type" not in field_map:
+            field_map["ioc_type"] = i
         elif col in _HEADER_DATE:
             target = _HEADER_DATE[col]
             if target not in field_map:
@@ -204,7 +216,6 @@ def _detect_csv_from_values(data_rows: list[list[str]]) -> tuple[dict, str, list
             best_type = dominant
 
     # Detect an explicit ioc_type column — values that are largely TYPE_MAP keys
-    from ingestion.type_map import TYPE_MAP
     type_map_keys = set(TYPE_MAP.keys())
     type_col = None
     for col_idx in range(num_cols):
@@ -245,8 +256,24 @@ def _detect_csv_from_values(data_rows: list[list[str]]) -> tuple[dict, str, list
 
     field_map["ioc_value"] = best_col
 
-    # Detect label columns — unclaimed columns whose values look like short categorical strings
+    # Detect date columns for headerless feeds (e.g. URLhaus has no header row but
+    # columns 1 and 4 are clearly timestamps). Assign first_seen then last_seen in order.
     claimed = {field_map.get("ioc_value"), field_map.get("ioc_type")} - {None}
+    for col_idx in range(num_cols):
+        if col_idx in claimed:
+            continue
+        values = [row[col_idx].strip() for row in sample if col_idx < len(row)]
+        values = [v for v in values if v]
+        if not values:
+            continue
+        if sum(1 for v in values if _CSV_DATE_RE.match(v)) >= len(values) * 0.7:
+            if "first_seen" not in field_map:
+                field_map["first_seen"] = col_idx
+            elif "last_seen" not in field_map:
+                field_map["last_seen"] = col_idx
+            claimed.add(col_idx)
+
+    # Detect label columns — unclaimed columns whose values look like short categorical strings
     label_columns: list[int] = []
     for col_idx in range(num_cols):
         if col_idx in claimed:
@@ -305,16 +332,12 @@ def detect_csv_layout(rows: list[list[str]]) -> DetectedLayout:
 _COMMON_DATA_PATHS = [
     "", "data", "results", "indicators", "iocs", "items",
     "records", "feed", "response", "hits", "objects", "pulses",
+    "vulnerabilities", "events", "alerts", "threats", "entries",
 ]
 
 _LABEL_FIELD_NAMES = {
     "tags", "labels", "category", "threat_type", "malware",
     "classification", "tag", "threat", "family", "malware_families",
-}
-
-_CONFIDENCE_FIELD_NAMES = {
-    "confidence", "confidence_level", "confidence_score",
-    "certainty", "risk_score", "score",
 }
 
 _PAGINATION_FIELDS = {"next", "next_page", "cursor", "after"}
@@ -339,7 +362,7 @@ _JSON_IOC_SYNONYMS: dict[str, str | None] = {
     # Email
     "email": "email", "emailaddress": "email",
     # CVE
-    "cve": "cve",
+    "cve": "cve", "cveid": "cve", "cvename": "cve", "vulnerability": "cve",
 }
 
 

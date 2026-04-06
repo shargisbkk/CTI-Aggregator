@@ -87,8 +87,7 @@ class FeedSource(models.Model):
     collection_id = models.CharField(max_length=256, blank=True, default="",
                        help_text="TAXII collection ID. Leave blank for all other adapter types.")
     is_enabled   = models.BooleanField(default=True)
-    config       = models.JSONField(blank=True, default=dict,
-                       help_text="Internal auto-detection cache. Do not edit manually.")
+    config       = models.JSONField(blank=True, default=dict)
     last_pulled  = models.DateTimeField(null=True, blank=True)
     updated_at   = models.DateTimeField(auto_now=True)
 

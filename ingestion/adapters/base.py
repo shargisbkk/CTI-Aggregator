@@ -15,8 +15,8 @@ class FeedAdapter(ABC):
 
     def __init__(self, api_key: str = "", since: Optional[datetime] = None, config: Optional[dict] = None):
         self._api_key = (api_key or "").strip()
-        self.since = since
-        self.config = config or {}
+        self.since    = since
+        self.config   = config or {}
 
     def _build_auth_headers(self) -> dict:
         """Return HTTP headers dict with API key injected, if configured."""
@@ -30,13 +30,13 @@ class FeedAdapter(ABC):
         """Normalize a raw indicator dict. Delegates to processors.normalize."""
         return normalize_one(raw)
 
-    def ingest(self) -> list[dict]:
+    def ingest(self) -> Optional[list[dict]]:
         """Fetch and normalize records. Skips bad records so one failure won't drop the batch."""
         try:
             raw_records = self.fetch_raw()
         except Exception:
             logger.exception("%s: fetch_raw() failed", self.source_name)
-            return None  # None = fetch failed (vs [] = no new data)
+            return None  # None signals fetch failure; empty list means no data returned
 
         indicators = []
         skipped = 0

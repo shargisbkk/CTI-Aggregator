@@ -2,7 +2,7 @@
 Loads the centralized type mapping from type_map.json.
 
 Every adapter's raw ioc_type is lowercased and looked up in TYPE_MAP.
-Unmapped types become "unknown".
+Unmapped types are dropped by normalize_one().
 
 To add a new source type, edit type_map.json — no Python changes needed.
 """

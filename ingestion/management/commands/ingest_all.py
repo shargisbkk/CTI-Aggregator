@@ -1,5 +1,3 @@
-from datetime import timedelta
-
 from django.core.management.base import BaseCommand
 from django.utils import timezone
 
@@ -8,8 +6,6 @@ from ingestion.models import FeedSource
 from ingestion.source_config import get_adapter_class
 from processors.dedup import dedup
 from processors.enrich import geo_enrich_batch
-
-DEFAULT_LOOKBACK_DAYS = 180
 
 
 class Command(BaseCommand):
@@ -31,7 +27,7 @@ class Command(BaseCommand):
                 ))
                 continue
 
-            since = source.last_pulled or (timezone.now() - timedelta(days=DEFAULT_LOOKBACK_DAYS))
+            since = source.last_pulled
             # Build config from model fields so adapters never read the model directly.
             config = dict(source.config or {})
             config["url"]          = source.url
@@ -45,7 +41,8 @@ class Command(BaseCommand):
             if source.collection_id:
                 config.setdefault("collection_id", source.collection_id)
 
-            self.stdout.write(f"  {source.name}: fetching since {since.isoformat()}...")
+            since_display = since.isoformat() if since else "first pull"
+            self.stdout.write(f"  {source.name}: fetching since {since_display}...")
 
             try:
                 adapter = adapter_class(

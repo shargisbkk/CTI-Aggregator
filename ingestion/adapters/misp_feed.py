@@ -24,21 +24,6 @@ from ingestion.adapters.http import request_with_retry
 
 logger = logging.getLogger(__name__)
 
-# MISP attribute type → canonical ioc_type passed to normalize_record via TYPE_MAP
-MISP_TYPE_MAP = {
-    "ip-src": "ip", "ip-dst": "ip",
-    "ip-src|port": "ip", "ip-dst|port": "ip",
-    "domain": "domain", "hostname": "domain",
-    "url": "url", "uri": "uri", "link": "url",
-    "email-src": "email", "email-dst": "email",
-    "md5": "hash", "sha1": "hash", "sha256": "hash", "sha512": "hash",
-    "filename|md5": "hash", "filename|sha1": "hash", "filename|sha256": "hash",
-    "ssdeep": "hash", "imphash": "hash", "tlsh": "hash",
-    "mutex": "mutex", "filename": "filepath",
-    "vulnerability": "cve", "cve": "cve",
-    "AS": "asn", "asn": "asn",
-    "yara": "yara",
-}
 
 
 class MispFeedAdapter(FeedAdapter):
@@ -134,7 +119,7 @@ class MispFeedAdapter(FeedAdapter):
                     else:
                         value = parts[0]
 
-                ioc_type = MISP_TYPE_MAP.get(misp_type, misp_type)
+                ioc_type = misp_type
 
                 # Use attribute category as the label (e.g. "network activity",
                 # "payload installation").  Event-level tags are MISP metadata

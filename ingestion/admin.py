@@ -6,7 +6,7 @@ from ingestion.models import FeedSource
 class FeedSourceForm(forms.ModelForm):
     password = forms.CharField(
         required=False,
-        widget=forms.PasswordInput(render_value=True),
+        widget=forms.PasswordInput(),
         help_text="TAXII basic-auth password.",
     )
 
@@ -23,7 +23,14 @@ class FeedSourceAdmin(admin.ModelAdmin):
     search_fields = ("name", "url")
     readonly_fields = ("last_pulled", "updated_at")
 
-    # config is intentionally excluded — internal cache for auto-detected field layouts.
+    SEEDED_SOURCE_NAMES = {"AlienVault OTX", "ThreatFox", "MalwareBazaar", "URLhaus"}
+
+    def get_readonly_fields(self, request, obj=None):
+        if obj and obj.name in self.SEEDED_SOURCE_NAMES:
+            return self.readonly_fields + ("adapter_type",)
+        return self.readonly_fields
+
+    # config is intentionally excluded from the default form view.
     fieldsets = (
         (None, {
             "fields": ("name", "adapter_type", "url", "is_enabled"),

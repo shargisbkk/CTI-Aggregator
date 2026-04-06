@@ -1,6 +1,6 @@
 import json
 import logging
-import math
+
 import pandas as pd
 from django.db import connection
 

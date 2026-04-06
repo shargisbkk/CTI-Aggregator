@@ -26,6 +26,9 @@ else
   echo "==> Superuser env vars not set; skipping superuser creation."
 fi
 
+echo "==> Seeding feed sources..."
+python manage.py seed_sources
+
 echo "==> Downloading GeoIP database..."
 python manage.py download_geoip
 

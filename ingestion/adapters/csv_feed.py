@@ -1,16 +1,31 @@
 """
-Adapter for CSV/TSV feeds (URLhaus, Feodo Tracker, DShield, etc.).
+Adapter for CSV and TSV feeds.
 
-If the FeedSource config includes a field_map, it is used directly (manual mode).
-If field_map is absent, the adapter auto-detects columns via autodetect.detect_csv_layout,
-which inspects the header row (if present) or scans sample values with regex heuristics.
-Minimum required config: { "url": "..." }
+Uses a configured field_map when provided. Otherwise auto-detects columns
+by inspecting the header row or scanning sample values with regex heuristics.
 """
 
 import csv
 import io
 import logging
 from datetime import datetime, timezone
+
+_COMMON_DATE_FMTS = [
+    "%Y-%m-%d %H:%M:%S UTC",
+    "%Y-%m-%dT%H:%M:%SZ",
+    "%Y-%m-%dT%H:%M:%S",
+    "%Y-%m-%d %H:%M:%S",
+    "%Y-%m-%d",
+]
+
+
+def _parse_date(value: str, fmt: str | None) -> datetime | None:
+    for f in ([fmt] if fmt else _COMMON_DATE_FMTS):
+        try:
+            return datetime.strptime(value, f).replace(tzinfo=timezone.utc)
+        except ValueError:
+            continue
+    return None
 
 from ingestion.adapters.autodetect import detect_csv_layout
 from ingestion.adapters.base import FeedAdapter
@@ -48,7 +63,7 @@ class CsvFeedAdapter(FeedAdapter):
             line for line in io.StringIO(r.text)
             if not (comment_char and line.startswith(comment_char))
         ]
-        # skipinitialspace handles feeds like ThreatFox that use ", " as separator
+        # skipinitialspace handles feeds that include a space after the delimiter
         all_rows = list(csv.reader(raw_lines, delimiter=delimiter, skipinitialspace=True))
 
         # Auto-detect columns when no field_map is configured
@@ -80,7 +95,7 @@ class CsvFeedAdapter(FeedAdapter):
             if not ioc_value:
                 continue
 
-            # Per-row type — used when feed includes an explicit type column (e.g. ThreatFox)
+            # Override the feed-level type when the row contains an explicit type column
             row_ioc_type = ioc_type
             if "ioc_type" in field_map:
                 col = field_map["ioc_type"]
@@ -104,20 +119,16 @@ class CsvFeedAdapter(FeedAdapter):
                 last_seen = row[last_seen_fallback_col].strip() if last_seen_fallback_col < len(row) else None
                 last_seen = last_seen or None
 
-            if self.since and first_seen and first_seen_format:
-                try:
-                    row_time = datetime.strptime(first_seen, first_seen_format)
-                    row_time = row_time.replace(tzinfo=timezone.utc)
-                    if row_time < self.since:
-                        continue
-                except ValueError:
-                    pass
+            if self.since and first_seen:
+                row_time = _parse_date(first_seen, first_seen_format or None)
+                if row_time and row_time < self.since:
+                    continue
 
             labels = static_labels[:]
             for col_idx in label_columns:
                 if col_idx < len(row):
                     cell = row[col_idx].strip()
-                    if label_separator and label_separator != delimiter:
+                    if label_separator:
                         parts = [t.strip() for t in cell.split(label_separator) if t.strip()]
                     else:
                         parts = [cell] if cell else []

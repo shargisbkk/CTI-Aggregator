@@ -16,7 +16,9 @@ services:
       retries: 10
 
   web:
-    image: plaguedoctor131/cti-aggregator-web:latest
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
     depends_on:
       db:
         condition: service_healthy

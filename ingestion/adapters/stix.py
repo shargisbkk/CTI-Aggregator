@@ -37,7 +37,7 @@ def extract_indicators(raw_objects: list[dict]) -> list[dict]:
     """Filter STIX bundle objects to type=indicator and extract IOCs from their patterns."""
     out = []
     for o in raw_objects:
-        if o.get("type") != "indicator":
+        if not isinstance(o, dict) or o.get("type") != "indicator":
             continue
 
         try:

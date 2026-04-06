@@ -166,6 +166,8 @@ def fetch_taxii_raw(
             continue
 
         for col in collections:
+            if not isinstance(col, dict):
+                continue
             if col.get("can_read") is False:
                 continue
             col_id = col.get("id", "")
