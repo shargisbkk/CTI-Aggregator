@@ -112,14 +112,17 @@ def _clean_labels(raw_labels: list, ioc_type: str) -> list:
     """Lowercase, strip, deduplicate, and remove empties/noise/self-references."""
     seen = set()
     out = []
-    for lbl in (raw_labels or []):
-        lbl = str(lbl).strip().lower().replace('"', "")
-        if not lbl or lbl == ioc_type or lbl in seen:
-            continue
-        if lbl in _LABEL_BLOCKLIST or lbl.startswith("unknown"):
-            continue
-        seen.add(lbl)
-        out.append(lbl)
+    for raw_lbl in (raw_labels or []):
+        # Split comma-separated strings before cleaning
+        parts = [p.strip() for p in str(raw_lbl).split(",") if p.strip()]
+        for lbl in parts:
+            lbl = lbl.lower().replace('"', "")
+            if not lbl or lbl == ioc_type or lbl in seen:
+                continue
+            if lbl in _LABEL_BLOCKLIST or lbl.startswith("unknown"):
+                continue
+            seen.add(lbl)
+            out.append(lbl)
     return out
 
 
