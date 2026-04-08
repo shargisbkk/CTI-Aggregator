@@ -2,7 +2,7 @@ import json as _json
 
 from django import forms
 from django.contrib import admin
-from ingestion.models import FeedSource, GeoEnrichment
+from ingestion.models import FeedSource
 
 
 class FeedSourceForm(forms.ModelForm):
@@ -152,11 +152,3 @@ class FeedSourceAdmin(admin.ModelAdmin):
     class Media:
         css = {"all": ("ingestion/admin/css/feed_source_admin.css",)}
         js  = ("ingestion/admin/js/feed_source_admin.js",)
-
-
-@admin.register(GeoEnrichment)
-class GeoEnrichmentAdmin(admin.ModelAdmin):
-    list_display  = ("indicator", "country", "city", "country_code", "latitude", "longitude", "enriched_at")
-    search_fields = ("indicator__ioc_value", "country", "city")
-    readonly_fields = ("indicator", "country", "country_code", "continent_code",
-                       "city", "latitude", "longitude", "enriched_at")
