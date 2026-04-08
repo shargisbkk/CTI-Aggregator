@@ -1,7 +1,6 @@
 """
-The database (FeedSource table) is the single source of truth for all
-feed configuration. No hardcoded defaults — everything lives in the
-FeedSource.config JSONField, managed through the Django admin.
+FeedSource is the single source of truth for feed configuration.
+All settings live in the config JSONField, managed through the admin.
 """
 
 import importlib
@@ -13,15 +12,12 @@ ADAPTER_TYPES = {
     "csv":   "ingestion.adapters.csv_feed.CsvFeedAdapter",
     "misp":  "ingestion.adapters.misp_feed.MispFeedAdapter",
     "taxii": "ingestion.adapters.taxii.TaxiiFeedAdapter",
-    "json":  "ingestion.adapters.json_feed.JsonFeedAdapter",
+    "json":  "ingestion.adapters.rest_feed.RestFeedAdapter",
 }
 
 
 def get_adapter_class(adapter_type: str):
-    """
-    Map an adapter_type string (from FeedSource.adapter_type) to the
-    corresponding adapter class. Returns None if unknown.
-    """
+    """Return the adapter class for the given adapter_type, or None if unknown."""
     path = ADAPTER_TYPES.get(adapter_type)
     if not path:
         return None

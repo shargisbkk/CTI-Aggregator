@@ -13,6 +13,7 @@ Usage:
 from datetime import timedelta
 
 from django.core.management.base import BaseCommand
+from django.db.models import Q
 from django.utils import timezone
 
 from ingestion.models import IndicatorOfCompromise
@@ -35,10 +36,11 @@ class Command(BaseCommand):
         days = opts["days"]
         cutoff = timezone.now() - timedelta(days=days)
 
-        # Only purge indicators that have a last_seen date and it's old.
-        # Null last_seen means the feed doesn't track timestamps — leave those alone.
+        # Purge if last_seen is old, OR if last_seen is null but first_seen is old.
+        # Indicators with both dates null have no timestamp basis — leave those alone.
         to_delete = IndicatorOfCompromise.objects.filter(
-            last_seen__isnull=False, last_seen__lt=cutoff,
+            Q(last_seen__isnull=False, last_seen__lt=cutoff) |
+            Q(last_seen__isnull=True,  first_seen__isnull=False, first_seen__lt=cutoff)
         )
 
         count = to_delete.count()

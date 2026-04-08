@@ -1,0 +1,60 @@
+/* Feed Source admin form — compact inputs sized to realistic data */
+
+/* Short single-value fields: field names, paths, param names */
+#id_data_path,
+#id_ioc_value_field,
+#id_ioc_type_field,
+#id_since_param,
+#id_ioc_value_column,
+#id_ioc_type_column,
+#id_collection_id {
+    width: 280px;
+    max-width: 100%;
+}
+
+/* Very short fields: method toggle, initial_days count */
+#id_initial_days {
+    width: 80px;
+}
+
+/* Textareas: wide enough to read JSON but not full-page */
+#id_request_body,
+#id_advanced_config {
+    width: 420px;
+    max-width: 100%;
+    font-family: monospace;
+    font-size: 0.85em;
+}
+
+/* URL field — longer but still bounded */
+#id_url {
+    width: 480px;
+    max-width: 100%;
+}
+
+/* Auth fields */
+#id_api_key,
+#id_auth_header,
+#id_username {
+    width: 280px;
+    max-width: 100%;
+}
+
+/* Responsive: on narrow viewports everything goes full-width */
+@media (max-width: 800px) {
+    #id_data_path,
+    #id_ioc_value_field,
+    #id_ioc_type_field,
+    #id_since_param,
+    #id_ioc_value_column,
+    #id_ioc_type_column,
+    #id_collection_id,
+    #id_request_body,
+    #id_advanced_config,
+    #id_url,
+    #id_api_key,
+    #id_auth_header,
+    #id_username {
+        width: 100%;
+    }
+}

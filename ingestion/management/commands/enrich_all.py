@@ -20,6 +20,7 @@ class Command(BaseCommand):
             batch_qs = (
                 IndicatorOfCompromise.objects
                 .filter(ioc_type="ip")
+                .order_by("id")
                 .values("ioc_value")[offset : offset + BATCH_SIZE]
             )
             records = [{"ioc_type": "ip", "ioc_value": r["ioc_value"]} for r in batch_qs]

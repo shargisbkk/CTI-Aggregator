@@ -1,37 +1,62 @@
 """
 Adapter for CSV and TSV feeds.
+skip_header and ioc_value_column are both auto-detected from row content.
+No config is required beyond the URL for standard feeds.
 
-Uses a configured field_map when provided. Otherwise auto-detects columns
-by inspecting the header row or scanning sample values with regex heuristics.
+Config keys (FeedSource.config):
+    ioc_value_column — column name or zero-based index for the indicator value (auto-detected if absent)
+    ioc_type_column  — column name or zero-based index for the indicator type (optional)
+    skip_header      — True/False override; auto-detected from row content if absent
+    delimiter        — column separator character, default ","
+    comment_char     — lines starting with this are skipped, default "#"
 """
 
 import csv
 import io
 import logging
-from datetime import datetime, timezone
 
-_COMMON_DATE_FMTS = [
-    "%Y-%m-%d %H:%M:%S UTC",
-    "%Y-%m-%dT%H:%M:%SZ",
-    "%Y-%m-%dT%H:%M:%S",
-    "%Y-%m-%d %H:%M:%S",
-    "%Y-%m-%d",
-]
-
-
-def _parse_date(value: str, fmt: str | None) -> datetime | None:
-    for f in ([fmt] if fmt else _COMMON_DATE_FMTS):
-        try:
-            return datetime.strptime(value, f).replace(tzinfo=timezone.utc)
-        except ValueError:
-            continue
-    return None
-
-from ingestion.adapters.autodetect import detect_csv_layout
-from ingestion.adapters.base import FeedAdapter
+from ingestion.adapters.base import FeedAdapter, _ioc_score
 from ingestion.adapters.http import request_with_retry
 
 logger = logging.getLogger(__name__)
+
+
+def _looks_like_header(row: list[str]) -> bool:
+    """True if no cell scores as an IOC value — indicates a column-name row."""
+    cells = [c.strip() for c in row if c.strip()]
+    return bool(cells) and all(_ioc_score(c) == 0 for c in cells)
+
+
+def _auto_ioc_column(sample_rows: list[list[str]]) -> int | None:
+    """Return the column index whose values score highest as IOCs across sample rows."""
+    if not sample_rows:
+        return None
+    n_cols = max(len(row) for row in sample_rows)
+    best_col, best_score = None, 0
+    for col in range(n_cols):
+        vals  = [row[col].strip() for row in sample_rows if col < len(row) and row[col].strip()]
+        score = sum(_ioc_score(v) for v in vals)
+        if score > best_score:
+            best_col, best_score = col, score
+    return best_col if best_score > 0 else None
+
+
+def _resolve_column(header_row: list[str] | None, col_spec) -> int | None:
+    """Resolve a column spec (name or zero-based int) to a column index."""
+    if col_spec is None or col_spec == "":
+        return None
+    if isinstance(col_spec, int):
+        return col_spec
+    try:
+        return int(col_spec)
+    except (ValueError, TypeError):
+        pass
+    if header_row:
+        normalized = [h.strip().lower() for h in header_row]
+        name = str(col_spec).strip().lower()
+        if name in normalized:
+            return normalized.index(name)
+    return None
 
 
 class CsvFeedAdapter(FeedAdapter):
@@ -42,116 +67,65 @@ class CsvFeedAdapter(FeedAdapter):
         self.source_name = self.config.get("_source_name", "csv")
 
     def fetch_raw(self) -> list[dict]:
-        url = self.config["url"]
-        timeout = self.config.get("timeout", 120)
+        url          = self.config["url"]
+        timeout      = self.config.get("timeout", 120)
         comment_char = self.config.get("comment_char", "#")
-        delimiter = self.config.get("delimiter", ",")
-        min_columns = self.config.get("min_columns", 1)
-        field_map = dict(self.config.get("field_map") or {})
-        ioc_type = self.config.get("ioc_type", "")
-        last_seen_fallback_col = self.config.get("last_seen_fallback_col")
-        label_columns = self.config.get("label_columns", [])
-        label_separator = self.config.get("label_separator", ",")
-        static_labels = list(self.config.get("static_labels", []))
-        first_seen_format = self.config.get("first_seen_format")
+        delimiter    = self.config.get("delimiter", ",")
+
+        ioc_value_col_spec = self.config.get("ioc_value_column")
+        ioc_type_col_spec  = self.config.get("ioc_type_column")
 
         headers = self._build_auth_headers()
-
         r = request_with_retry("GET", url, headers=headers, timeout=timeout)
 
         raw_lines = [
             line for line in io.StringIO(r.text)
             if not (comment_char and line.startswith(comment_char))
         ]
-        # skipinitialspace handles feeds that include a space after the delimiter
         all_rows = list(csv.reader(raw_lines, delimiter=delimiter, skipinitialspace=True))
+        if not all_rows:
+            return []
 
-        # Auto-detect columns when no field_map is configured
-        skip_header = False
-        if not field_map:
-            layout = detect_csv_layout(all_rows)
-            field_map     = layout.field_map
-            ioc_type      = ioc_type or layout.ioc_type
-            label_columns = label_columns or layout.label_columns
-            skip_header   = layout.skip_header
-            logger.info(
-                "%s: auto-detected ioc_type=%r field_map=%r label_columns=%r header_skipped=%s",
-                self.source_name, ioc_type, field_map, label_columns, skip_header,
-            )
-
-        # Explicit config always wins over auto-detected skip_header
         if "skip_header" in self.config:
             skip_header = bool(self.config["skip_header"])
+        else:
+            skip_header = _looks_like_header(all_rows[0])
+            if skip_header:
+                logger.info("%s: auto-detected header row", self.source_name)
 
-        rows = all_rows[1:] if skip_header else all_rows
+        header_row = all_rows[0] if skip_header else None
+        rows       = all_rows[1:] if skip_header else all_rows
 
+        ioc_value_col = _resolve_column(header_row, ioc_value_col_spec)
+        ioc_type_col  = _resolve_column(header_row, ioc_type_col_spec)
+
+        if ioc_value_col is None:
+            ioc_value_col = _auto_ioc_column(rows[:20])
+            if ioc_value_col is not None:
+                logger.info("%s: auto-detected ioc_value_column=%d", self.source_name, ioc_value_col)
+            else:
+                logger.warning("%s: could not detect ioc_value_column — set it in config",
+                               self.source_name)
+                return []
+
+        labels = [self.source_name.lower()]
         indicators = []
         for row in rows:
-            if len(row) < min_columns:
+            if not row:
                 continue
-
-            ioc_value_col = field_map.get("ioc_value", 0)
             ioc_value = row[ioc_value_col].strip() if ioc_value_col < len(row) else ""
             if not ioc_value:
                 continue
-
-            # Override the feed-level type when the row contains an explicit type column
-            row_ioc_type = ioc_type
-            if "ioc_type" in field_map:
-                col = field_map["ioc_type"]
-                raw_type = row[col].strip() if col < len(row) else ""
-                if raw_type:
-                    row_ioc_type = raw_type
-
-            first_seen = None
-            if "first_seen" in field_map:
-                col = field_map["first_seen"]
-                first_seen = row[col].strip() if col < len(row) else None
-                first_seen = first_seen or None
-
-            last_seen = None
-            if "last_seen" in field_map:
-                col = field_map["last_seen"]
-                last_seen = row[col].strip() if col < len(row) else None
-                last_seen = last_seen or None
-
-            if not last_seen and last_seen_fallback_col is not None:
-                last_seen = row[last_seen_fallback_col].strip() if last_seen_fallback_col < len(row) else None
-                last_seen = last_seen or None
-
-            if self.since and first_seen:
-                row_time = _parse_date(first_seen, first_seen_format or None)
-                if row_time and row_time < self.since:
-                    continue
-
-            labels = static_labels[:]
-            for col_idx in label_columns:
-                if col_idx < len(row):
-                    cell = row[col_idx].strip()
-                    if label_separator:
-                        parts = [t.strip() for t in cell.split(label_separator) if t.strip()]
-                    else:
-                        parts = [cell] if cell else []
-                    for part in parts:
-                        if part and part.lower() != "none" and part not in labels:
-                            labels.append(part)
-
-            confidence = None
-            if "confidence" in field_map:
-                col = field_map["confidence"]
-                raw_conf = row[col].strip() if col < len(row) else None
-                try:
-                    confidence = int(raw_conf) if raw_conf else None
-                except (ValueError, TypeError):
-                    confidence = None
-
+            row_ioc_type = ""
+            if ioc_type_col is not None and ioc_type_col < len(row):
+                row_ioc_type = row[ioc_type_col].strip()
             indicators.append({
-                "ioc_type": row_ioc_type,
-                "ioc_value": ioc_value,
-                "labels": labels,
-                "confidence": confidence,
-                "first_seen": first_seen,
-                "last_seen": last_seen,
+                "ioc_type":   row_ioc_type,
+                "ioc_value":  ioc_value,
+                "labels":     labels[:],
+                "confidence": None,
+                "first_seen": None,
+                "last_seen":  None,
             })
 
         return indicators

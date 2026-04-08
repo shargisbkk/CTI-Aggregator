@@ -1,20 +1,15 @@
 """
-Generic adapter for plain-text IOC lists (one indicator per line).
-
-Covers: Emerging Threats, OpenPhish, PhishHunt, Stop Forum Spam, FireHOL, etc.
+Adapter for plain-text IOC feeds (one indicator per line).
 
 Config keys (FeedSource.config):
-    url             — URL to fetch (required)
-    timeout         — request timeout in seconds (default 120)
-    comment_char    — lines starting with this are skipped (default "#")
-    ioc_type        — canonical IOC type for every line; auto-detected if absent
-    static_labels   — list of labels applied to every indicator (default [])
-    auth_header     — header name for API key auth, or null (default null)
+    url          — URL to fetch (required)
+    ioc_type     — canonical IOC type; inferred from values if absent
+    comment_char — comment prefix override; defaults to both "#" and ";"
+    timeout      — request timeout in seconds (default 120)
 """
 
 import logging
 
-from ingestion.adapters.autodetect import detect_ioc_type
 from ingestion.adapters.base import FeedAdapter
 from ingestion.adapters.http import request_with_retry
 
@@ -29,40 +24,37 @@ class TextFeedAdapter(FeedAdapter):
         self.source_name = self.config.get("_source_name", "text")
 
     def fetch_raw(self) -> list[dict]:
-        url = self.config["url"]
-        timeout = self.config.get("timeout", 120)
-        comment_char = self.config.get("comment_char", "#")
+        url      = self.config["url"]
+        timeout  = self.config.get("timeout", 120)
         ioc_type = self.config.get("ioc_type", "")
-        static_labels = list(self.config.get("static_labels", []))
+        labels   = [self.source_name.lower()]
+
+        # Default handles both # and ; comment styles; config can override.
+        comment_chars = tuple(self.config["comment_char"]) if "comment_char" in self.config \
+                        else ("#", ";")
 
         headers = self._build_auth_headers()
-
         r = request_with_retry("GET", url, headers=headers, timeout=timeout)
-
-        # Auto-detect ioc_type from first 20 data lines when not configured
-        if not ioc_type:
-            sample = [
-                ln.strip() for ln in r.text.splitlines()
-                if ln.strip() and not (comment_char and ln.startswith(comment_char))
-            ][:20]
-            known = [t for t in (detect_ioc_type(v) for v in sample) if t != "unknown"]
-            ioc_type = max(set(known), key=known.count) if known else "ip"
-            logger.info("%s: auto-detected ioc_type=%r from %d sample lines",
-                        self.source_name, ioc_type, len(sample))
 
         indicators = []
         for line in r.text.splitlines():
             line = line.strip()
-            if not line or (comment_char and line.startswith(comment_char)):
+            if not line or line.startswith(comment_chars):
                 continue
-
+            # Strip inline comments (e.g. "1.2.3.0/24 ; note").
+            for ch in comment_chars:
+                if ch in line:
+                    line = line[:line.index(ch)].strip()
+                    break
+            if not line:
+                continue
             indicators.append({
-                "ioc_type": ioc_type,
-                "ioc_value": line,
-                "labels": static_labels[:],
+                "ioc_type":   ioc_type,
+                "ioc_value":  line,
+                "labels":     labels[:],
                 "confidence": None,
                 "first_seen": None,
-                "last_seen": None,
+                "last_seen":  None,
             })
 
         return indicators

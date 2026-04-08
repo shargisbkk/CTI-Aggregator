@@ -34,10 +34,7 @@ class IndicatorOfCompromise(models.Model):
         return "Unknown"
 
 class GeoEnrichment(models.Model):
-    """
-    Geo-location data for IP-type indicators, populated at ingestion time
-    using the local DB-IP Lite database. One row per indicator (OneToOne).
-    """
+    """Geo-location data for IP indicators, populated at ingestion time via the local DB-IP database."""
     indicator    = models.OneToOneField(
         IndicatorOfCompromise,
         on_delete=models.CASCADE,
@@ -60,32 +57,26 @@ class GeoEnrichment(models.Model):
 
 class FeedSource(models.Model):
     """
-    Represents a single threat intelligence feed (e.g. OTX, URLhaus).
-    Add and configure feeds through the Django admin — no code changes needed.
-    adapter_type controls which ingestion adapter fetches and parses the feed.
+    Represents a single threat intelligence feed source.
+    Configure feeds through the Django admin — no code changes needed.
+    adapter_type determines which ingestion adapter is used.
     """
     ADAPTER_CHOICES = [
         ("text",  "Plain Text List"),
         ("csv",   "CSV / TSV File"),
         ("misp",  "MISP Feed"),
         ("taxii", "TAXII 2.1 Server"),
-        ("json",  "JSON REST API"),
+        ("json",  "REST API"),
     ]
 
     name         = models.CharField(max_length=64, unique=True)
     adapter_type = models.CharField(max_length=16, choices=ADAPTER_CHOICES, default="json")
-    url          = models.CharField(max_length=512, blank=True, default="",
-                       help_text="Feed URL. For TAXII, use the discovery endpoint URL.")
-    api_key      = models.TextField(blank=True, default="")
-    auth_header  = models.CharField(max_length=64, blank=True, default="",
-                       help_text="HTTP header name for the API key, e.g. 'Auth-Key' or 'X-OTX-API-KEY'. "
-                                 "Leave blank if no authentication is needed.")
-    username     = models.CharField(max_length=256, blank=True, default="",
-                       help_text="TAXII basic-auth username. Leave blank if not using basic auth.")
-    password     = models.CharField(max_length=256, blank=True, default="",
-                       help_text="TAXII basic-auth password.")
-    collection_id = models.CharField(max_length=256, blank=True, default="",
-                       help_text="TAXII collection ID. Leave blank for all other adapter types.")
+    url           = models.CharField(max_length=512, blank=True, default="")
+    api_key       = models.TextField(blank=True, default="")
+    auth_header   = models.CharField(max_length=64, blank=True, default="")
+    username      = models.CharField(max_length=256, blank=True, default="")
+    password      = models.CharField(max_length=256, blank=True, default="")
+    collection_id = models.CharField(max_length=256, blank=True, default="")
     is_enabled   = models.BooleanField(default=True)
     config       = models.JSONField(blank=True, default=dict)
     last_pulled  = models.DateTimeField(null=True, blank=True)

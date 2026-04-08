@@ -5,7 +5,9 @@ Maps raw IOC types to canonical types, enforces case rules,
 cleans labels, and drops records that are empty or unrecognized.
 """
 
+import ipaddress
 import logging
+import re
 from typing import Optional
 
 from ingestion.type_map import TYPE_MAP
@@ -24,6 +26,35 @@ def _safe_confidence(val) -> Optional[int]:
         return int(val)
     except (TypeError, ValueError):
         return None
+
+
+def _classify_value(value: str) -> str:
+    """Infer canonical IOC type from the value itself when the source doesn't provide one."""
+    if "/" in value:
+        host = value.split("/", 1)[0]
+        for cls in (ipaddress.IPv4Address, ipaddress.IPv6Address):
+            try:
+                cls(host)
+                return "ip"
+            except ValueError:
+                pass
+    for cls in (ipaddress.IPv4Address, ipaddress.IPv6Address):
+        try:
+            cls(value)
+            return "ip"
+        except ValueError:
+            pass
+    if re.match(r"^https?://", value, re.I):
+        return "url"
+    if re.match(r"^[^@\s]+@[^@\s]+\.[^@\s]+$", value):
+        return "email"
+    if re.match(r"^CVE-\d{4}-\d+$", value, re.I):
+        return "cve"
+    if re.match(r"^[0-9a-fA-F]{32}$|^[0-9a-fA-F]{40}$|^[0-9a-fA-F]{64}$", value):
+        return "hash"
+    if re.match(r"^(?:[a-zA-Z0-9](?:[a-zA-Z0-9\-]{0,61}[a-zA-Z0-9])?\.)+[a-zA-Z]{2,}$", value):
+        return "domain"
+    return ""
 
 
 _LABEL_BLOCKLIST = {"unknown", "n/a", "none", "other"}
@@ -51,9 +82,13 @@ def normalize_one(raw: dict) -> Optional[dict]:
 
     raw_type = str(raw.get("ioc_type") or "").strip().lower()
 
-    ioc_type = TYPE_MAP.get(raw_type)
+    ioc_type = TYPE_MAP.get(raw_type) or _classify_value(raw_value)
     if not ioc_type:
         return None
+
+    # Strip port from ip:port values. Single colon only — IPv6 has multiple.
+    if ioc_type == "ip" and "port" in raw_type and raw_value.count(":") == 1:
+        raw_value = raw_value.rsplit(":", 1)[0]
 
     ioc_value = (
         raw_value if ioc_type in PRESERVE_CASE

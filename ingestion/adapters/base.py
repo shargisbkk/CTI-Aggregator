@@ -1,4 +1,6 @@
+import ipaddress
 import logging
+import re
 from abc import ABC, abstractmethod
 from datetime import datetime
 from typing import Optional
@@ -6,6 +8,33 @@ from typing import Optional
 from processors.normalize import normalize_one
 
 logger = logging.getLogger(__name__)
+
+
+def _ioc_score(v: str) -> int:
+    """Score how IOC-like a string is. Higher scores win ties: sha256 (3) > sha1 (2) > all others (1)."""
+    if not isinstance(v, str):
+        return 0
+    v = v.strip()
+    try:
+        ipaddress.ip_address(v)
+        return 1
+    except ValueError:
+        pass
+    if v.startswith(("http://", "https://", "ftp://")):
+        return 1
+    if re.match(r'^[^@\s]+@[^@\s]+\.[^@\s]+$', v):
+        return 1
+    if re.match(r'^CVE-\d{4}-\d+$', v, re.I):
+        return 1
+    if re.match(r'^[0-9a-f]{64}$', v, re.I):
+        return 3  # sha256
+    if re.match(r'^[0-9a-f]{40}$', v, re.I):
+        return 2  # sha1
+    if re.match(r'^[0-9a-f]{32}$', v, re.I):
+        return 1  # md5
+    if re.match(r'^(?:[a-z0-9](?:[a-z0-9\-]{0,61}[a-z0-9])?\.)+[a-z]{2,}$', v, re.I):
+        return 1
+    return 0
 
 
 class FeedAdapter(ABC):
@@ -19,7 +48,7 @@ class FeedAdapter(ABC):
         self.config   = config or {}
 
     def _build_auth_headers(self) -> dict:
-        """Return HTTP headers dict with API key injected, if configured."""
+        """Build auth headers from config if auth_header and api_key are both set."""
         headers = {}
         auth_header = self.config.get("auth_header")
         if auth_header and self._api_key:
@@ -27,7 +56,7 @@ class FeedAdapter(ABC):
         return headers
 
     def normalize_record(self, raw: dict) -> Optional[dict]:
-        """Normalize a raw indicator dict. Delegates to processors.normalize."""
+        """Normalize a raw indicator dict via processors.normalize."""
         return normalize_one(raw)
 
     def ingest(self) -> Optional[list[dict]]:
@@ -36,7 +65,7 @@ class FeedAdapter(ABC):
             raw_records = self.fetch_raw()
         except Exception:
             logger.exception("%s: fetch_raw() failed", self.source_name)
-            return None  # None signals fetch failure; empty list means no data returned
+            return None  # None = fetch failed; [] = no data
 
         indicators = []
         skipped = 0
