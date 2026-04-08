@@ -37,8 +37,17 @@ UPSERT_SQL = """
 
 
 def _clean_ts(value):
-    """Convert pandas Timestamp to datetime, or None if NaT."""
-    return None if pd.isnull(value) else value
+    """Convert pandas Timestamp to Python datetime, or None if NaT/None."""
+    if value is None:
+        return None
+    try:
+        if pd.isnull(value):
+            return None
+    except (TypeError, ValueError):
+        pass
+    if hasattr(value, "to_pydatetime"):
+        return value.to_pydatetime()
+    return value
 
 
 def _clean_conf(value):

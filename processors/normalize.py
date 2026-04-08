@@ -8,6 +8,7 @@ cleans labels, and drops records that are empty or unrecognized.
 import ipaddress
 import logging
 import re
+from datetime import datetime, timezone
 from typing import Optional
 
 from ingestion.type_map import TYPE_MAP
@@ -17,6 +18,52 @@ logger = logging.getLogger(__name__)
 PRESERVE_CASE = {"url", "file", "regkey"}
 
 MAX_VALUE_LENGTH = 500
+
+# Common timestamp format strings tried in order when fromisoformat() fails.
+_TS_FORMATS = (
+    "%Y-%m-%dT%H:%M:%S",
+    "%Y-%m-%dT%H:%M:%SZ",
+    "%Y-%m-%d %H:%M:%S",
+    "%Y-%m-%d %H:%M:%S UTC",
+    "%Y-%m-%d",
+)
+
+
+def _parse_ts(raw) -> Optional[datetime]:
+    """Parse a raw timestamp value into a timezone-aware datetime, or return None."""
+    if raw is None:
+        return None
+    if isinstance(raw, datetime):
+        return raw if raw.tzinfo else raw.replace(tzinfo=timezone.utc)
+    if isinstance(raw, (int, float)):
+        # Unix timestamp (e.g. Feodo Tracker, some MISP attributes)
+        try:
+            return datetime.fromtimestamp(float(raw), tz=timezone.utc)
+        except (ValueError, OSError, OverflowError):
+            return None
+    s = str(raw).strip()
+    if not s:
+        return None
+    # Normalise "Z" suffix to "+00:00" for fromisoformat
+    s_iso = s.replace("Z", "+00:00") if s.endswith("Z") else s
+    try:
+        dt = datetime.fromisoformat(s_iso)
+        return dt if dt.tzinfo else dt.replace(tzinfo=timezone.utc)
+    except ValueError:
+        pass
+    # Try string-integer Unix timestamp (e.g. MISP stores "1675000000")
+    try:
+        return datetime.fromtimestamp(float(s), tz=timezone.utc)
+    except (ValueError, OSError, OverflowError):
+        pass
+    for fmt in _TS_FORMATS:
+        try:
+            dt = datetime.strptime(s, fmt)
+            return dt.replace(tzinfo=timezone.utc)
+        except ValueError:
+            continue
+    logger.debug("normalize: could not parse timestamp %r", raw)
+    return None
 
 
 def _safe_confidence(val) -> Optional[int]:
@@ -38,9 +85,11 @@ def _classify_value(value: str) -> str:
                 return "ip"
             except ValueError:
                 pass
+    # Handle ip:port format (single colon only; IPv6 has multiple colons)
+    candidate = value.rsplit(":", 1)[0] if value.count(":") == 1 else value
     for cls in (ipaddress.IPv4Address, ipaddress.IPv6Address):
         try:
-            cls(value)
+            cls(candidate)
             return "ip"
         except ValueError:
             pass
@@ -86,8 +135,8 @@ def normalize_one(raw: dict) -> Optional[dict]:
     if not ioc_type:
         return None
 
-    # Strip port from ip:port values. Single colon only — IPv6 has multiple.
-    if ioc_type == "ip" and "port" in raw_type and raw_value.count(":") == 1:
+    # Strip port from ip:port values. Single colon only — IPv6 has multiple colons.
+    if ioc_type == "ip" and raw_value.count(":") == 1:
         raw_value = raw_value.rsplit(":", 1)[0]
 
     ioc_value = (
@@ -105,6 +154,6 @@ def normalize_one(raw: dict) -> Optional[dict]:
         "ioc_value":   ioc_value,
         "confidence":  _safe_confidence(raw.get("confidence")),
         "labels":      _clean_labels(raw.get("labels") or [], ioc_type),
-        "first_seen":  raw.get("first_seen") or None,
-        "last_seen":   raw.get("last_seen") or None,
+        "first_seen":  _parse_ts(raw.get("first_seen")),
+        "last_seen":   _parse_ts(raw.get("last_seen")),
     }

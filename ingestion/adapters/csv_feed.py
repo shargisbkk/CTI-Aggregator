@@ -9,6 +9,7 @@ Config keys (FeedSource.config):
     skip_header      — True/False override; auto-detected from row content if absent
     delimiter        — column separator character, default ","
     comment_char     — lines starting with this are skipped, default "#"
+    label_fields     — extra column names to include as labels beyond auto-detected ones
 """
 
 import csv
@@ -19,6 +20,9 @@ from ingestion.adapters.base import FeedAdapter, _ioc_score
 from ingestion.adapters.http import request_with_retry
 
 logger = logging.getLogger(__name__)
+
+# Generic label column names found in CSV threat feeds (e.g. URLhaus uses "threat").
+_KNOWN_LABEL_COLS = ("tags", "labels", "label", "threat", "category")
 
 
 def _looks_like_header(row: list[str]) -> bool:
@@ -75,6 +79,7 @@ class CsvFeedAdapter(FeedAdapter):
 
         ioc_value_col_spec = self.config.get("ioc_value_column")
         ioc_type_col_spec  = self.config.get("ioc_type_column")
+        extra_label_fields = self.config.get("label_fields") or []
 
         headers = self._build_auth_headers()
         r = request_with_retry("GET", url, headers=headers, timeout=timeout)
@@ -109,8 +114,20 @@ class CsvFeedAdapter(FeedAdapter):
                                self.source_name)
                 return []
 
-        labels = [self.source_name.lower()]
-        indicators = []
+        # Find label columns from known generic names + any configured extras.
+        label_cols = []
+        if header_row:
+            norm_headers = [h.strip().lower() for h in header_row]
+            known = set(_KNOWN_LABEL_COLS) | {f.strip().lower() for f in extra_label_fields}
+            for idx, h in enumerate(norm_headers):
+                if h in known and idx != ioc_value_col and idx != ioc_type_col:
+                    label_cols.append(idx)
+            if label_cols:
+                names = [header_row[i].strip() for i in label_cols]
+                logger.info("%s: using label columns %s", self.source_name, names)
+
+        base_labels = [self.source_name.lower()]
+        indicators  = []
         for row in rows:
             if not row:
                 continue
@@ -120,10 +137,18 @@ class CsvFeedAdapter(FeedAdapter):
             row_ioc_type = ""
             if ioc_type_col is not None and ioc_type_col < len(row):
                 row_ioc_type = row[ioc_type_col].strip()
+
+            row_labels = base_labels[:]
+            for col in label_cols:
+                if col < len(row):
+                    val = row[col].strip()
+                    if val:
+                        row_labels.append(val)
+
             indicators.append({
                 "ioc_type":   row_ioc_type,
                 "ioc_value":  ioc_value,
-                "labels":     labels[:],
+                "labels":     row_labels,
                 "confidence": None,
                 "first_seen": None,
                 "last_seen":  None,

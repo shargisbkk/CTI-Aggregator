@@ -34,7 +34,7 @@ class IndicatorOfCompromise(models.Model):
         return "Unknown"
 
 class GeoEnrichment(models.Model):
-    """Geo-location data for IP indicators, populated at ingestion time via the local DB-IP database."""
+    """Geo-location data for IP indicators, populated at ingestion time."""
     indicator    = models.OneToOneField(
         IndicatorOfCompromise,
         on_delete=models.CASCADE,

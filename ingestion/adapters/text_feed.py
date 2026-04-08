@@ -9,6 +9,7 @@ Config keys (FeedSource.config):
 """
 
 import logging
+import re
 
 from ingestion.adapters.base import FeedAdapter
 from ingestion.adapters.http import request_with_retry
@@ -42,10 +43,9 @@ class TextFeedAdapter(FeedAdapter):
             if not line or line.startswith(comment_chars):
                 continue
             # Strip inline comments (e.g. "1.2.3.0/24 ; note").
-            for ch in comment_chars:
-                if ch in line:
-                    line = line[:line.index(ch)].strip()
-                    break
+            # Split on whichever comment char appears first in the line.
+            _comment_pattern = "[" + re.escape("".join(comment_chars)) + "]"
+            line = re.split(_comment_pattern, line)[0].strip()
             if not line:
                 continue
             indicators.append({

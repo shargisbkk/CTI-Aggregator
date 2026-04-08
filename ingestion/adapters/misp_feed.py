@@ -124,8 +124,8 @@ class MispFeedAdapter(FeedAdapter):
                 # Use attribute category as the label (e.g. "network activity",
                 # "payload installation").  Event-level tags are MISP metadata
                 # (tlp:white, type:OSINT) — same on every event, so skip them.
-                labels = list(self.config.get("static_labels", []))
-                if event_label and event_label not in labels:
+                labels = []
+                if event_label:
                     labels.append(event_label)
                 category = (attr.get("category") or "").strip().lower()
                 if category and category not in labels:

@@ -9,11 +9,26 @@ SOURCES = [
         "auth_header":  "X-OTX-API-KEY",
         "is_enabled":   False,
         "config": {
-            "since_param":    "modified_since",
-            "since_format":   "%Y-%m-%dT%H:%M:%S",
-            "initial_days":   180,
-            "data_path":      "results.indicators",
-            "next_page_path": "next",
+            # Incremental pull: OTX supports filtering by modified date.
+            "since_param":     "modified_since",
+            "since_format":    "%Y-%m-%dT%H:%M:%S",
+            "initial_days":    180,
+            # Pagination
+            "next_page_path":  "next",
+            # data_path set explicitly so auto-detection doesn't dive to
+            # results.indicators and discard the pulse-level context we need.
+            "data_path":       "results",
+            # expand_path tells the adapter that each result (pulse) contains
+            # the actual indicators in this sub-array; pulse-level labels are
+            # carried into each child indicator.
+            "expand_path":     "indicators",
+            # Field mapping within each indicator object.
+            "ioc_value_field": "indicator",
+            "ioc_type_field":  "type",
+            "first_seen_field": "created",   # OTX uses "created", not "first_seen"
+            # Pulse-level label fields to carry into each indicator.
+            # "tags" is auto-detected; "name" (pulse title) and "adversary" are explicit.
+            "label_fields":    ["name", "adversary", "malware_families"],
         },
     },
     {
@@ -23,9 +38,13 @@ SOURCES = [
         "auth_header":  "Auth-Key",
         "is_enabled":   False,
         "config": {
-            "method":       "POST",
-            "request_body": {"query": "get_iocs", "days": 1},
-            "data_path":    "data",
+            "method":          "POST",
+            "request_body":    {"query": "get_iocs", "days": 1},
+            "data_path":       "data",
+            "ioc_value_field": "ioc",
+            "ioc_type_field":  "ioc_type",
+            # "tags" is auto-detected; source-specific fields are explicit.
+            "label_fields":    ["malware_printable", "threat_type", "malware", "malware_alias"],
         },
     },
 ]

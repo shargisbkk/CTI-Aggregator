@@ -6,23 +6,27 @@ from ingestion.models import FeedSource, GeoEnrichment
 
 
 class FeedSourceForm(forms.ModelForm):
-    password        = forms.CharField(required=False, widget=forms.PasswordInput())
+    # TAXII auth
+    password         = forms.CharField(required=False, widget=forms.PasswordInput())
 
-    data_path       = forms.CharField(required=False)
-    ioc_value_field = forms.CharField(required=False)
-    ioc_type_field  = forms.CharField(required=False)
-    method          = forms.ChoiceField(choices=[("GET", "GET"), ("POST", "POST")], required=False)
-    since_param     = forms.CharField(required=False)
-    initial_days    = forms.IntegerField(required=False, min_value=1)
-    request_body    = forms.CharField(required=False, widget=forms.Textarea(attrs={"rows": 4}))
+    # REST API — visible
+    method           = forms.ChoiceField(choices=[("GET", "GET"), ("POST", "POST")], required=False)
+    request_body     = forms.CharField(required=False, widget=forms.Textarea(attrs={"rows": 4}))
 
-    delimiter       = forms.ChoiceField(
+    # CSV — visible
+    delimiter        = forms.ChoiceField(
         choices=[(",", "Comma (,)"), ("\t", "Tab"), ("|", "Pipe (|)"), (";", "Semicolon (;)")],
         required=False,
     )
-    skip_header     = forms.BooleanField(required=False)
-    ioc_value_column = forms.CharField(required=False)
-    ioc_type_column  = forms.CharField(required=False)
+
+    # Advanced Config — collapsed, override auto-detection
+    data_path        = forms.CharField(required=False, help_text="Dot-notation path to the indicator array (e.g. 'data' or 'results'). Leave blank to auto-detect.")
+    ioc_value_field  = forms.CharField(required=False, help_text="Field containing the IOC value. Leave blank to auto-detect.")
+    ioc_type_field   = forms.CharField(required=False, help_text="Field containing the IOC type. Leave blank to infer from value.")
+    first_seen_field = forms.CharField(required=False, help_text="Field containing the first-seen timestamp (e.g. 'created', 'date_added'). Defaults to 'first_seen'.")
+    last_seen_field  = forms.CharField(required=False, help_text="Field containing the last-seen timestamp. Defaults to 'last_seen'.")
+    ioc_value_column = forms.CharField(required=False, help_text="Column name or index for the IOC value. Leave blank to auto-detect.")
+    ioc_type_column  = forms.CharField(required=False, help_text="Column name or index for the IOC type. Leave blank to infer from value.")
 
     class Meta:
         model   = FeedSource
@@ -32,16 +36,16 @@ class FeedSourceForm(forms.ModelForm):
         super().__init__(*args, **kwargs)
         if self.instance and self.instance.pk:
             cfg = self.instance.config or {}
-            self.initial["data_path"]        = cfg.get("data_path", "")
-            self.initial["ioc_value_field"]  = cfg.get("ioc_value_field", "")
-            self.initial["ioc_type_field"]   = cfg.get("ioc_type_field", "")
             self.initial["method"]           = cfg.get("method", "GET")
-            self.initial["since_param"]      = cfg.get("since_param", "")
-            self.initial["initial_days"]     = cfg.get("initial_days") or None
             rb = cfg.get("request_body")
             self.initial["request_body"]     = _json.dumps(rb, indent=2) if rb else ""
             self.initial["delimiter"]        = cfg.get("delimiter", ",")
-            self.initial["skip_header"]      = cfg.get("skip_header", False)
+            # Advanced Config
+            self.initial["data_path"]        = cfg.get("data_path", "")
+            self.initial["ioc_value_field"]  = cfg.get("ioc_value_field", "")
+            self.initial["ioc_type_field"]   = cfg.get("ioc_type_field", "")
+            self.initial["first_seen_field"] = cfg.get("first_seen_field", "")
+            self.initial["last_seen_field"]  = cfg.get("last_seen_field", "")
             self.initial["ioc_value_column"] = cfg.get("ioc_value_column", "")
             self.initial["ioc_type_column"]  = cfg.get("ioc_type_column", "")
 
@@ -56,59 +60,50 @@ class FeedSourceForm(forms.ModelForm):
 
     def save(self, commit=True):
         instance = super().save(commit=False)
-        cfg = {}
+        cfg = dict(instance.config or {})
         adapter = self.cleaned_data.get("adapter_type") or (instance.adapter_type if instance.pk else "")
 
-        if adapter == "csv":
-            delimiter = self.cleaned_data.get("delimiter", ",") or ","
-            if delimiter != ",":
-                cfg["delimiter"] = delimiter
-
-            if self.cleaned_data.get("skip_header"):
-                cfg["skip_header"] = True
-
-            ioc_col = self.cleaned_data.get("ioc_value_column", "").strip()
-            if ioc_col:
-                try:
-                    cfg["ioc_value_column"] = int(ioc_col)
-                except ValueError:
-                    cfg["ioc_value_column"] = ioc_col
-
-            ioc_type_col = self.cleaned_data.get("ioc_type_column", "").strip()
-            if ioc_type_col:
-                try:
-                    cfg["ioc_type_column"] = int(ioc_type_col)
-                except ValueError:
-                    cfg["ioc_type_column"] = ioc_type_col
-
-        elif adapter == "json":
-            data_path = self.cleaned_data.get("data_path", "").strip()
-            if data_path:
-                cfg["data_path"] = data_path
-
-            ioc_value_field = self.cleaned_data.get("ioc_value_field", "").strip()
-            if ioc_value_field:
-                cfg["ioc_value_field"] = ioc_value_field
-
-            ioc_type_field = self.cleaned_data.get("ioc_type_field", "").strip()
-            if ioc_type_field:
-                cfg["ioc_type_field"] = ioc_type_field
-
+        if adapter == "json":
             method = self.cleaned_data.get("method", "GET") or "GET"
             if method != "GET":
                 cfg["method"] = method
-
-            since_param = self.cleaned_data.get("since_param", "").strip()
-            if since_param:
-                cfg["since_param"] = since_param
-
-            initial_days = self.cleaned_data.get("initial_days")
-            if initial_days:
-                cfg["initial_days"] = int(initial_days)
+            else:
+                cfg.pop("method", None)
 
             rb_raw = self.cleaned_data.get("request_body", "").strip()
             if rb_raw:
                 cfg["request_body"] = _json.loads(rb_raw)
+            else:
+                cfg.pop("request_body", None)
+
+        elif adapter == "csv":
+            delimiter = self.cleaned_data.get("delimiter", ",") or ","
+            if delimiter != ",":
+                cfg["delimiter"] = delimiter
+            else:
+                cfg.pop("delimiter", None)
+
+        # Advanced Config — persist only non-empty overrides; remove if cleared
+        for key, form_key in [
+            ("data_path",        "data_path"),
+            ("ioc_value_field",  "ioc_value_field"),
+            ("ioc_type_field",   "ioc_type_field"),
+            ("first_seen_field", "first_seen_field"),
+            ("last_seen_field",  "last_seen_field"),
+            ("ioc_value_column", "ioc_value_column"),
+            ("ioc_type_column",  "ioc_type_column"),
+        ]:
+            val = self.cleaned_data.get(form_key, "").strip()
+            if val:
+                if key in ("ioc_value_column", "ioc_type_column"):
+                    try:
+                        cfg[key] = int(val)
+                    except ValueError:
+                        cfg[key] = val
+                else:
+                    cfg[key] = val
+            else:
+                cfg.pop(key, None)
 
         instance.config = cfg
         if commit:
@@ -132,14 +127,25 @@ class FeedSourceAdmin(admin.ModelAdmin):
             "fields": ("api_key", "auth_header"),
         }),
         ("REST API", {
-            "fields": ("data_path", "ioc_value_field", "ioc_type_field",
-                       "method", "since_param", "initial_days", "request_body"),
+            "fields": ("method", "request_body"),
         }),
         ("CSV / TSV", {
-            "fields": ("delimiter", "skip_header", "ioc_value_column", "ioc_type_column"),
+            "fields": ("delimiter",),
         }),
         ("TAXII", {
             "fields": ("username", "password", "collection_id"),
+        }),
+        ("Advanced Config", {
+            "classes": ("collapse",),
+            "description": (
+                "Leave blank — values are auto-detected on first run. "
+                "Only fill these in if auto-detection fails for an unusual feed."
+            ),
+            "fields": (
+                "data_path", "ioc_value_field", "ioc_type_field",
+                "first_seen_field", "last_seen_field",
+                "ioc_value_column", "ioc_type_column",
+            ),
         }),
     )
 

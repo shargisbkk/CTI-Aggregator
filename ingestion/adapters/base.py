@@ -21,7 +21,9 @@ def _ioc_score(v: str) -> int:
         return 0
     v = v.strip()
     try:
-        ipaddress.ip_address(v)
+        # Strip port before checking — ip:port format (single colon only; IPv6 has multiple)
+        candidate = v.rsplit(":", 1)[0] if v.count(":") == 1 else v
+        ipaddress.ip_address(candidate)
         return 1
     except ValueError:
         pass
