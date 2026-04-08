@@ -34,6 +34,7 @@ def _auto_ioc_column(sample_rows: list[list[str]]) -> int | None:
     n_cols = max(len(row) for row in sample_rows)
     best_col, best_score = None, 0
     for col in range(n_cols):
+        # sum IOC scores across rows for this column; highest total wins
         vals  = [row[col].strip() for row in sample_rows if col < len(row) and row[col].strip()]
         score = sum(_ioc_score(v) for v in vals)
         if score > best_score:

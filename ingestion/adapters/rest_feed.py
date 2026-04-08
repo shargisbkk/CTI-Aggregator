@@ -23,6 +23,7 @@ def _resolve_path(data, path: str):
         return data
     for key in path.split("."):
         if isinstance(data, list):
+            # hit a list mid-path, pull the key from each item and continue
             result = []
             for item in data:
                 if isinstance(item, dict):
@@ -51,9 +52,13 @@ def _auto_data_path(data) -> tuple[str | None, list]:
 
     seen = set()
     candidates = []
+    empty_preferred = []
     for key in _PREFERRED_DATA_PATHS:
-        if key in data and isinstance(data[key], list) and data[key]:
-            candidates.append(key)
+        if key in data and isinstance(data[key], list):
+            if data[key]:
+                candidates.append(key)
+            else:
+                empty_preferred.append(key)
             seen.add(key)
     for key, val in data.items():
         if key not in seen and isinstance(val, list) and val:
@@ -70,7 +75,7 @@ def _auto_data_path(data) -> tuple[str | None, list]:
             continue
         if any(_ioc_score(str(v)) > 0 for v in first.values() if isinstance(v, (str, int, float))):
             return key, items
-        # No IOC values at this level — check one level deeper.
+        # top level items had no IOC values, check one level deeper
         for sub_key, sub_val in first.items():
             if isinstance(sub_val, list) and sub_val:
                 sub_first = next((i for i in sub_val if isinstance(i, dict)), None)
@@ -85,6 +90,8 @@ def _auto_data_path(data) -> tuple[str | None, list]:
     if candidates:
         key = candidates[0]
         return key, data[key]
+    if empty_preferred:
+        return empty_preferred[0], []
     return None, []
 
 
@@ -161,7 +168,7 @@ class RestFeedAdapter(FeedAdapter):
         while next_url:
             try:
                 r    = request_with_retry(method, next_url, **kwargs)
-                kwargs.pop("params", None)
+                kwargs.pop("params", None)  # since_param only goes on the first request
                 data = r.json()
             except Exception as exc:
                 logger.warning("%s: page %d failed (%s), returning %d collected",

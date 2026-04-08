@@ -1,3 +1,8 @@
+"""
+Base adapter interface. All feed adapters extend FeedAdapter and implement fetch_raw().
+Adding a new transport type means adding a new subclass, not changing existing code.
+"""
+
 import ipaddress
 import logging
 import re
