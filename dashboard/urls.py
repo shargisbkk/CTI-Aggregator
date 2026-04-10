@@ -58,6 +58,12 @@ urlpatterns = [
     ),
 
     path(
+        "feeds/status/",
+        views.ingestion_status,
+        name="dashboard-ingestion-status"
+    ),
+
+    path(
         "toggle-theme/",
         views.toggle_theme,
         name="toggle-theme"

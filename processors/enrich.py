@@ -1,8 +1,7 @@
 """
-Enrichment functions for indicators already saved to the database.
+Enrichment for indicators already saved to the database.
 
-geo_enrich_batch() runs at ingestion time using the local DB-IP Lite .mmdb file.
-Must be called AFTER upsert_indicators() so the indicator rows exist in the DB first.
+geo_enrich_batch() — geo-IP lookup via local DB-IP Lite .mmdb.
 """
 
 import ipaddress
@@ -16,16 +15,9 @@ from ingestion.models import GeoEnrichment, IndicatorOfCompromise
 
 logger = logging.getLogger(__name__)
 
-
 def _extract_ip(value: str) -> str | None:
-    """
-    Strip CIDR notation and port numbers from an IP string so it can be
-    looked up in the geo database. Returns None if the value is not a valid IP.
-    """
-    # Strip CIDR prefix length
     if "/" in value:
         value = value.split("/")[0]
-    # Strip port from IPv4 only (exactly one colon means host:port, not IPv6)
     if value.count(":") == 1:
         value = value.split(":")[0]
     try:
@@ -38,9 +30,6 @@ def _extract_ip(value: str) -> str | None:
 def geo_enrich_batch(normalized_records: list[dict]) -> int:
     """
     Geo-enrich all IP indicators in a normalized batch using the local DB-IP Lite database.
-
-    Accepts the same list of dicts passed to upsert_indicators(). Writes one
-    GeoEnrichment row per IP. Safe to call multiple times (uses update_or_create).
     Returns the count of IPs successfully enriched.
     """
     db_path = getattr(settings, "GEOIP_PATH", None)
@@ -48,12 +37,15 @@ def geo_enrich_batch(normalized_records: list[dict]) -> int:
         logger.warning("geo_enrich_batch: GEOIP_PATH not configured — skipping")
         return 0
 
+    from pathlib import Path
+    if not Path(str(db_path)).exists():
+        logger.warning("geo_enrich_batch: %s not found — run download_geoip first", db_path)
+        return 0
+
     ip_values = [r["ioc_value"] for r in normalized_records if r.get("ioc_type") == "ip"]
     if not ip_values:
         return 0
 
-    # Fetch all matching IOC objects in one query.
-    # Full objects are needed here because GeoEnrichment.indicator is a foreign key.
     ioc_map = {
         obj.ioc_value: obj
         for obj in IndicatorOfCompromise.objects.filter(
@@ -62,7 +54,6 @@ def geo_enrich_batch(normalized_records: list[dict]) -> int:
     }
 
     count = 0
-    # Open the .mmdb file once before the loop. It is 125MB so opening it per IP would be very slow.
     with geoip2.database.Reader(str(db_path)) as reader:
         for raw_ip in ip_values:
             ioc = ioc_map.get(raw_ip)
@@ -86,10 +77,11 @@ def geo_enrich_batch(normalized_records: list[dict]) -> int:
                 )
                 count += 1
             except geoip2.errors.AddressNotFoundError:
-                # Private and reserved IPs (10.x, 192.168.x, etc.) are not in the database.
                 pass
             except Exception as e:
                 logger.error("geo_enrich_batch: failed on %s: %s", raw_ip, e)
 
     logger.info("geo_enrich_batch: %d/%d IPs enriched", count, len(ip_values))
     return count
+
+

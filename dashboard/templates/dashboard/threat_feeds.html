@@ -165,27 +165,51 @@ document.addEventListener('DOMContentLoaded', function() {
         })
         .then(response => response.json())
         .then(data => {
-            if (data.status === 'success') {
-                // Show success message
-                alert('Database updated successfully!');
-                // Reload the page to show updated data
-                location.reload();
+
+            if (data.status === 'started') {
+                alert('Ingestion started in background. Check logs for progress.');
+                pollIngestionStatus();
             } else {
-                alert('Error: ' + data.message);
+                alert('Failed to start ingestion: ' + data.message);
+                updateBtn.disabled = false;
+                buttonText.textContent = 'Update All Feeds';
+                loadingSpinner.style.display = 'none';
             }
         })
         .catch(error => {
             console.error('Error:', error);
             alert('An error occurred while updating the database.');
-        })
-        .finally(() => {
-            // Re-enables the button and hide spinner
             updateBtn.disabled = false;
             buttonText.textContent = 'Update All Feeds';
             loadingSpinner.style.display = 'none';
         });
     });
 });
+
+// Poll the server every 4 seconds until ingestion finishes, then notify and reload.
+function pollIngestionStatus() {
+    const interval = setInterval(() => {
+        fetch('{% url "dashboard:dashboard-ingestion-status" %}')
+            .then(r => r.json())
+            .then(data => {
+                if (data.status === 'done') {
+                    clearInterval(interval);
+                    updateBtn.disabled = false;
+                    buttonText.textContent = 'Update All Feeds';
+                    loadingSpinner.style.display = 'none';
+                    alert('Database updated successfully!');
+                    location.reload();
+                } else if (data.status === 'error') {
+                    clearInterval(interval);
+                    updateBtn.disabled = false;
+                    buttonText.textContent = 'Update All Feeds';
+                    loadingSpinner.style.display = 'none';
+                    alert('An error occurred while updating the database.');
+                }
+            })
+            .catch(() => clearInterval(interval));
+    }, 4000);
+}
 
 // Helper function to get CSRF token from cookies
 // This is needed if the CSRF token is not available in a hidden input field

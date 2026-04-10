@@ -32,6 +32,17 @@
 
     <div class="card shadow-sm p-3 mb-4">
 
+        <div class="d-flex justify-content-between align-items-center mb-3">
+            <span class="fw-semibold">Filters</span>
+            <button class="custom-collapse-btn"
+                    data-bs-toggle="collapse"
+                    data-bs-target="#filterCollapse"
+                    aria-expanded="true">
+                <i class="fa fa-chevron-up"></i>
+            </button>
+        </div>
+
+        <div id="filterCollapse" class="collapse show">
         <form method="get" id="filterForm" class="row g-3">
 
             <!-- Search input (matches value, type, and labels) -->
@@ -98,8 +109,8 @@
                        onkeydown="if(event.key==='Enter'){event.preventDefault();addLabel();}">
             </div>
 
-            <!-- Active label chips + clear -->
-            <div class="col d-flex flex-wrap align-items-center gap-2">
+            <!-- Active label chips + clear (only shown when labels are active) -->
+            <div class="col d-flex flex-wrap align-items-center gap-2" style="min-height: 38px;">
                 {% for l in current_labels %}
                     <span class="badge label-chip d-flex align-items-center gap-1"
                           style="font-size:.85rem;">
@@ -110,11 +121,14 @@
                                 onclick="removeLabel('{{ l|escapejs }}')"></button>
                     </span>
                 {% endfor %}
-                <a href="?q={{ current_q }}&type={{ current_type }}&source={{ current_source }}&confidence={{ current_confidence }}"
-                   class="btn btn-outline-secondary btn-sm">Clear</a>
+                {% if current_labels %}
+                    <a href="?q={{ current_q }}&type={{ current_type }}&source={{ current_source }}&confidence={{ current_confidence }}"
+                       class="btn btn-outline-secondary btn-sm">Clear</a>
+                {% endif %}
             </div>
 
         </form>
+        </div>
 
     </div>
 
@@ -160,14 +174,14 @@
                                 <span class="text-muted">—</span>
                             {% endif %}
                         </td>
-                        <td>
+                        <td style="max-width: 220px;">
                             {% for label in row.labels %}
                                 <a href="#"
                                    onclick="appendLabelFilter('{{ label|escapejs }}'); return false;"
                                    class="badge label-chip text-decoration-none me-1">{{ label }}</a>
                             {% endfor %}
                         </td>
-                        <td>{{ row.sources|join:", " }}</td>
+                        <td style="white-space: nowrap;">{{ row.sources|join:", " }}</td>
                         <td>{{ row.first_seen|date:"M d, Y g:i A" }}</td>
                         <td>{{ row.last_seen|date:"M d, Y g:i A" }}</td>
                     </tr>

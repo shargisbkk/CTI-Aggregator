@@ -171,25 +171,40 @@ def threat_feeds(request):
 @require_POST
 def update_all_feeds(request):
     """
-    Execute the ingest_all management command to pull data from all feeds.
-    Returns JSON response with status and output.
+    Run ingest_all in a background thread so the page doesn't hang.
+    Progress appears in docker compose logs.
     """
-    try:
-        output = StringIO()
-        err_output = StringIO()
-        call_command('ingest_all', stdout=output, stderr=err_output)
-        full_output = output.getvalue() + err_output.getvalue()
+    import threading
+    from django.core.cache import cache
 
-        return JsonResponse({
-            "status": "success",
-            "message": "Database update completed successfully.",
-            "output": full_output,
-        })
-    except Exception as e:
-        return JsonResponse({
-            "status": "error",
-            "message": f"Error during database update: {str(e)}"
-        }, status=400)
+    def run():
+        import logging
+        import traceback
+        from django.core.management import call_command
+        logger = logging.getLogger(__name__)
+        try:
+            cache.set("ingestion_status", "running", timeout=3600)
+            call_command('ingest_all')
+            cache.set("ingestion_status", "done", timeout=120)
+        except Exception as e:
+            logger.error("ingest_all crashed: %s\n%s", e, traceback.format_exc())
+            cache.set("ingestion_status", "error", timeout=120)
+
+    t = threading.Thread(target=run, daemon=True)
+    t.start()
+
+    return JsonResponse({
+        "status": "started",
+        "message": "Ingestion started in background. Check logs for progress.",
+    })
+
+
+@login_required
+def ingestion_status(request):
+    """Poll endpoint — returns current ingestion status from cache."""
+    from django.core.cache import cache
+    status = cache.get("ingestion_status", "idle")
+    return JsonResponse({"status": status})
 
 
 # ======================================================

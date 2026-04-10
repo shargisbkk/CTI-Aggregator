@@ -47,17 +47,30 @@ def extract_indicators(raw_objects: list[dict]) -> list[dict]:
             obj = None
 
         if obj is not None:
-            pattern    = getattr(obj, "pattern",  "")
-            labels     = list(getattr(obj, "labels",  []) or [])
-            confidence = getattr(obj, "confidence", None)
+            pattern    = getattr(obj, "pattern", "")
             first_seen = getattr(obj, "valid_from", None) or getattr(obj, "created", None)
             last_seen  = getattr(obj, "modified", None)
+            # STIX 2.1 uses labels; 2.0 uses indicator_types — take whichever is populated.
+            raw_labels = list(getattr(obj, "labels", None) or getattr(obj, "indicator_types", None) or [])
+            # confidence is a native STIX integer (0-100); absent in 2.0.
+            confidence = getattr(obj, "confidence", None)
+            if confidence is not None:
+                try:
+                    confidence = int(confidence)
+                except (TypeError, ValueError):
+                    confidence = None
         else:
             pattern    = o.get("pattern", "")
-            labels     = list(o.get("labels") or [])
-            confidence = o.get("confidence")
             first_seen = o.get("valid_from") or o.get("created")
             last_seen  = o.get("modified")
+            raw_labels = list(o.get("labels") or o.get("indicator_types") or [])
+            raw_conf   = o.get("confidence")
+            try:
+                confidence = int(raw_conf) if raw_conf is not None else None
+            except (TypeError, ValueError):
+                confidence = None
+
+        labels = [str(l) for l in raw_labels if l]
 
         for ioc_type, ioc_value in _parse_pattern(pattern):
             out.append({

@@ -61,8 +61,8 @@
         if (restApiSection)  restApiSection.style.display  = val === "json"  ? "" : "none";
         if (csvSection)      csvSection.style.display      = val === "csv"   ? "" : "none";
         if (taxiiSection)    taxiiSection.style.display    = val === "taxii" ? "" : "none";
-        // Advanced Config is useful for json and csv sources only.
-        if (advancedSection) advancedSection.style.display = (val === "json" || val === "csv") ? "" : "none";
+        // Advanced Config is for JSON sources only (CSV uses the CSV/TSV section).
+        if (advancedSection) advancedSection.style.display = val === "json" ? "" : "none";
 
         updateMethodFields();
     }

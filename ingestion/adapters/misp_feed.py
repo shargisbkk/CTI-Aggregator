@@ -27,8 +27,6 @@ logger = logging.getLogger(__name__)
 
 
 class MispFeedAdapter(FeedAdapter):
-    source_name = ""
-
     def __init__(self, api_key="", since=None, config=None):
         super().__init__(api_key, since, config)
         self.source_name = self.config.get("_source_name", "misp")
@@ -80,6 +78,10 @@ class MispFeedAdapter(FeedAdapter):
         if max_events > 0:
             events = events[:max_events]
 
+        # Maps MISP threat_level_id to a numeric confidence score.
+        # Level 4 (Undefined) is treated as unknown confidence.
+        _THREAT_LEVEL_CONFIDENCE = {1: 80, 2: 60, 3: 40}
+
         # Fetch each event and extract attributes
         indicators = []
         for uuid, ts, meta in events:
@@ -92,15 +94,12 @@ class MispFeedAdapter(FeedAdapter):
             # Handle both {"Event": {...}} and bare event dict
             event = event_data.get("Event", event_data)
 
-            # Extract event info as a label — this carries the actual threat
-            # context (e.g. "Dridex Ransomware", "Turla Backdoor").
-            event_label = (event.get("info") or "").strip()
-            # Strip common "OSINT" / "OSINT -" / "OSINT:" prefixes
-            for prefix in ("OSINT -", "OSINT:", "OSINT"):
-                if event_label.upper().startswith(prefix.upper()):
-                    event_label = event_label[len(prefix):].strip()
-                    break
-            event_label = event_label.lower() if event_label else ""
+            # Event-level labels shared by all attributes in this event.
+            event_labels = [
+                t["name"] for t in event.get("Tag", [])
+                if isinstance(t, dict) and t.get("name")
+            ]
+            confidence = _THREAT_LEVEL_CONFIDENCE.get(event.get("threat_level_id"))
 
             for attr in event.get("Attribute", []):
                 if filter_to_ids and not attr.get("to_ids", False):
@@ -113,32 +112,26 @@ class MispFeedAdapter(FeedAdapter):
                 if "|" in value and "|" in misp_type:
                     parts = value.split("|", 1)
                     type_parts = misp_type.split("|", 1)
-                    # Use the second part (usually the hash) for filename|hash types
                     if "filename" in type_parts[0]:
                         value = parts[1] if len(parts) > 1 else parts[0]
                     else:
                         value = parts[0]
 
-                ioc_type = misp_type
-
-                # Use attribute category as the label (e.g. "network activity",
-                # "payload installation").  Event-level tags are MISP metadata
-                # (tlp:white, type:OSINT) — same on every event, so skip them.
-                labels = []
-                if event_label:
-                    labels.append(event_label)
-                category = (attr.get("category") or "").strip().lower()
-                if category and category not in labels:
-                    labels.append(category)
+                # Attribute-level tags supplement the event-level ones.
+                attr_labels = [
+                    t["name"] for t in attr.get("Tag", [])
+                    if isinstance(t, dict) and t.get("name")
+                ]
+                labels = event_labels + [l for l in attr_labels if l not in event_labels]
 
                 ts = attr.get("timestamp")
                 indicators.append({
-                    "ioc_type": ioc_type,
-                    "ioc_value": value,
-                    "labels": labels,
-                    "confidence": None,
+                    "ioc_type":   misp_type,
+                    "ioc_value":  value,
+                    "labels":     labels,
+                    "confidence": confidence,
                     "first_seen": attr.get("first_seen") or ts,
-                    "last_seen": attr.get("last_seen"),
+                    "last_seen":  attr.get("last_seen"),
                 })
 
         return indicators

@@ -1,29 +1,26 @@
 import logging
 
-import pandas as pd
-
 logger = logging.getLogger(__name__)
 
 
 def dedup(records: list[dict]) -> list[dict]:
     """
-    Deduplicate a batch of parsed IOC dicts.
-
-    Converts timestamps to UTC, sorts by last_seen descending, then drops
-    duplicate (ioc_type, ioc_value) pairs keeping the freshest.
-    Returns a list of dicts ready for upsert_indicators().
+    Deduplicate a batch of parsed IOC dicts by (ioc_type, ioc_value),
+    keeping the record with the most recent last_seen.
     """
-    columns = ["ioc_type", "ioc_value", "confidence", "labels", "first_seen", "last_seen"]
-    df = pd.DataFrame(records, columns=columns)
+    seen: dict[tuple, dict] = {}
+    for r in records:
+        key = (r.get("ioc_type", ""), r.get("ioc_value", ""))
+        existing = seen.get(key)
+        if existing is None:
+            seen[key] = r
+        else:
+            r_ts = r.get("last_seen")
+            e_ts = existing.get("last_seen")
+            if r_ts and (e_ts is None or r_ts > e_ts):
+                seen[key] = r
 
-    for col in ("first_seen", "last_seen"):
-        df[col] = pd.to_datetime(df[col], utc=True, errors="coerce")
-
-    before = len(df)
-    df = df.sort_values("last_seen", ascending=False)
-    df = df.drop_duplicates(subset=["ioc_type", "ioc_value"], keep="first")
-    after = len(df)
-
-    logger.info("dedup: %d -> %d (removed %d duplicates)", before, after, before - after)
-
-    return df.reset_index(drop=True).to_dict("records")
+    before = len(records)
+    result = list(seen.values())
+    logger.info("dedup: %d -> %d (removed %d duplicates)", before, len(result), before - len(result))
+    return result

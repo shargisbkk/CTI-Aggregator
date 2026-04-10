@@ -15,6 +15,7 @@ class IndicatorOfCompromise(models.Model):
     sources      = models.JSONField(default=list, blank=True)
     first_seen   = models.DateTimeField(null=True, blank=True)
     last_seen    = models.DateTimeField(null=True, blank=True)
+    ingested_at  = models.DateTimeField(auto_now=True)
 
     class Meta:
         db_table = "indicators_of_compromise"
@@ -25,9 +26,8 @@ class IndicatorOfCompromise(models.Model):
 
     @property
     def confidence_level(self):
-        """Map numeric confidence to High / Medium / Low."""
         if self.confidence is None:
-            return "Low"
+            return "Unknown"
         for label, display, low, high in self.CONFIDENCE_LEVELS:
             if low <= self.confidence <= high:
                 return display
@@ -72,10 +72,10 @@ class FeedSource(models.Model):
     name         = models.CharField(max_length=64, unique=True)
     adapter_type = models.CharField(max_length=16, choices=ADAPTER_CHOICES, default="json")
     url           = models.CharField(max_length=512, blank=True, default="")
-    api_key       = models.TextField(blank=True, default="")
+    api_key_env   = models.CharField(max_length=64, blank=True, default="")
     auth_header   = models.CharField(max_length=64, blank=True, default="")
     username      = models.CharField(max_length=256, blank=True, default="")
-    password      = models.CharField(max_length=256, blank=True, default="")
+    password_env  = models.CharField(max_length=64, blank=True, default="")
     collection_id = models.CharField(max_length=256, blank=True, default="")
     is_enabled   = models.BooleanField(default=True)
     config       = models.JSONField(blank=True, default=dict)
