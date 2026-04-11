@@ -201,9 +201,12 @@ def update_all_feeds(request):
 
 @login_required
 def ingestion_status(request):
-    """Poll endpoint — returns current ingestion status from cache."""
+    """Poll endpoint — returns current ingestion status and per-source results from cache."""
     from django.core.cache import cache
     status = cache.get("ingestion_status", "idle")
+    if status == "done":
+        results = cache.get("ingestion_results", [])
+        return JsonResponse({"status": "done", "results": results})
     return JsonResponse({"status": status})
 
 

@@ -10,7 +10,7 @@ with the actual indicators.
 Config keys (FeedSource.config):
     url             — base URL of the MISP feed (must end with /)
     timeout         — request timeout in seconds (default 120)
-    days            — only process events modified within this many days (default 30)
+    initial_days    — lookback window on the very first pull (default 180); ignored once last_pulled is set
     filter_to_ids   — only import attributes with to_ids=True (default true)
     max_events      — limit how many events to fetch per run (default 200)
     auth_header     — header name for API key auth, or null (default null)
@@ -24,6 +24,10 @@ from ingestion.adapters.http import request_with_retry
 
 logger = logging.getLogger(__name__)
 
+# Maps MISP threat_level_id to a numeric confidence score.
+# Level 4 (Undefined) is treated as unknown confidence.
+# Keys are ints; coerce before lookup since some MISP deployments serialize as strings.
+_THREAT_LEVEL_CONFIDENCE = {1: 80, 2: 60, 3: 40}
 
 
 class MispFeedAdapter(FeedAdapter):
@@ -44,21 +48,23 @@ class MispFeedAdapter(FeedAdapter):
         return r.json()
 
     def fetch_raw(self) -> list[dict]:
-        base_url = self.config["url"]
-        timeout = self.config.get("timeout", 120)
-        days = self.config.get("days", 30)
+        base_url      = self.config["url"]
+        timeout       = self.config.get("timeout", 120)
+        initial_days  = self.config.get("initial_days")
         filter_to_ids = self.config.get("filter_to_ids", True)
-        max_events = self.config.get("max_events", 200)
+        max_events    = self.config.get("max_events", 200)
 
         headers = self._build_auth_headers()
 
-        # Determine time cutoff
+        # On the first pull, fetch all events unless initial_days is explicitly
+        # set in config (use that to limit a very large feed).
+        # On subsequent pulls, self.since (= last_pulled) is used instead.
         if self.since:
             cutoff_ts = self.since.timestamp()
-        elif days > 0:
-            cutoff_ts = (datetime.now(timezone.utc) - timedelta(days=days)).timestamp()
+        elif initial_days:
+            cutoff_ts = (datetime.now(timezone.utc) - timedelta(days=int(initial_days))).timestamp()
         else:
-            cutoff_ts = 0
+            cutoff_ts = 0  # no restriction — get everything
 
         # Fetch manifest
         try:
@@ -78,10 +84,6 @@ class MispFeedAdapter(FeedAdapter):
         if max_events > 0:
             events = events[:max_events]
 
-        # Maps MISP threat_level_id to a numeric confidence score.
-        # Level 4 (Undefined) is treated as unknown confidence.
-        _THREAT_LEVEL_CONFIDENCE = {1: 80, 2: 60, 3: 40}
-
         # Fetch each event and extract attributes
         indicators = []
         for uuid, ts, meta in events:
@@ -95,11 +97,22 @@ class MispFeedAdapter(FeedAdapter):
             event = event_data.get("Event", event_data)
 
             # Event-level labels shared by all attributes in this event.
-            event_labels = [
-                t["name"] for t in event.get("Tag", [])
-                if isinstance(t, dict) and t.get("name")
-            ]
-            confidence = _THREAT_LEVEL_CONFIDENCE.get(event.get("threat_level_id"))
+            # Use a set to deduplicate tags that appear more than once in the Tag list.
+            seen_event_labels: set[str] = set()
+            event_labels: list[str] = []
+            for t in event.get("Tag", []):
+                name = t.get("name") if isinstance(t, dict) else None
+                if name and name not in seen_event_labels:
+                    seen_event_labels.add(name)
+                    event_labels.append(name)
+
+            # Coerce threat_level_id to int before lookup — some MISP deployments
+            # serialize it as a string (e.g. "1" instead of 1).
+            try:
+                threat_level = int(event.get("threat_level_id"))
+            except (TypeError, ValueError):
+                threat_level = None
+            confidence = _THREAT_LEVEL_CONFIDENCE.get(threat_level)
 
             for attr in event.get("Attribute", []):
                 if filter_to_ids and not attr.get("to_ids", False):
@@ -122,15 +135,16 @@ class MispFeedAdapter(FeedAdapter):
                     t["name"] for t in attr.get("Tag", [])
                     if isinstance(t, dict) and t.get("name")
                 ]
-                labels = event_labels + [l for l in attr_labels if l not in event_labels]
+                labels = event_labels + [l for l in attr_labels if l not in seen_event_labels]
 
-                ts = attr.get("timestamp")
+                # Use attr_ts (not the outer loop's ts) to avoid shadowing.
+                attr_ts = attr.get("timestamp")
                 indicators.append({
                     "ioc_type":   misp_type,
                     "ioc_value":  value,
                     "labels":     labels,
                     "confidence": confidence,
-                    "first_seen": attr.get("first_seen") or ts,
+                    "first_seen": attr.get("first_seen") or attr_ts,
                     "last_seen":  attr.get("last_seen"),
                 })
 

@@ -140,6 +140,7 @@
 
     <div class="card shadow-sm p-3">
 
+        <div class="table-responsive">
         <table class="table table-hover align-middle table-custom">
 
             <!-- Table header -->
@@ -163,7 +164,7 @@
                     <tr>
                         <td><span class="badge bg-secondary">{{ row.ioc_type }}</span></td>
                         <td class="text-break" style="max-width: 300px;">{{ row.ioc_value }}</td>
-                        <td>
+                        <td class="text-center">
                             {% if row.confidence_level == "High" %}
                                 <span class="badge bg-danger">High ({{ row.confidence }})</span>
                             {% elif row.confidence_level == "Medium" %}
@@ -171,15 +172,36 @@
                             {% elif row.confidence_level == "Low" %}
                                 <span class="badge bg-success">Low ({{ row.confidence }})</span>
                             {% else %}
-                                <span class="text-muted">—</span>
+                                <span class="badge bg-secondary">None</span>
                             {% endif %}
                         </td>
-                        <td style="max-width: 220px;">
+                        <td style="max-width: 240px;">
                             {% for label in row.labels %}
-                                <a href="#"
-                                   onclick="appendLabelFilter('{{ label|escapejs }}'); return false;"
-                                   class="badge label-chip text-decoration-none me-1">{{ label }}</a>
+                                {% if forloop.counter <= 4 %}
+                                    <a href="#"
+                                       title="{{ label }}"
+                                       onclick="appendLabelFilter('{{ label|escapejs }}'); return false;"
+                                       class="badge label-chip text-decoration-none me-1 mb-1">{{ label }}</a>
+                                {% endif %}
                             {% endfor %}
+                            {% if row.labels|length > 4 %}
+                                <div class="dropdown d-inline-block mb-1">
+                                    <button type="button"
+                                            class="badge bg-secondary border-0"
+                                            data-bs-toggle="dropdown"
+                                            aria-expanded="false">+{{ row.labels|length|add:"-4" }}</button>
+                                    <ul class="dropdown-menu p-2" style="min-width: auto;">
+                                        {% for label in row.labels|slice:"4:" %}
+                                            <li class="mb-1">
+                                                <a class="badge label-chip text-decoration-none"
+                                                   href="#"
+                                                   title="{{ label }}"
+                                                   onclick="appendLabelFilter('{{ label|escapejs }}'); return false;">{{ label }}</a>
+                                            </li>
+                                        {% endfor %}
+                                    </ul>
+                                </div>
+                            {% endif %}
                         </td>
                         <td style="white-space: nowrap;">{{ row.sources|join:", " }}</td>
                         <td>{{ row.first_seen|date:"M d, Y g:i A" }}</td>
@@ -200,6 +222,7 @@
             </tbody>
 
         </table>
+        </div>
 
 
         <!-- ==============================================
@@ -248,6 +271,7 @@
 </div>
 
 <script>
+
 // Add the typed label to the active filter set and resubmit
 function addLabel() {
     const input = document.getElementById('labelInput');

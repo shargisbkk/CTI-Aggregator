@@ -51,6 +51,10 @@ class FeedSourceForm(forms.ModelForm):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         if self.instance and self.instance.pk:
+            if self.instance.api_key_env:
+                self.fields['api_key_input'].help_text = (
+                    f'Key already set ({self.instance.api_key_env}). Leave blank to keep it.'
+                )
             cfg = self.instance.config or {}
             self.initial["method"]           = cfg.get("method", "GET")
             rb = cfg.get("request_body")

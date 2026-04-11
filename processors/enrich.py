@@ -1,11 +1,10 @@
 """
-Enrichment for indicators already saved to the database.
-
-geo_enrich_batch() — geo-IP lookup via local DB-IP Lite .mmdb.
+Geo enrichment for IP indicators using the local DB-IP Lite city database.
 """
 
 import ipaddress
 import logging
+from pathlib import Path
 
 import geoip2.database
 import geoip2.errors
@@ -14,6 +13,7 @@ from django.conf import settings
 from ingestion.models import GeoEnrichment, IndicatorOfCompromise
 
 logger = logging.getLogger(__name__)
+
 
 def _extract_ip(value: str) -> str | None:
     if "/" in value:
@@ -28,16 +28,11 @@ def _extract_ip(value: str) -> str | None:
 
 
 def geo_enrich_batch(normalized_records: list[dict]) -> int:
-    """
-    Geo-enrich all IP indicators in a normalized batch using the local DB-IP Lite database.
-    Returns the count of IPs successfully enriched.
-    """
     db_path = getattr(settings, "GEOIP_PATH", None)
     if not db_path:
         logger.warning("geo_enrich_batch: GEOIP_PATH not configured — skipping")
         return 0
 
-    from pathlib import Path
     if not Path(str(db_path)).exists():
         logger.warning("geo_enrich_batch: %s not found — run download_geoip first", db_path)
         return 0
@@ -48,9 +43,7 @@ def geo_enrich_batch(normalized_records: list[dict]) -> int:
 
     ioc_map = {
         obj.ioc_value: obj
-        for obj in IndicatorOfCompromise.objects.filter(
-            ioc_type="ip", ioc_value__in=ip_values
-        )
+        for obj in IndicatorOfCompromise.objects.filter(ioc_type="ip", ioc_value__in=ip_values)
     }
 
     count = 0
@@ -83,5 +76,3 @@ def geo_enrich_batch(normalized_records: list[dict]) -> int:
 
     logger.info("geo_enrich_batch: %d/%d IPs enriched", count, len(ip_values))
     return count
-
-

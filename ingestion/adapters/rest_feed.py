@@ -10,15 +10,45 @@ Config keys (all optional — auto-detected if absent):
     request_body     — JSON body for POST requests
     since_param      — query param name for incremental pulls
     since_format     — strftime format for since value
-    initial_days     — lookback on first pull (default 180)
+    initial_days     — lookback window on first pull; if absent, no since param is sent and the feed returns everything
     expand_path      — sub-array field within each parent record (e.g. OTX pulse → indicators)
 """
 
+import ipaddress
 import logging
+import re
 from datetime import datetime, timedelta, timezone as dt_timezone
 
-from ingestion.adapters.base import FeedAdapter, _ioc_score
+from ingestion.adapters.base import FeedAdapter
 from ingestion.adapters.http import request_with_retry
+
+
+def _ioc_score(v: str) -> int:
+    """Score how IOC-like a string is. Used by auto-detection when ioc_value_field is not configured."""
+    if not isinstance(v, str):
+        return 0
+    v = v.strip()
+    try:
+        candidate = v.rsplit(":", 1)[0] if v.count(":") == 1 else v
+        ipaddress.ip_address(candidate)
+        return 1
+    except ValueError:
+        pass
+    if v.startswith(("http://", "https://", "ftp://")):
+        return 1
+    if re.match(r'^[^@\s]+@[^@\s]+\.[^@\s]+$', v):
+        return 1
+    if re.match(r'^CVE-\d{4}-\d+$', v, re.I):
+        return 1
+    if re.match(r'^[0-9a-f]{64}$', v, re.I):
+        return 3  # sha256
+    if re.match(r'^[0-9a-f]{40}$', v, re.I):
+        return 2  # sha1
+    if re.match(r'^[0-9a-f]{32}$', v, re.I):
+        return 1  # md5
+    if re.match(r'^(?:[a-z0-9](?:[a-z0-9\-]{0,61}[a-z0-9])?\.)+[a-z]{2,}$', v, re.I):
+        return 1
+    return 0
 
 logger = logging.getLogger(__name__)
 
@@ -159,11 +189,14 @@ class RestFeedAdapter(FeedAdapter):
         base_params = {}
         since_param  = self.config.get("since_param")
         since_format = self.config.get("since_format", "%Y-%m-%dT%H:%M:%S")
-        initial_days = self.config.get("initial_days", 180)
+        initial_days = self.config.get("initial_days")
         if since_param and method != "POST":
             if self.since:
                 base_params[since_param] = self.since.strftime(since_format)
             elif initial_days:
+                # initial_days must be set explicitly in config — no default.
+                # On first pull without it, no since param is sent and the feed
+                # returns everything. OTX sets this to 180 (6 months) due to data volume.
                 cutoff = datetime.now(dt_timezone.utc) - timedelta(days=int(initial_days))
                 base_params[since_param] = cutoff.strftime(since_format)
 

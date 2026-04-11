@@ -23,7 +23,7 @@ SOURCES = [
             "ioc_value_field":     "indicator",
             "ioc_type_field":      "type",
             "first_seen_field":    "created",
-            "parent_label_fields": ["name", "adversary", "tags", "malware_families"],
+            "parent_label_fields": ["adversary", "tags", "malware_families"],
         },
     },
 
@@ -40,7 +40,7 @@ SOURCES = [
         "is_enabled":   False,
         "config": {
             "method":           "POST",
-            "request_body":     {"query": "get_iocs", "days": 1},
+            "request_body":     {"query": "get_iocs", "days": 7},
             "data_path":        "data",
             "ioc_value_field":  "ioc",
             "ioc_type_field":   "ioc_type",

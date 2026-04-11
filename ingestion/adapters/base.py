@@ -3,9 +3,7 @@ Base adapter interface. All feed adapters extend FeedAdapter and implement fetch
 Adding a new transport type means adding a new subclass, not changing existing code.
 """
 
-import ipaddress
 import logging
-import re
 from abc import ABC, abstractmethod
 from datetime import datetime
 from typing import Optional
@@ -13,35 +11,6 @@ from typing import Optional
 from processors.normalize import normalize_one
 
 logger = logging.getLogger(__name__)
-
-
-def _ioc_score(v: str) -> int:
-    """Score how IOC-like a string is. Higher scores win ties: sha256 (3) > sha1 (2) > all others (1)."""
-    if not isinstance(v, str):
-        return 0
-    v = v.strip()
-    try:
-        # Strip port before checking — ip:port format (single colon only; IPv6 has multiple)
-        candidate = v.rsplit(":", 1)[0] if v.count(":") == 1 else v
-        ipaddress.ip_address(candidate)
-        return 1
-    except ValueError:
-        pass
-    if v.startswith(("http://", "https://", "ftp://")):
-        return 1
-    if re.match(r'^[^@\s]+@[^@\s]+\.[^@\s]+$', v):
-        return 1
-    if re.match(r'^CVE-\d{4}-\d+$', v, re.I):
-        return 1
-    if re.match(r'^[0-9a-f]{64}$', v, re.I):
-        return 3  # sha256
-    if re.match(r'^[0-9a-f]{40}$', v, re.I):
-        return 2  # sha1
-    if re.match(r'^[0-9a-f]{32}$', v, re.I):
-        return 1  # md5
-    if re.match(r'^(?:[a-z0-9](?:[a-z0-9\-]{0,61}[a-z0-9])?\.)+[a-z]{2,}$', v, re.I):
-        return 1
-    return 0
 
 
 class FeedAdapter(ABC):

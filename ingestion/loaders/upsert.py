@@ -1,5 +1,6 @@
 import json
 import logging
+from datetime import datetime, timezone
 
 from django.db import connection
 
@@ -16,7 +17,7 @@ UPSERT_SQL = """
     ON CONFLICT (ioc_type, ioc_value) DO UPDATE SET
         first_seen  = LEAST(indicators_of_compromise.first_seen, EXCLUDED.first_seen),
         last_seen   = GREATEST(indicators_of_compromise.last_seen, EXCLUDED.last_seen),
-        -- GREATEST treats NULL as "no value" so enrichment-set confidence is never overwritten by a feed's NULL.
+        -- GREATEST ignores NULL, so a feed that omits confidence won't overwrite an enrichment-set value
         confidence  = GREATEST(indicators_of_compromise.confidence, EXCLUDED.confidence),
         ingested_at = NOW(),
         sources = COALESCE((
@@ -36,12 +37,15 @@ UPSERT_SQL = """
 """
 
 
-def _clean_ts(value):
+def _ensure_aware(value) -> datetime | None:
+    # timestamps are already parsed by normalize_one() — this just guarantees tz-awareness
     if value is None:
         return None
     if hasattr(value, "to_pydatetime"):
-        return value.to_pydatetime()
-    return value
+        value = value.to_pydatetime()
+    if not isinstance(value, datetime):
+        return None
+    return value if value.tzinfo else value.replace(tzinfo=timezone.utc)
 
 
 def _clean_conf(value):
@@ -53,12 +57,15 @@ def _clean_conf(value):
         return None
 
 
-def _clean_list(value):
-    if value is None:
+MAX_LABEL_LEN = 60
+
+def _truncate_labels(value) -> list:
+    # normalization (lowercase, dedup) is done upstream — this is a final length cap before the DB
+    if not value:
         return []
-    if isinstance(value, (list, tuple, set)):
-        return list(value)
-    return [str(value)]
+    if not isinstance(value, (list, tuple, set)):
+        value = [str(value)]
+    return [str(l)[:MAX_LABEL_LEN] for l in value if l]
 
 
 def _upsert_batch(rows: list[tuple]) -> None:
@@ -87,10 +94,10 @@ def upsert_indicators(normalized_records: list[dict], source_name: str = "") -> 
             r["ioc_type"],
             r["ioc_value"],
             _clean_conf(r.get("confidence")),
-            json.dumps(_clean_list(r.get("labels"))),
+            json.dumps(_truncate_labels(r.get("labels"))),
             json.dumps([source_name] if source_name else []),
-            _clean_ts(r.get("first_seen")),
-            _clean_ts(r.get("last_seen")),
+            _ensure_aware(r.get("first_seen")),
+            _ensure_aware(r.get("last_seen")),
         ))
         if len(batch) >= BATCH_SIZE:
             _upsert_batch(batch)

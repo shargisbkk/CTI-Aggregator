@@ -197,7 +197,22 @@ function pollIngestionStatus() {
                     updateBtn.disabled = false;
                     buttonText.textContent = 'Update All Feeds';
                     loadingSpinner.style.display = 'none';
-                    alert('Database updated successfully!');
+
+                    // Build per-source summary from results returned by the status endpoint
+                    var lines = [];
+                    var total = 0;
+                    (data.results || []).forEach(function(r) {
+                        if (r.error) {
+                            lines.push('\u2717 ' + r.name + ': error \u2014 ' + r.error);
+                        } else {
+                            lines.push('\u2713 ' + r.name + ': ' + r.added.toLocaleString() + ' new indicators');
+                            total += r.added;
+                        }
+                    });
+                    var summary = lines.length
+                        ? lines.join('\n') + '\n\nTotal: ' + total.toLocaleString() + ' new indicators'
+                        : 'Done \u2014 no results to show.';
+                    alert(summary);
                     location.reload();
                 } else if (data.status === 'error') {
                     clearInterval(interval);

@@ -1,6 +1,7 @@
 import os
 import traceback
 
+from django.core.cache import cache
 from django.core.management.base import BaseCommand
 from django.utils import timezone
 
@@ -22,12 +23,14 @@ class Command(BaseCommand):
             return
 
         total = 0
+        results = []   # per-source summary stored in cache for the UI
         for source in sources:
             adapter_class = get_adapter_class(source.adapter_type)
             if not adapter_class:
                 self.stderr.write(self.style.ERROR(
                     f"  {source.name}: unknown adapter_type '{source.adapter_type}' — skipping"
                 ))
+                results.append({"name": source.name, "added": 0, "error": "unknown adapter type"})
                 continue
 
             since = source.last_pulled
@@ -55,10 +58,12 @@ class Command(BaseCommand):
                     self.stdout.write(self.style.WARNING(
                         f"  {source.name}: fetch failed (check logs) — will retry from same point"
                     ))
+                    results.append({"name": source.name, "added": 0, "error": "fetch failed"})
                     continue
 
                 if not iocs:
                     self.stdout.write(f"  {source.name}: no new indicators")
+                    results.append({"name": source.name, "added": 0, "error": None})
                     continue
 
                 deduped   = dedup(iocs)
@@ -75,12 +80,16 @@ class Command(BaseCommand):
                     f"({len(iocs)} raw, {len(deduped)} after dedup, "
                     f"{geo_count} geo-enriched)"
                 )
+                results.append({"name": source.name, "added": count, "error": None})
 
             except RuntimeError as e:
                 self.stdout.write(self.style.WARNING(f"  {source.name} skipped: {e}"))
+                results.append({"name": source.name, "added": 0, "error": str(e)[:120]})
             except Exception as e:
                 self.stderr.write(self.style.ERROR(
                     f"  {source.name} failed: {e}\n{traceback.format_exc()}"
                 ))
+                results.append({"name": source.name, "added": 0, "error": str(e)[:120]})
 
+        cache.set("ingestion_results", results, timeout=300)
         self.stdout.write(self.style.SUCCESS(f"\nDone. {total} total new indicators saved."))
