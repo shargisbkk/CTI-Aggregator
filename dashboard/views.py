@@ -94,7 +94,10 @@ def indicators(request):
     elif conf == "low":
         query = query.filter(Q(confidence__lt=50) | Q(confidence__isnull=True))
 
-    query = query.order_by("-last_seen")
+    #sort by most recently ingested so new indicators always appear at the top.
+    #last_seen is null for some feeds (Emerging Threats has no timestamps) which
+    #would sort those rows to the top under PostgreSQL default NULL ordering.
+    query = query.order_by("-ingested_at")
 
     paginator = Paginator(query, 50)
     page_obj = paginator.get_page(request.GET.get("page"))
