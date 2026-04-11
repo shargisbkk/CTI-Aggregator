@@ -37,7 +37,7 @@ class Command(BaseCommand):
         cutoff = timezone.now() - timedelta(days=days)
 
         # Purge if last_seen is old, OR if last_seen is null but first_seen is old.
-        # Indicators with both dates null have no timestamp basis — leave those alone.
+        # Indicators with both dates null have no timestamp basis, so leave those alone.
         to_delete = IndicatorOfCompromise.objects.filter(
             Q(last_seen__isnull=False, last_seen__lt=cutoff) |
             Q(last_seen__isnull=True,  first_seen__isnull=False, first_seen__lt=cutoff)

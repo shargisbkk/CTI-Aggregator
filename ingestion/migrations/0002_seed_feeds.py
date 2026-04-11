@@ -3,7 +3,7 @@ from django.db import migrations
 
 SOURCES = [
     # ------------------------------------------------------------------
-    # AlienVault OTX — REST/JSON, requires ALIENVAULT_OTX_API_KEY env var
+    # AlienVault OTX (REST/JSON, requires ALIENVAULT_OTX_API_KEY env var)
     # Disabled by default; enable once key is in .env
     # ------------------------------------------------------------------
     {
@@ -28,7 +28,7 @@ SOURCES = [
     },
 
     # ------------------------------------------------------------------
-    # ThreatFox — REST/JSON POST, requires THREATFOX_API_KEY env var
+    # ThreatFox (REST/JSON POST, requires THREATFOX_API_KEY env var)
     # Disabled by default; enable once key is in .env
     # ------------------------------------------------------------------
     {
@@ -50,7 +50,7 @@ SOURCES = [
     },
 
     # ------------------------------------------------------------------
-    # URLhaus — CSV bulk export, no auth required
+    # URLhaus (CSV bulk export, no auth required)
     # Header row is commented out (#), so integer column indices are used
     # Columns: 0=id, 1=dateadded, 2=url, 3=url_status, 4=last_online,
     #          5=threat, 6=tags, 7=urlhaus_link, 8=reporter
@@ -71,7 +71,7 @@ SOURCES = [
     },
 
     # ------------------------------------------------------------------
-    # Emerging Threats — plain text IP list, no auth required
+    # Emerging Threats (plain text IP list, no auth required)
     # One IP per line, # comments stripped automatically
     # ------------------------------------------------------------------
     {
@@ -85,7 +85,7 @@ SOURCES = [
     },
 
     # ------------------------------------------------------------------
-    # Feodo Tracker — CSV blocklist of active botnet C2 IPs, no auth
+    # Feodo Tracker (CSV blocklist of active botnet C2 IPs, no auth)
     # Columns: first_seen_utc, dst_ip, dst_port, c2_status,
     #          last_online, malware
     # ------------------------------------------------------------------

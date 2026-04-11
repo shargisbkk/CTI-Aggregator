@@ -24,11 +24,11 @@ class FeedSourceForm(forms.ModelForm):
     )
     auth_header = forms.CharField(required=False, widget=forms.TextInput())
 
-    # REST API — visible
+    # REST API (visible)
     method       = forms.ChoiceField(choices=[("GET", "GET"), ("POST", "POST")], required=False)
     request_body = forms.CharField(required=False, widget=forms.Textarea(attrs={"rows": 4}))
 
-    # CSV — visible
+    # CSV (visible)
     delimiter = forms.ChoiceField(
         choices=[(",", "Comma (,)"), ("\t", "Tab"), ("|", "Pipe (|)"), (";", "Semicolon (;)")],
         required=False,
@@ -37,7 +37,7 @@ class FeedSourceForm(forms.ModelForm):
     ioc_type_column  = forms.CharField(required=False, widget=forms.TextInput())
     ioc_type         = forms.CharField(required=False, widget=forms.TextInput())
 
-    # Advanced Config — collapsed, JSON-only overrides
+    # Advanced Config (collapsed, JSON-only overrides)
     data_path        = forms.CharField(required=False, widget=forms.TextInput())
     ioc_value_field  = forms.CharField(required=False, widget=forms.TextInput())
     ioc_type_field   = forms.CharField(required=False, widget=forms.TextInput())
@@ -118,7 +118,7 @@ class FeedSourceForm(forms.ModelForm):
                 else:
                     cfg.pop(key, None)
 
-        # Advanced Config — JSON-only overrides
+        # Advanced Config (JSON-only overrides)
         for key in ("data_path", "ioc_value_field", "ioc_type_field",
                     "first_seen_field", "last_seen_field"):
             val = self.cleaned_data.get(key, "").strip()
@@ -132,7 +132,7 @@ class FeedSourceForm(forms.ModelForm):
         feed_name = self.cleaned_data.get("name", "").strip() or (instance.name if instance.pk else "")
         env_path  = str(settings.BASE_DIR / ".env")
 
-        # Write API key to .env if provided — never stored in DB.
+        # Write API key to .env if provided; never stored in DB.
         key_value = self.cleaned_data.get("api_key_input", "").strip()
         if key_value and feed_name:
             env_var  = re.sub(r"[^a-zA-Z0-9]", "_", feed_name).upper().strip("_") + "_API_KEY"
@@ -140,7 +140,7 @@ class FeedSourceForm(forms.ModelForm):
             load_dotenv(env_path, override=True)
             instance.api_key_env = env_var
 
-        # Write TAXII password to .env if provided — never stored in DB.
+        # Write TAXII password to .env if provided; never stored in DB.
         pw_value = self.cleaned_data.get("password_input", "").strip()
         if pw_value and feed_name:
             env_var = re.sub(r"[^a-zA-Z0-9]", "_", feed_name).upper().strip("_") + "_TAXII_PASSWORD"

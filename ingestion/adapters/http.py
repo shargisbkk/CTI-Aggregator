@@ -27,7 +27,7 @@ def request_with_retry(method, url, *, max_tries=5, **kwargs):
             if 200 <= r.status_code < 300:
                 return r
 
-            # rate limited — use Retry-After if provided
+            # rate limited; use Retry-After if provided
             if r.status_code == 429:
                 if attempt >= max_tries:
                     r.raise_for_status()
@@ -43,7 +43,7 @@ def request_with_retry(method, url, *, max_tries=5, **kwargs):
                 delay = min(delay * 2, 120.0)
                 continue
 
-            # server error — retry if attempts left
+            # server error; retry if attempts left
             if r.status_code in RETRYABLE_STATUS_CODES and attempt < max_tries:
                 wait = delay + random.uniform(0, 0.5)
                 logger.warning("Server error %d, retrying in %.1fs (attempt %d/%d)",
@@ -52,11 +52,11 @@ def request_with_retry(method, url, *, max_tries=5, **kwargs):
                 delay = min(delay * 2, 120.0)
                 continue
 
-            # non-retryable (4xx etc.) — raise now
+            # non-retryable (4xx etc.), raise now
             r.raise_for_status()
 
         except requests.HTTPError:
-            # HTTPError from raise_for_status — don't retry
+            # HTTPError from raise_for_status, don't retry
             raise
         except requests.RequestException:
             if attempt >= max_tries:

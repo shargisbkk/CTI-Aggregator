@@ -17,7 +17,7 @@ def dedup(records: list[dict]) -> list[dict]:
         if existing is None:
             seen[key] = r
         else:
-            # Always merge labels — the DB upsert can only merge incoming vs stored,
+            # Always merge labels; the DB upsert can only merge incoming vs stored,
             # not two rows that dedup collapses into one before they reach the DB.
             merged_labels = list(dict.fromkeys(
                 (existing.get("labels") or []) + (r.get("labels") or [])

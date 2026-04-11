@@ -194,9 +194,7 @@ class RestFeedAdapter(FeedAdapter):
             if self.since:
                 base_params[since_param] = self.since.strftime(since_format)
             elif initial_days:
-                # initial_days must be set explicitly in config — no default.
-                # On first pull without it, no since param is sent and the feed
-                # returns everything. OTX sets this to 180 (6 months) due to data volume.
+                # No last_pulled yet; use initial_days to cap how far back the first pull goes.
                 cutoff = datetime.now(dt_timezone.utc) - timedelta(days=int(initial_days))
                 base_params[since_param] = cutoff.strftime(since_format)
 

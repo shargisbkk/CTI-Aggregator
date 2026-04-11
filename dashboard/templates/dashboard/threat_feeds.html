@@ -130,10 +130,51 @@
 
 </div>
 
-<!-- JavaScript for Update All Feeds button
-    handles the click event for the "Update All Feeds" button,
-    sends an AJAX request to trigger the update,
-    and provides user feedback during the process. -->
+<!-- Ingestion results modal -->
+<div class="modal fade" id="ingestionResultsModal" tabindex="-1" aria-labelledby="ingestionResultsLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="ingestionResultsLabel">
+                    <i class="fas fa-sync-alt me-2"></i>Ingestion Complete
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body" id="ingestionResultsBody"></div>
+            <div class="modal-footer" id="ingestionResultsFooter">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+    .dark-mode .modal-content {
+        background-color: var(--clr-dark-surface-tonal-a10);
+        color: var(--clr-light-a0);
+        border-color: var(--clr-dark-surface-a30);
+    }
+    .dark-mode .modal-header,
+    .dark-mode .modal-footer {
+        border-color: var(--clr-dark-surface-a30);
+    }
+    .dark-mode .modal-header .btn-close {
+        filter: invert(1);
+    }
+    .ingestion-result-row {
+        display: flex;
+        align-items: center;
+        padding: 8px 0;
+        border-bottom: 1px solid var(--clr-light-surface-a20);
+    }
+    .dark-mode .ingestion-result-row {
+        border-color: var(--clr-dark-surface-tonal-a20);
+    }
+    .ingestion-result-row:last-child {
+        border-bottom: none;
+    }
+</style>
+
 <script>
 document.addEventListener('DOMContentLoaded', function() {
     const updateBtn = document.getElementById('updateAllFeedsBtn');
@@ -165,12 +206,10 @@ document.addEventListener('DOMContentLoaded', function() {
         })
         .then(response => response.json())
         .then(data => {
-
             if (data.status === 'started') {
-                alert('Ingestion started in background. Check logs for progress.');
                 pollIngestionStatus();
             } else {
-                alert('Failed to start ingestion: ' + data.message);
+                showIngestionError('Failed to start ingestion: ' + data.message);
                 updateBtn.disabled = false;
                 buttonText.textContent = 'Update All Feeds';
                 loadingSpinner.style.display = 'none';
@@ -178,7 +217,7 @@ document.addEventListener('DOMContentLoaded', function() {
         })
         .catch(error => {
             console.error('Error:', error);
-            alert('An error occurred while updating the database.');
+            showIngestionError('An error occurred while contacting the server.');
             updateBtn.disabled = false;
             buttonText.textContent = 'Update All Feeds';
             loadingSpinner.style.display = 'none';
@@ -186,7 +225,7 @@ document.addEventListener('DOMContentLoaded', function() {
     });
 });
 
-// Poll the server every 4 seconds until ingestion finishes, then notify and reload.
+// Poll the server every 4 seconds until ingestion finishes, then show results modal.
 function pollIngestionStatus() {
     const interval = setInterval(() => {
         fetch('{% url "dashboard:dashboard-ingestion-status" %}')
@@ -194,36 +233,73 @@ function pollIngestionStatus() {
             .then(data => {
                 if (data.status === 'done') {
                     clearInterval(interval);
-                    updateBtn.disabled = false;
-                    buttonText.textContent = 'Update All Feeds';
-                    loadingSpinner.style.display = 'none';
-
-                    // Build per-source summary from results returned by the status endpoint
-                    var lines = [];
-                    var total = 0;
-                    (data.results || []).forEach(function(r) {
-                        if (r.error) {
-                            lines.push('\u2717 ' + r.name + ': error \u2014 ' + r.error);
-                        } else {
-                            lines.push('\u2713 ' + r.name + ': ' + r.added.toLocaleString() + ' new indicators');
-                            total += r.added;
-                        }
-                    });
-                    var summary = lines.length
-                        ? lines.join('\n') + '\n\nTotal: ' + total.toLocaleString() + ' new indicators'
-                        : 'Done \u2014 no results to show.';
-                    alert(summary);
-                    location.reload();
+                    document.getElementById('updateAllFeedsBtn').disabled = false;
+                    document.getElementById('buttonText').textContent = 'Update All Feeds';
+                    document.getElementById('loadingSpinner').style.display = 'none';
+                    showIngestionResults(data.results || []);
                 } else if (data.status === 'error') {
                     clearInterval(interval);
-                    updateBtn.disabled = false;
-                    buttonText.textContent = 'Update All Feeds';
-                    loadingSpinner.style.display = 'none';
-                    alert('An error occurred while updating the database.');
+                    document.getElementById('updateAllFeedsBtn').disabled = false;
+                    document.getElementById('buttonText').textContent = 'Update All Feeds';
+                    document.getElementById('loadingSpinner').style.display = 'none';
+                    showIngestionError('Ingestion failed. Check the server logs for details.');
                 }
             })
             .catch(() => clearInterval(interval));
     }, 4000);
+}
+
+// Populate and show the results modal with per-source rows.
+function showIngestionResults(results) {
+    let bodyHtml = '';
+    let total = 0;
+
+    results.forEach(r => {
+        if (r.error) {
+            bodyHtml += `
+                <div class="ingestion-result-row">
+                    <i class="fas fa-times-circle me-2" style="color: var(--clr-light-danger-a10); font-size: 1.1rem;"></i>
+                    <span class="fw-semibold">${r.name}</span>
+                    <span class="ms-auto text-muted small">${r.error}</span>
+                </div>`;
+        } else {
+            total += r.added;
+            bodyHtml += `
+                <div class="ingestion-result-row">
+                    <i class="fas fa-check-circle me-2" style="color: var(--clr-light-success-a10); font-size: 1.1rem;"></i>
+                    <span class="fw-semibold">${r.name}</span>
+                    <span class="ms-auto">
+                        <span class="badge" style="background-color: var(--clr-light-success-a0); color: #fff;">
+                            +${r.added.toLocaleString()} new
+                        </span>
+                    </span>
+                </div>`;
+        }
+    });
+
+    document.getElementById('ingestionResultsBody').innerHTML =
+        bodyHtml || '<p class="text-muted mb-0">No results returned.</p>';
+
+    document.getElementById('ingestionResultsFooter').innerHTML = `
+        <span class="me-auto fw-semibold">Total: ${total.toLocaleString()} new indicators</span>
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+    `;
+
+    const modalEl = document.getElementById('ingestionResultsModal');
+    modalEl.addEventListener('hidden.bs.modal', () => location.reload(), { once: true });
+    new bootstrap.Modal(modalEl).show();
+}
+
+// Show a simple error message in the modal.
+function showIngestionError(message) {
+    document.getElementById('ingestionResultsBody').innerHTML = `
+        <div class="d-flex align-items-center">
+            <i class="fas fa-exclamation-triangle me-2" style="color: var(--clr-light-danger-a10); font-size: 1.1rem;"></i>
+            <span>${message}</span>
+        </div>`;
+    document.getElementById('ingestionResultsFooter').innerHTML =
+        '<button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>';
+    new bootstrap.Modal(document.getElementById('ingestionResultsModal')).show();
 }
 
 // Helper function to get CSRF token from cookies

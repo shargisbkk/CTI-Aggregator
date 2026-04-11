@@ -38,7 +38,7 @@ UPSERT_SQL = """
 
 
 def _ensure_aware(value) -> datetime | None:
-    # timestamps are already parsed by normalize_one() — this just guarantees tz-awareness
+    # timestamps are already parsed by normalize_one(); this just guarantees tz-awareness
     if value is None:
         return None
     if hasattr(value, "to_pydatetime"):
@@ -60,7 +60,7 @@ def _clean_conf(value):
 MAX_LABEL_LEN = 60
 
 def _truncate_labels(value) -> list:
-    # normalization (lowercase, dedup) is done upstream — this is a final length cap before the DB
+    # normalization (lowercase, dedup) is done upstream; this is a final length cap before the DB
     if not value:
         return []
     if not isinstance(value, (list, tuple, set)):

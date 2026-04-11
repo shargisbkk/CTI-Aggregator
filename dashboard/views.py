@@ -61,7 +61,7 @@ def home(request):
 def indicators(request):
     query = IndicatorOfCompromise.objects.all()
 
-    # Search — matches on value, type, or labels
+    # Search matches on value, type, or labels
     q = request.GET.get("q", "").strip()
     if q:
         query = query.filter(
@@ -80,7 +80,7 @@ def indicators(request):
     if source_filter:
         query = query.filter(sources__contains=[source_filter])
 
-    # Label filter — multiple values, AND logic (each label must be present)
+    # Label filter with multiple values using AND logic (each label must be present)
     label_filters = [l.strip() for l in request.GET.getlist("label") if l.strip()]
     for lf in label_filters:
         query = query.filter(labels__contains=[lf])
@@ -201,7 +201,7 @@ def update_all_feeds(request):
 
 @login_required
 def ingestion_status(request):
-    """Poll endpoint — returns current ingestion status and per-source results from cache."""
+    """Poll endpoint that returns current ingestion status and per-source results from cache."""
     from django.core.cache import cache
     status = cache.get("ingestion_status", "idle")
     if status == "done":

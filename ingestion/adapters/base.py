@@ -62,5 +62,18 @@ class FeedAdapter(ABC):
 
     @abstractmethod
     def fetch_raw(self) -> list[dict]:
-        """Fetch from the source and return raw indicator dicts."""
+        """
+        Fetch from the source and return raw indicator dicts.
+
+        Each dict must follow this schema (normalize_one() handles the rest):
+            ioc_type  (str)            raw type string; mapped via type_map.json
+            ioc_value (str)            the indicator value
+            labels    (list[str])      optional tags/categories
+            confidence (int|None)      optional 0-100 score
+            first_seen (str|datetime|int|None)  optional; any parseable timestamp
+            last_seen  (str|datetime|int|None)  optional; any parseable timestamp
+
+        Unknown ioc_type values fall back to value-based inference (_classify_value).
+        Records with no resolvable type are silently dropped by normalize_one().
+        """
         ...

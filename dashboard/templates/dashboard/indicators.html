@@ -19,7 +19,7 @@
          Title and future action buttons
     =================================================== -->
 
-    <div class="d-flex justify-content-between align-items-center mb-4">
+    <div class="text-center mb-4">
         <h2 class="fw-bold">Indicators</h2>
     </div>
 
@@ -141,18 +141,29 @@
     <div class="card shadow-sm p-3">
 
         <div class="table-responsive">
-        <table class="table table-hover align-middle table-custom">
+        <table class="table table-hover align-middle table-custom" style="table-layout: fixed; width: 100%;">
+
+            <!-- All percentages so columns scale consistently with the viewport -->
+            <colgroup>
+                <col style="width: 6%;">
+                <col style="width: 28%;">
+                <col style="width: 9%;">
+                <col style="width: 22%;">
+                <col style="width: 11%;">
+                <col style="width: 12%;">
+                <col style="width: 12%;">
+            </colgroup>
 
             <!-- Table header -->
             <thead>
                 <tr>
                     <th>Type</th>
                     <th>Value</th>
-                    <th>Confidence</th>
+                    <th class="text-center">Confidence</th>
                     <th>Labels</th>
                     <th>Source</th>
-                    <th>First Seen</th>
-                    <th>Last Seen</th>
+                    <th class="text-center">First Seen</th>
+                    <th class="text-center">Last Seen</th>
                 </tr>
             </thead>
 
@@ -162,8 +173,13 @@
                 {% for row in page_obj %}
 
                     <tr>
-                        <td><span class="badge bg-secondary">{{ row.ioc_type }}</span></td>
-                        <td class="text-break" style="max-width: 300px;">{{ row.ioc_value }}</td>
+                        <td>
+                            <a href="#"
+                               onclick="setTypeFilter('{{ row.ioc_type|escapejs }}'); return false;"
+                               class="badge bg-secondary text-decoration-none"
+                               title="Filter by {{ row.ioc_type }}">{{ row.ioc_type }}</a>
+                        </td>
+                        <td style="overflow-wrap: break-word; word-break: break-all;">{{ row.ioc_value }}</td>
                         <td class="text-center">
                             {% if row.confidence_level == "High" %}
                                 <span class="badge bg-danger">High ({{ row.confidence }})</span>
@@ -175,13 +191,14 @@
                                 <span class="badge bg-secondary">None</span>
                             {% endif %}
                         </td>
-                        <td style="max-width: 240px;">
+                        <td>
                             {% for label in row.labels %}
                                 {% if forloop.counter <= 4 %}
                                     <a href="#"
                                        title="{{ label }}"
                                        onclick="appendLabelFilter('{{ label|escapejs }}'); return false;"
-                                       class="badge label-chip text-decoration-none me-1 mb-1">{{ label }}</a>
+                                       class="badge label-chip text-decoration-none me-1 mb-1"
+                                       style="max-width: 85px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; display: inline-block; vertical-align: middle;">{{ label }}</a>
                                 {% endif %}
                             {% endfor %}
                             {% if row.labels|length > 4 %}
@@ -203,9 +220,9 @@
                                 </div>
                             {% endif %}
                         </td>
-                        <td style="white-space: nowrap;">{{ row.sources|join:", " }}</td>
-                        <td>{{ row.first_seen|date:"M d, Y g:i A" }}</td>
-                        <td>{{ row.last_seen|date:"M d, Y g:i A" }}</td>
+                        <td>{{ row.sources|join:", " }}</td>
+                        <td class="text-center">{{ row.first_seen|date:"n/j/y" }}<br><small class="text-muted">{{ row.first_seen|date:"g:i A" }}</small></td>
+                        <td class="text-center">{{ row.last_seen|date:"n/j/y" }}<br><small class="text-muted">{{ row.last_seen|date:"g:i A" }}</small></td>
                     </tr>
 
                 {% empty %}
@@ -294,6 +311,14 @@ function appendLabelFilter(label) {
     if (!existing.includes(label)) {
         params.append('label', label);
     }
+    params.delete('page');
+    window.location.search = params.toString();
+}
+
+// Clicking a type badge in the table sets the type filter
+function setTypeFilter(type) {
+    const params = new URLSearchParams(window.location.search);
+    params.set('type', type);
     params.delete('page');
     window.location.search = params.toString();
 }

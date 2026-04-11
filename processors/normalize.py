@@ -77,7 +77,7 @@ def _classify_value(value: str) -> str:
                 return "ip"
             except ValueError:
                 pass
-    # ip:port — single colon only; IPv6 has multiple
+    # ip:port with single colon only; IPv6 has multiple
     candidate = value.rsplit(":", 1)[0] if value.count(":") == 1 else value
     for cls in (ipaddress.IPv4Address, ipaddress.IPv6Address):
         try:
@@ -121,6 +121,15 @@ def _clean_labels(raw_labels: list, ioc_type: str) -> list:
 
 
 def normalize_one(raw: dict) -> Optional[dict]:
+    """
+    Normalize a raw indicator dict from any adapter into the canonical schema.
+
+    Accepts the schema defined in FeedAdapter.fetch_raw():
+        ioc_type, ioc_value, labels, confidence, first_seen, last_seen
+
+    Returns a canonical dict ready for dedup + upsert, or None if the record
+    is unresolvable (empty value, unknown type with no classifiable value, too long).
+    """
     raw_value = str(raw.get("ioc_value") or "").strip()
     if not raw_value:
         return None
@@ -130,7 +139,7 @@ def normalize_one(raw: dict) -> Optional[dict]:
     if not ioc_type:
         return None
 
-    # strip port from ip:port — single colon only, IPv6 has multiple
+    # strip port from ip:port; single colon only since IPv6 has multiple
     if ioc_type == "ip" and raw_value.count(":") == 1:
         raw_value = raw_value.rsplit(":", 1)[0]
 
@@ -140,7 +149,6 @@ def normalize_one(raw: dict) -> Optional[dict]:
         logger.warning("normalize: value too long (%d chars), skipping: %.80s…", len(ioc_value), ioc_value)
         return None
 
-    # hand off to upsert with fully typed, cleaned fields
     return {
         "ioc_type":   ioc_type,
         "ioc_value":  ioc_value,

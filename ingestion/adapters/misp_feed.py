@@ -56,15 +56,14 @@ class MispFeedAdapter(FeedAdapter):
 
         headers = self._build_auth_headers()
 
-        # On the first pull, fetch all events unless initial_days is explicitly
-        # set in config (use that to limit a very large feed).
-        # On subsequent pulls, self.since (= last_pulled) is used instead.
+        # self.since = last_pulled timestamp from DB; None on first run.
+        # initial_days caps how far back to go on that first pull.
         if self.since:
             cutoff_ts = self.since.timestamp()
         elif initial_days:
             cutoff_ts = (datetime.now(timezone.utc) - timedelta(days=int(initial_days))).timestamp()
         else:
-            cutoff_ts = 0  # no restriction — get everything
+            cutoff_ts = 0  # no restriction, get everything
 
         # Fetch manifest
         try:
@@ -96,8 +95,7 @@ class MispFeedAdapter(FeedAdapter):
             # Handle both {"Event": {...}} and bare event dict
             event = event_data.get("Event", event_data)
 
-            # Event-level labels shared by all attributes in this event.
-            # Use a set to deduplicate tags that appear more than once in the Tag list.
+            # Tags on the Event apply to every attribute; deduplicate before merging.
             seen_event_labels: set[str] = set()
             event_labels: list[str] = []
             for t in event.get("Tag", []):
@@ -106,7 +104,7 @@ class MispFeedAdapter(FeedAdapter):
                     seen_event_labels.add(name)
                     event_labels.append(name)
 
-            # Coerce threat_level_id to int before lookup — some MISP deployments
+            # Coerce threat_level_id to int before lookup; some MISP deployments
             # serialize it as a string (e.g. "1" instead of 1).
             try:
                 threat_level = int(event.get("threat_level_id"))
@@ -130,7 +128,7 @@ class MispFeedAdapter(FeedAdapter):
                     else:
                         value = parts[0]
 
-                # Attribute-level tags supplement the event-level ones.
+                # Merge attribute-level tags with event tags, skipping duplicates.
                 attr_labels = [
                     t["name"] for t in attr.get("Tag", [])
                     if isinstance(t, dict) and t.get("name")

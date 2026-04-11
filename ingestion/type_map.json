@@ -73,5 +73,13 @@
 
     "x509-fingerprint-sha1":   "ssl_cert",
     "x509-fingerprint-sha256": "ssl_cert",
-    "x509-fingerprint-md5":    "ssl_cert"
+    "x509-fingerprint-md5":    "ssl_cert",
+
+    "btc":                    "crypto",
+    "btc_address":            "crypto",
+    "bitcoin":                "crypto",
+    "crypto-address":         "crypto",
+    "cryptocurrency-address": "crypto",
+    "xmr":                    "crypto",
+    "monero":                 "crypto"
 }

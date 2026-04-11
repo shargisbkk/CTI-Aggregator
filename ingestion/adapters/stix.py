@@ -14,22 +14,32 @@ logger = logging.getLogger(__name__)
 # Covers: ipv4-addr, domain-name, url, email-addr, network-traffic:dst_ref.value, etc.
 _VALUE_RE = re.compile(r"([\w-]+):(?:[\w.]+\.)?value\s*=\s*'([^']+)'")
 
-# Matches file:hashes.MD5 = 'x' and file:hashes.'SHA-256' = 'x'
-_HASH_RE = re.compile(r"file:hashes(?:\.\w+|\.'[^']+')\s*=\s*'([^']+)'", re.IGNORECASE)
+# Captures the algorithm name and hash value from file:hashes.MD5 = 'x'
+# and file:hashes.'SHA-256' = 'x' (quoted algorithm names).
+# Group 1 = unquoted algo (e.g. MD5), group 2 = quoted algo (e.g. SHA-256), group 3 = value.
+_HASH_RE = re.compile(
+    r"file:hashes\.(?:(\w+)|'([^']+)')\s*=\s*'([^']+)'",
+    re.IGNORECASE,
+)
 
 
 def _parse_pattern(pattern: str) -> list[tuple[str, str]]:
     """
-    Extract (stix_object_type, value) pairs from a STIX pattern string.
+    Extract (ioc_type, value) pairs from a STIX pattern string.
 
     Handles simple patterns, compound AND/OR patterns, reference paths,
     and file hash patterns. Only extracts actual observable values —
     not type hints or property references.
+
+    Hash algorithm names are normalized (lowercase, hyphens stripped) so they
+    match type_map.json keys directly: MD5 -> md5, SHA-256 -> sha256, etc.
     """
     if not pattern:
         return []
     results = [(m.group(1), m.group(2)) for m in _VALUE_RE.finditer(pattern)]
-    results += [("file", m.group(1)) for m in _HASH_RE.finditer(pattern)]
+    for m in _HASH_RE.finditer(pattern):
+        algo = (m.group(1) or m.group(2) or "hash").lower().replace("-", "")
+        results.append((algo, m.group(3)))
     return results
 
 
@@ -50,7 +60,7 @@ def extract_indicators(raw_objects: list[dict]) -> list[dict]:
             pattern    = getattr(obj, "pattern", "")
             first_seen = getattr(obj, "valid_from", None) or getattr(obj, "created", None)
             last_seen  = getattr(obj, "modified", None)
-            # STIX 2.1 uses labels; 2.0 uses indicator_types — take whichever is populated.
+            # STIX 2.1 uses labels; 2.0 uses indicator_types; take whichever is populated.
             raw_labels = list(getattr(obj, "labels", None) or getattr(obj, "indicator_types", None) or [])
             # confidence is a native STIX integer (0-100); absent in 2.0.
             confidence = getattr(obj, "confidence", None)
