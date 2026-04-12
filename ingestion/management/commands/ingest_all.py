@@ -62,6 +62,9 @@ class Command(BaseCommand):
                     continue
 
                 if not iocs:
+                    #still advance last_pulled so the next run fetches forward from now
+                    source.last_pulled = timezone.now()
+                    source.save(update_fields=["last_pulled"])
                     self.stdout.write(f"  {source.name}: no new indicators")
                     results.append({"name": source.name, "added": 0, "error": None})
                     continue
