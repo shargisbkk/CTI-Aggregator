@@ -69,7 +69,7 @@ urlpatterns = [
         name="toggle-theme"
     ),
 
-    # Other Patters (used for passing data into js scripts)
+    # Other Patterns (used for passing data into js scripts)
     path(
         "api/threat-confidence-chart-data/",
         views.threat_confidence_chart_data,

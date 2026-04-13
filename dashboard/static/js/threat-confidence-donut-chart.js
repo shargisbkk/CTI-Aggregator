@@ -1,9 +1,9 @@
 // Global chart variable
 let myChart = null;
+let resizeObserver = null;
 
-// Get the sites dark mode to apply if needed to the chart
-function getEchartsTheme() {
-    return document.body.classList.contains('dark-mode') ? 'dark' : 'light';
+function getChartTextColor() {
+    return document.body.classList.contains('dark-mode') ? '#f0f0f0' : '#1f2937';
 }
 
 // Initialize chart
@@ -18,28 +18,39 @@ function renderThreatConfidenceChart(){
     }
 
     // Initialize chart
-    const theme = getEchartsTheme();
-    myChart = echarts.init(chartDom, theme);
+    myChart = echarts.init(chartDom, null, { backgroundColor: 'transparent' });
+    chartDom.style.backgroundColor = 'transparent';
 
     // Define chart options
     const option = {
+        backgroundColor: 'transparent',
         title: {
             text: 'IOCs by Confidence Level',
-            top: '3%'
+            top: '2%',
+            left: 'center',
+            textStyle: {
+                color: getChartTextColor()
+            }
         },
         tooltip: {
             trigger: 'item'
         },
         legend: {
-            top: '12%',
+            bottom: '5%',
             left: 'center',
+            type: 'scroll',
+            orient: 'horizontal',
+            textStyle: {
+                overflow: 'break',
+                color: getChartTextColor()
+            }
         },
         series: [
             {
                 name: 'IOCs with',
                 type: 'pie',
-                radius: ['40%', '70%'],
-                center: ['50%', '60%'],
+                radius: ['35%', '65%'],
+                center: ['50%', '45%'],
                 avoidLabelOverlap: true,
                 itemStyle: {
                     borderRadius: 10,
@@ -77,10 +88,38 @@ function renderThreatConfidenceChart(){
         .catch(error => {
             console.error('Error fetching chart data for threat confidence: ', error);
         });
+
+    // ResizeObserver to watch container size changes
+    if(resizeObserver) {
+        resizeObserver.disconnect();
+    }
+    resizeObserver = new ResizeObserver(() => {
+        if(myChart && !myChart.isDisposed()){
+            myChart.resize();
+        }
+    });
+    resizeObserver.observe(chartDom);
 }
 
 // Call the function to initialize the chart
 document.addEventListener('DOMContentLoaded', renderThreatConfidenceChart);
+
+// Also handle window resize as fallback
+window.addEventListener('resize', () => {
+    if(myChart && !myChart.isDisposed()){
+        myChart.resize();
+    }
+});
+
+// Clean up on page unload
+window.addEventListener('beforeunload', () => {
+    if(resizeObserver){
+        resizeObserver.disconnect();
+    }
+    if(myChart){
+        myChart.dispose();
+    }
+});
 
 // Make the function globally accessible
 window.renderThreatConfidenceChart = renderThreatConfidenceChart;

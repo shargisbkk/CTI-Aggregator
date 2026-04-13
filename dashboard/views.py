@@ -9,8 +9,12 @@ from django.core.management import call_command
 from django.db import connection
 from urllib.parse import urlencode
 from datetime import timedelta
-from ingestion.models import FeedSource, IndicatorOfCompromise
+from ingestion.models import FeedSource, IndicatorOfCompromise, GeoEnrichment
 from io import StringIO
+import plotly.graph_objects as go
+import plotly.express as px
+import pandas as pd
+import pycountry
 
 # ======================================================
 # DASHBOARD HOME VIEW
@@ -257,8 +261,6 @@ def analytics(request):
                            .count()
     )
 
-    active_feeds = "Not Implemented"
-
     # Unnest the JSONB sources array to count per source name
     with connection.cursor() as cur:
         cur.execute("""
@@ -287,14 +289,96 @@ def analytics(request):
         .order_by("-count")
     )
 
+    top_countries_sources = (
+        GeoEnrichment.objects
+        .values("country")
+        .annotate(count=Count("country"))
+        .order_by("-count")
+    )
+#===========================================================================================================
+    # Create map with these counts too
+    country_rows = list(top_countries_sources)
+    country_df = pd.DataFrame(country_rows)
+    # Sanitation for country names
+    if len(country_rows) > 0:
+        country_df['country'] = country_df['country'].astype(str).str.strip()
+        country_df = country_df[country_df['country'] != '']          # drop blanks
+        country_df['count'] = pd.to_numeric(country_df['count'], errors='coerce').fillna(0).astype(int)
+
+    def name_to_iso3(name):
+        try:
+            return pycountry.countries.lookup(name).alpha_3
+        except Exception:
+            return None
+
+    if country_df.empty:
+        world_map_json = "{}"
+    else:
+        country_df['iso3'] = country_df['country'].apply(name_to_iso3)
+        unmapped = country_df[country_df['iso3'].isna()]['country'].unique().tolist()
+        if unmapped:
+            print('Unmapped country names for choropleth:', unmapped)
+        country_df = country_df.dropna(subset=['iso3'])
+
+        if country_df.empty:
+            world_map_json = "{}"
+        else:
+            country_fig = go.Figure(go.Choropleth(
+                locations=country_df['iso3'].tolist(),  # ISO-3 codes
+                z=country_df['count'].tolist(),
+                text=country_df['country'].tolist(),
+                locationmode='ISO-3',
+                colorscale='Viridis',
+                marker_line_color='white',
+                colorbar_title='Count',
+            ))
+
+            country_fig.update_layout(
+                template='plotly_dark',
+                geo=dict(projection_type='natural earth'),
+                margin=dict(t=30, b=10, l=10, r=10),
+                paper_bgcolor='#26343d',
+                plot_bgcolor='#26343d',
+                font_color='white',
+            )
+            world_map_json = country_fig.to_json()
+    #print("country_df sample:", country_df[['country','iso3','count']].head(20).to_dict(orient='records'))
+
+    # PLOTLY QUERIES
+    # Query for confidence values and their count from iocs
+    conf_query = (
+        IndicatorOfCompromise.objects
+        .values("confidence")
+        .annotate(count=Count("confidence"))
+        .order_by("-confidence")
+    )
+    # Materialize query so when we pull data, Django doesnt run the query again
+    conf_rows = list(conf_query)
+    # Create a labels and values list from the query
+    conf_labels = [str(r["confidence"]) if r["confidence"] is not None else "None" for r in conf_rows]
+    conf_values = [r["count"] for r in conf_rows]
+    # Figure from Plotly Graph Objects import
+    conf_figure = go.Figure(data=[go.Pie(labels=conf_labels, values=conf_values, hole=0.4)])
+    conf_figure.update_layout(
+        template="plotly_dark", 
+        title_text="Threat Confidence by Count", 
+        title_x=0.5,
+        paper_bgcolor="#26343d",
+        plot_bgcolor="#26343d",
+        font_color="white",
+        margin=dict(t=80,b=20,l=20,r=20))
+#===========================================================================================================
+
     context = {
-        "total_indicators":    count_records,
-        "high_confidence":     high_confidence,
-        "last_seen_this_week": last_seen_this_week,
-        "active_feeds":        active_feeds,
-        "top_sources":         top_sources,
-        "multi_source_count":  multi_source_count,
-        "top_ioc_types":       top_ioc_types,
+        "total_indicators":     count_records,
+        "high_confidence":      high_confidence,
+        "last_seen_this_week":  last_seen_this_week,
+        "top_sources":          top_sources,
+        "multi_source_count":   multi_source_count,
+        "top_ioc_types":        top_ioc_types,
+        "top_countries":        top_countries_sources,
+        "threat_conf_fig_json": conf_figure.to_json(),
+        "world_map_json":       world_map_json
     }
 
     return render(
