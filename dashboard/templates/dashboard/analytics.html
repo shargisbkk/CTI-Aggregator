@@ -24,6 +24,10 @@ Analytics
         Analytics
     </h2>
 
+    {% if total_indicators == 0 %}
+    <p>No indicators in database</p>
+
+    {% else %}
 
     <!-- ==================================================
          SUMMARY STAT CARDS
@@ -306,5 +310,7 @@ Analytics
         }
     })();
 </script>
+
+    {% endif %}
 
 {% endblock %}
