@@ -279,9 +279,10 @@ def analytics(request):
     country_rows = list(top_countries_sources)
     country_df = pd.DataFrame(country_rows)
     # Sanitation for country names
-    country_df['country'] = country_df['country'].astype(str).str.strip()
-    country_df = country_df[country_df['country'] != '']          # drop blanks
-    country_df['count'] = pd.to_numeric(country_df['count'], errors='coerce').fillna(0).astype(int)
+    if len(country_rows) > 0:
+        country_df['country'] = country_df['country'].astype(str).str.strip()
+        country_df = country_df[country_df['country'] != '']          # drop blanks
+        country_df['count'] = pd.to_numeric(country_df['count'], errors='coerce').fillna(0).astype(int)
 
     def name_to_iso3(name):
         try:
