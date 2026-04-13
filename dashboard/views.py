@@ -9,7 +9,7 @@ from django.core.management import call_command
 from django.db import connection
 from urllib.parse import urlencode
 from datetime import timedelta
-from ingestion.models import FeedSource, IndicatorOfCompromise
+from ingestion.models import FeedSource, IndicatorOfCompromise, GeoEnrichment
 from io import StringIO
 
 # ======================================================
@@ -236,8 +236,6 @@ def analytics(request):
                            .count()
     )
 
-    active_feeds = "Not Implemented"
-
     # Unnest the JSONB sources array to count per source name
     with connection.cursor() as cur:
         cur.execute("""
@@ -266,14 +264,21 @@ def analytics(request):
         .order_by("-count")
     )
 
+    top_countries_sources = (
+        GeoEnrichment.objects
+        .values("country")
+        .annotate(count=Count("country"))
+        .order_by("-count")
+    )
+
     context = {
         "total_indicators":    count_records,
         "high_confidence":     high_confidence,
         "last_seen_this_week": last_seen_this_week,
-        "active_feeds":        active_feeds,
         "top_sources":         top_sources,
         "multi_source_count":  multi_source_count,
         "top_ioc_types":       top_ioc_types,
+        "top_countries":       top_countries_sources
     }
 
     return render(

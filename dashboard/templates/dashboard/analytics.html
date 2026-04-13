@@ -200,6 +200,47 @@ Analytics
         </div>
     </div>
 
+    <!--
+        Placeholder for testing enrichment table----------------------------------------------
+    -->
+
+    <div class="col-xl-6">
+        <div class="card shadow-sm p-4 mb-4">
+
+            <h5 class="fw-bold card-title mb-3">
+                Top Countries by IOC Count
+                <button class="btn btn-sm btn-icon rounded-circle float-end custom-collapse-btn" type="button"
+                        data-bs-toggle="collapse" data-bs-target="#topCountriesTable">
+                    <i class="fa fa-chevron-up"></i>
+                </button>
+            </h5>
+
+            <div id="topCountriesTable" class="collapse show">
+                <table class="table table-hover table-custom">
+
+                    <thead>
+                        <tr>
+                            <th>Countries</th>
+                            <th>Amounts</th>
+                        </tr>
+                    </thead>
+                        
+                    <tbody>
+                        {% for rowdata in top_countries %}
+                        <tr>
+                            <td>{{rowdata.country}}</td>
+                            <td>{{rowdata.count}}</td>
+                        </tr>
+                        {% empty %}
+                        <tr>
+                            <td>No data pulled</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
 
     <!-- ==================================================
          FUTURE CHART PLACEHOLDERS
