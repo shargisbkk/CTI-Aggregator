@@ -420,3 +420,66 @@ body.dark-mode {
     background-color: var(--clr-dark-surface-tonal-a20);
     color: var(--clr-light-a0);
 }
+
+/* ====================================
+    CVE news widget (home page)
+==================================== */
+
+.cve-id-link,
+.cve-id-link:link,
+.cve-id-link:visited,
+.cve-id-link:active {
+    color: #1a1a1a !important;
+    text-decoration: none !important;
+}
+
+.cve-id-link:hover {
+    text-decoration: underline !important;
+    color: #000000 !important;
+}
+
+.dark-mode .cve-id-link,
+.dark-mode .cve-id-link:link,
+.dark-mode .cve-id-link:visited,
+.dark-mode .cve-id-link:active,
+.dark-mode .cve-id-link:hover {
+    color: #ffffff !important;
+}
+
+.cve-article-link,
+.cve-article-link:link,
+.cve-article-link:visited,
+.cve-article-link:active {
+    color: #4a4a4a !important;
+    text-decoration: none !important;
+}
+
+.cve-article-link:hover {
+    text-decoration: underline !important;
+    color: #1a1a1a !important;
+}
+
+.dark-mode .cve-article-link,
+.dark-mode .cve-article-link:link,
+.dark-mode .cve-article-link:visited,
+.dark-mode .cve-article-link:active {
+    color: #d0d0d0 !important;
+}
+
+.dark-mode .cve-article-link:hover {
+    color: #ffffff !important;
+}
+
+.cve-article-time {
+    color: var(--clr-light-surface-a40);
+    font-size: 0.78rem;
+}
+
+.dark-mode .cve-article-time {
+    color: var(--clr-dark-surface-a40);
+}
+
+.cve-news-scroll {
+    max-height: 460px;
+    overflow-y: auto;
+}

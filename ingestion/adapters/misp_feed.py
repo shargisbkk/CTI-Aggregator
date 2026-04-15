@@ -1,20 +1,6 @@
-"""
-Generic adapter for MISP-format JSON event feeds.
-
-Covers: CIRCL MISP OSINT, Botvrij, Digital Side, any public MISP feed.
-
-MISP feeds expose a manifest.json listing event UUIDs, then individual
-{uuid}.json files for each event. Each event contains an Attribute[] array
-with the actual indicators.
-
-Config keys (FeedSource.config):
-    url             — base URL of the MISP feed (must end with /)
-    timeout         — request timeout in seconds (default 120)
-    initial_days    — lookback window on the very first pull (default 180); ignored once last_pulled is set
-    filter_to_ids   — only import attributes with to_ids=True (default true)
-    max_events      — limit how many events to fetch per run (default 200)
-    auth_header     — header name for API key auth, or null (default null)
-"""
+# adapter for MISP-format JSON event feeds (CIRCL, Botvrij, Digital Side, etc.)
+# fetches manifest.json to get event UUIDs, then each event's attributes become indicators
+# config: url, timeout, initial_days, filter_to_ids, max_events, auth_header
 
 import logging
 from datetime import datetime, timedelta, timezone
@@ -36,13 +22,13 @@ class MispFeedAdapter(FeedAdapter):
         self.source_name = self.config.get("_source_name", "misp")
 
     def _fetch_manifest(self, base_url, headers, timeout):
-        """Fetch and return the MISP feed manifest (uuid → event metadata)."""
+        # grabs the manifest listing all event UUIDs
         manifest_url = base_url.rstrip("/") + "/manifest.json"
         r = request_with_retry("GET", manifest_url, headers=headers, timeout=timeout)
         return r.json()
 
     def _fetch_event(self, base_url, uuid, headers, timeout):
-        """Fetch a single MISP event by UUID."""
+        # fetches one event by its UUID
         event_url = base_url.rstrip("/") + f"/{uuid}.json"
         r = request_with_retry("GET", event_url, headers=headers, timeout=timeout)
         return r.json()

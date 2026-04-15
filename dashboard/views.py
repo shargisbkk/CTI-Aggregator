@@ -9,7 +9,7 @@ from django.core.management import call_command
 from django.db import connection
 from urllib.parse import urlencode
 from datetime import timedelta
-from ingestion.models import FeedSource, IndicatorOfCompromise, GeoEnrichment
+from ingestion.models import FeedSource, IndicatorOfCompromise, GeoEnrichment, ThreatArticle
 from io import StringIO
 import plotly.graph_objects as go
 import plotly.express as px
@@ -44,12 +44,46 @@ def home(request):
         last_updated=Max("last_seen")
     )["last_updated"]
 
+    # CVE news: recent CVEs ordered by newest article first
+    cve_news = []
+    cve_labels = (
+        ThreatArticle.objects
+        .values("matched_label")
+        .annotate(
+            article_count=Count("id"),
+            newest_article=Max("published_at"),
+        )
+        .order_by("-newest_article")[:8]
+    )
+    for row in cve_labels:
+        cve_id = row["matched_label"]
+        articles = ThreatArticle.objects.filter(
+            matched_label=cve_id
+        ).order_by("-published_at")[:2]
+        # Pull the IOC's labels for context
+        ioc = IndicatorOfCompromise.objects.filter(
+            ioc_type="cve", ioc_value=cve_id.lower()
+        ).first()
+        labels = []
+        if ioc and isinstance(ioc.labels, list):
+            labels = [
+                l for l in ioc.labels
+                if isinstance(l, str) and len(l) > 3
+                and not l.lower().startswith("cve-")
+            ][:3]
+        cve_news.append({
+            "cve_id": cve_id,
+            "labels": labels,
+            "articles": articles,
+        })
+
     context = {
         "total_indicators": total_indicators,
         "feed_count": feed_count,
         "new_last_24h": new_last_24h,
         "last_updated": last_updated,
         "recent_indicators": recent_indicators,
+        "cve_news": cve_news,
     }
 
     return render(request, "dashboard/home.html", context)
@@ -101,7 +135,7 @@ def indicators(request):
     #sort by most recently ingested so new indicators always appear at the top.
     #last_seen is null for some feeds (Emerging Threats has no timestamps) which
     #would sort those rows to the top under PostgreSQL default NULL ordering.
-    query = query.order_by("-ingested_at")
+    query = query.order_by("-ingested_at", "-id")
 
     paginator = Paginator(query, 50)
     page_obj = paginator.get_page(request.GET.get("page"))

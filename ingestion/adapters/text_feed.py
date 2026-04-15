@@ -1,12 +1,5 @@
-"""
-Adapter for plain-text IOC feeds (one indicator per line).
-
-Config keys (FeedSource.config):
-    url          — URL to fetch (required)
-    ioc_type     — canonical IOC type; inferred from values if absent
-    comment_char — comment prefix override; defaults to both "#" and ";"
-    timeout      — request timeout in seconds (default 120)
-"""
+# adapter for plain-text feeds (one indicator per line)
+# config: url, ioc_type, comment_char, timeout
 
 import logging
 import re

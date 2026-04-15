@@ -1,7 +1,5 @@
-"""
-Normalizes raw indicator dicts into the canonical schema.
-Maps raw IOC types, enforces case rules, cleans labels, drops unrecognized records.
-"""
+# normalizes raw indicator dicts into our canonical schema
+# handles type mapping, casing, label cleanup, and drops anything unrecognized
 
 import ipaddress
 import logging
@@ -28,7 +26,7 @@ _TS_FORMATS = (
 
 
 def _parse_ts(raw) -> Optional[datetime]:
-    """Parse a timestamp from any common format into a timezone-aware datetime."""
+    # parses a timestamp from any common format into a timezone-aware datetime
     if raw is None:
         return None
     # already a datetime object
@@ -66,19 +64,28 @@ def _parse_ts(raw) -> Optional[datetime]:
     return None
 
 
+_TEXT_CONFIDENCE = {
+    "critical":  95,
+    "very high": 95,
+    "high":      80,
+    "medium":    60,
+    "moderate":  60,
+    "low":       40,
+}
+
+
 def _safe_confidence(val) -> Optional[int]:
     if val is None:
         return None
     try:
         return int(val)
     except (TypeError, ValueError):
-        return None
+        pass
+    return _TEXT_CONFIDENCE.get(str(val).strip().lower())
 
 
 def _classify_value(value: str) -> str:
-    """Infer canonical IOC type from the value when the source doesn't provide one.
-    Checks patterns in order from most specific to least specific.
-    """
+    # guesses the IOC type from the value itself when the source doesn't tell us
     # check for IP with CIDR or path prefix
     if "/" in value:
         host = value.split("/", 1)[0]
@@ -118,9 +125,7 @@ def _classify_value(value: str) -> str:
 _LABEL_BLOCKLIST = {"unknown", "n/a", "none", "other"}
 
 def _clean_labels(raw_labels: list, ioc_type: str) -> list:
-    """Deduplicate, lowercase, and filter out junk labels.
-    Also splits comma-separated values within a single label string.
-    """
+    # deduplicates, lowercases, and filters out junk labels
     seen = set()
     out = []
     for raw_lbl in (raw_labels or []):
@@ -139,15 +144,8 @@ def _clean_labels(raw_labels: list, ioc_type: str) -> list:
 
 
 def normalize_one(raw: dict) -> Optional[dict]:
-    """
-    Normalize a raw indicator dict from any adapter into the canonical schema.
-
-    Accepts the schema defined in FeedAdapter.fetch_raw():
-        ioc_type, ioc_value, labels, confidence, first_seen, last_seen
-
-    Returns a canonical dict ready for dedup + upsert, or None if the record
-    is unresolvable (empty value, unknown type with no classifiable value, too long).
-    """
+    # takes a raw dict from any adapter and returns a clean canonical dict
+    # returns None if the record can't be resolved (empty value, unknown type, too long)
     raw_value = str(raw.get("ioc_value") or "").strip()
     if not raw_value:
         return None

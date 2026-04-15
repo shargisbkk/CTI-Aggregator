@@ -34,12 +34,13 @@ class IndicatorOfCompromise(models.Model):
         return "Unknown"
 
 class GeoEnrichment(models.Model):
-    """Geo-location data for IP indicators, populated at ingestion time."""
+    #Geo-location data for IP indicators, populated at ingestion time."""
     indicator    = models.OneToOneField(
         IndicatorOfCompromise,
         on_delete=models.CASCADE,
         related_name="geo",
     )
+    #all the information we have in the table for enriched ip addresses 
     country        = models.CharField(max_length=100, blank=True, default="")
     country_code   = models.CharField(max_length=4, blank=True, default="")
     continent_code = models.CharField(max_length=2, blank=True, default="")
@@ -55,12 +56,9 @@ class GeoEnrichment(models.Model):
         return f"{self.indicator} in {self.country_code or '??'}"
 
 
+#the actual table of sources (seeded with 6 to start)
 class FeedSource(models.Model):
-    """
-    Represents a single threat intelligence feed source.
-    Configure feeds through the Django admin — no code changes needed.
-    adapter_type determines which ingestion adapter is used.
-    """
+
     ADAPTER_CHOICES = [
         ("text",  "Plain Text List"),
         ("csv",   "CSV / TSV File"),
@@ -88,3 +86,20 @@ class FeedSource(models.Model):
 
     def __str__(self) -> str:
         return self.name
+
+
+class ThreatArticle(models.Model):
+    # News articles matched to CVEs via RSS feeds
+    title         = models.CharField(max_length=300)
+    url           = models.URLField(max_length=700, unique=True)
+    source_name   = models.CharField(max_length=100)
+    matched_label = models.CharField(max_length=200, db_index=True)
+    published_at  = models.DateTimeField(null=True, blank=True)
+    fetched_at    = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        db_table = "threat_articles"
+        ordering = ["-published_at"]
+
+    def __str__(self):
+        return f"{self.matched_label}: {self.title[:60]}"

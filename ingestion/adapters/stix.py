@@ -1,7 +1,5 @@
-"""
-STIX 2.x parsing utilities — extracts IOC dicts from STIX pattern strings.
-Shared by TaxiiFeedAdapter. Does not fetch anything.
-"""
+# pulls IOC values out of STIX pattern strings like [ipv4-addr:value = '1.2.3.4']
+# used by the TAXII adapter — doesn't fetch anything itself
 
 import logging
 import re
@@ -22,16 +20,8 @@ _HASH_RE = re.compile(
 
 
 def _parse_pattern(pattern: str) -> list[tuple[str, str]]:
-    """
-    Extract (ioc_type, value) pairs from a STIX pattern string.
-
-    Handles simple patterns, compound AND/OR patterns, reference paths,
-    and file hash patterns. Only extracts actual observable values —
-    not type hints or property references.
-
-    Hash algorithm names are normalized (lowercase, hyphens stripped) so they
-    match type_map.json keys directly: MD5 -> md5, SHA-256 -> sha256, etc.
-    """
+    # extracts (type, value) pairs from a STIX pattern string
+    # also normalizes hash algo names so they match type_map.json (MD5 -> md5, SHA-256 -> sha256)
     if not pattern:
         return []
     results = [(m.group(1), m.group(2)) for m in _VALUE_RE.finditer(pattern)]
@@ -42,7 +32,7 @@ def _parse_pattern(pattern: str) -> list[tuple[str, str]]:
 
 
 def extract_indicators(raw_objects: list[dict]) -> list[dict]:
-    """Filter STIX bundle objects to type=indicator and extract IOCs from their patterns."""
+    # filters STIX objects to indicators and pulls IOCs from their patterns
     out = []
     for o in raw_objects:
         # only process STIX indicator objects, skip relationships/identities/etc
@@ -64,21 +54,12 @@ def extract_indicators(raw_objects: list[dict]) -> list[dict]:
             raw_labels = list(getattr(obj, "labels", None) or getattr(obj, "indicator_types", None) or [])
             # confidence is a STIX 2.1 integer (0 to 100); not present in 2.0
             confidence = getattr(obj, "confidence", None)
-            if confidence is not None:
-                try:
-                    confidence = int(confidence)
-                except (TypeError, ValueError):
-                    confidence = None
         else:
             pattern    = o.get("pattern", "")
             first_seen = o.get("valid_from") or o.get("created")
             last_seen  = o.get("modified")
             raw_labels = list(o.get("labels") or o.get("indicator_types") or [])
-            raw_conf   = o.get("confidence")
-            try:
-                confidence = int(raw_conf) if raw_conf is not None else None
-            except (TypeError, ValueError):
-                confidence = None
+            confidence = o.get("confidence")
 
         labels = [str(l) for l in raw_labels if l]
 

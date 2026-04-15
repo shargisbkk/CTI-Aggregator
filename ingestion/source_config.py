@@ -1,12 +1,10 @@
-"""
-FeedSource is the single source of truth for feed configuration.
-All settings live in the config JSONField, managed through the admin.
-"""
+# feed configuration — all settings live in the config JSONField, managed through admin
 
 import importlib
 
-# Maps adapter_type choices to their fully-qualified class paths.
-# Adding a new transport pattern = adding one entry here + one adapter file.
+# Adding a new transport pattern in the future means adding one entry here + one adapter file. So far we cover 
+# most of the types here and the inheritance from the base class allows it to get the normalization, deduplication, and enrichment 
+# automatically 
 ADAPTER_TYPES = {
     "text":  "ingestion.adapters.text_feed.TextFeedAdapter",
     "csv":   "ingestion.adapters.csv_feed.CsvFeedAdapter",
@@ -15,9 +13,8 @@ ADAPTER_TYPES = {
     "json":  "ingestion.adapters.rest_feed.RestFeedAdapter",
 }
 
-
 def get_adapter_class(adapter_type: str):
-    """Return the adapter class for the given adapter_type, or None if unknown."""
+    # looks up the adapter class for a given type, returns None if unknown
     path = ADAPTER_TYPES.get(adapter_type)
     if not path:
         return None

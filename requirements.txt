@@ -8,3 +8,4 @@ taxii2-client
 geoip2
 plotly
 pycountry
+feedparser
