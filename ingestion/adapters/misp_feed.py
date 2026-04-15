@@ -56,23 +56,22 @@ class MispFeedAdapter(FeedAdapter):
 
         headers = self._build_auth_headers()
 
-        # self.since = last_pulled timestamp from DB; None on first run.
-        # initial_days caps how far back to go on that first pull.
+        # determine the cutoff timestamp for filtering events
         if self.since:
             cutoff_ts = self.since.timestamp()
         elif initial_days:
             cutoff_ts = (datetime.now(timezone.utc) - timedelta(days=int(initial_days))).timestamp()
         else:
-            cutoff_ts = 0  # no restriction, get everything
+            cutoff_ts = 0  # no restriction, fetch everything
 
-        # Fetch manifest
+        # fetch the manifest (index of all event UUIDs and their timestamps)
         try:
             manifest = self._fetch_manifest(base_url, headers, timeout)
         except Exception:
             logger.exception("%s: failed to fetch manifest", self.source_name)
             return []
 
-        # Filter and sort events by timestamp (most recent first)
+        # filter to events newer than cutoff, sorted most recent first
         events = []
         for uuid, meta in manifest.items():
             ts = float(meta.get("timestamp", 0))
@@ -83,7 +82,7 @@ class MispFeedAdapter(FeedAdapter):
         if max_events > 0:
             events = events[:max_events]
 
-        # Fetch each event and extract attributes
+        # fetch each event individually and extract its attributes as indicators
         indicators = []
         for uuid, ts, meta in events:
             try:
@@ -92,10 +91,10 @@ class MispFeedAdapter(FeedAdapter):
                 logger.warning("%s: failed to fetch event %s, skipping", self.source_name, uuid)
                 continue
 
-            # Handle both {"Event": {...}} and bare event dict
+            # handle both wrapped {"Event": {...}} and bare event dict formats
             event = event_data.get("Event", event_data)
 
-            # Tags on the Event apply to every attribute; deduplicate before merging.
+            # collect event-level tags (these apply to every attribute in this event)
             seen_event_labels: set[str] = set()
             event_labels: list[str] = []
             for t in event.get("Tag", []):
@@ -104,8 +103,7 @@ class MispFeedAdapter(FeedAdapter):
                     seen_event_labels.add(name)
                     event_labels.append(name)
 
-            # Coerce threat_level_id to int before lookup; some MISP deployments
-            # serialize it as a string (e.g. "1" instead of 1).
+            # Coerce threat_level_id to int; some deployments serialize it as a string.
             try:
                 threat_level = int(event.get("threat_level_id"))
             except (TypeError, ValueError):
@@ -119,7 +117,7 @@ class MispFeedAdapter(FeedAdapter):
                 misp_type = attr.get("type", "").lower()
                 value = attr.get("value", "").strip()
 
-                # Handle composite types like "ip-src|port" or "filename|hash"
+                # split composite types like "ip-src|port" or "filename|hash"
                 if "|" in value and "|" in misp_type:
                     parts = value.split("|", 1)
                     type_parts = misp_type.split("|", 1)
@@ -128,14 +126,14 @@ class MispFeedAdapter(FeedAdapter):
                     else:
                         value = parts[0]
 
-                # Merge attribute-level tags with event tags, skipping duplicates.
+                # merge attribute-level tags with event-level tags, skip duplicates
                 attr_labels = [
                     t["name"] for t in attr.get("Tag", [])
                     if isinstance(t, dict) and t.get("name")
                 ]
                 labels = event_labels + [l for l in attr_labels if l not in seen_event_labels]
 
-                # Use attr_ts (not the outer loop's ts) to avoid shadowing.
+                # use the attribute's own timestamp, not the event-level one
                 attr_ts = attr.get("timestamp")
                 indicators.append({
                     "ioc_type":   misp_type,

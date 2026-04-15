@@ -42,7 +42,7 @@ class TextFeedAdapter(FeedAdapter):
             line = line.strip()
             if not line or line.startswith(comment_chars):
                 continue
-            # Strip inline comments (e.g. "1.2.3.0/24 ; note").
+            # Strip inline comments.
             line = comment_pattern.split(line)[0].strip()
             if not line:
                 continue

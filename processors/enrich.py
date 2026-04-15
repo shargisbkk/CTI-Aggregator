@@ -16,6 +16,7 @@ logger = logging.getLogger(__name__)
 
 
 def _extract_ip(value: str) -> str | None:
+    """Strip CIDR or port suffixes and validate as an IP address."""
     if "/" in value:
         value = value.split("/")[0]
     if value.count(":") == 1:
@@ -28,6 +29,9 @@ def _extract_ip(value: str) -> str | None:
 
 
 def geo_enrich_batch(normalized_records: list[dict]) -> int:
+    """Look up country, city, and coordinates for each IP indicator using the local GeoIP database.
+    Creates or updates a GeoEnrichment record linked to each IndicatorOfCompromise.
+    """
     db_path = getattr(settings, "GEOIP_PATH", None)
     if not db_path:
         logger.warning("geo_enrich_batch: GEOIP_PATH not configured — skipping")
@@ -37,10 +41,12 @@ def geo_enrich_batch(normalized_records: list[dict]) -> int:
         logger.warning("geo_enrich_batch: %s not found — run download_geoip first", db_path)
         return 0
 
+    # filter to only IP indicators from this batch
     ip_values = [r["ioc_value"] for r in normalized_records if r.get("ioc_type") == "ip"]
     if not ip_values:
         return 0
 
+    # load matching DB records so we can link GeoEnrichment to each one
     ioc_map = {
         obj.ioc_value: obj
         for obj in IndicatorOfCompromise.objects.filter(ioc_type="ip", ioc_value__in=ip_values)
@@ -56,7 +62,9 @@ def geo_enrich_batch(normalized_records: list[dict]) -> int:
             if not ip:
                 continue
             try:
+                # look up location data from the offline DB-IP Lite database
                 result = reader.city(ip)
+                # create or update the geo enrichment record for this indicator
                 GeoEnrichment.objects.update_or_create(
                     indicator=ioc,
                     defaults={
@@ -70,7 +78,7 @@ def geo_enrich_batch(normalized_records: list[dict]) -> int:
                 )
                 count += 1
             except geoip2.errors.AddressNotFoundError:
-                pass
+                pass  # private/reserved IPs won't be in the database
             except Exception as e:
                 logger.error("geo_enrich_batch: failed on %s: %s", raw_ip, e)
 

@@ -10,13 +10,11 @@ from stix2 import parse
 
 logger = logging.getLogger(__name__)
 
-# Matches :value = 'x' (simple types) and :ref.value = 'x' (reference paths).
-# Covers: ipv4-addr, domain-name, url, email-addr, network-traffic:dst_ref.value, etc.
+# extracts observable type and value from STIX patterns like [ipv4-addr:value = '1.2.3.4']
 _VALUE_RE = re.compile(r"([\w-]+):(?:[\w.]+\.)?value\s*=\s*'([^']+)'")
 
-# Captures the algorithm name and hash value from file:hashes.MD5 = 'x'
-# and file:hashes.'SHA-256' = 'x' (quoted algorithm names).
-# Group 1 = unquoted algo (e.g. MD5), group 2 = quoted algo (e.g. SHA-256), group 3 = value.
+# extracts hash algorithm and hash value from patterns like [file:hashes.MD5 = 'abc123']
+# group 1 = unquoted algo, group 2 = quoted algo, group 3 = value
 _HASH_RE = re.compile(
     r"file:hashes\.(?:(\w+)|'([^']+)')\s*=\s*'([^']+)'",
     re.IGNORECASE,
@@ -47,9 +45,11 @@ def extract_indicators(raw_objects: list[dict]) -> list[dict]:
     """Filter STIX bundle objects to type=indicator and extract IOCs from their patterns."""
     out = []
     for o in raw_objects:
+        # only process STIX indicator objects, skip relationships/identities/etc
         if not isinstance(o, dict) or o.get("type") != "indicator":
             continue
 
+        # try to parse with the stix2 library for structured access
         try:
             obj = parse(o, allow_custom=True)
         except Exception as e:
@@ -60,9 +60,9 @@ def extract_indicators(raw_objects: list[dict]) -> list[dict]:
             pattern    = getattr(obj, "pattern", "")
             first_seen = getattr(obj, "valid_from", None) or getattr(obj, "created", None)
             last_seen  = getattr(obj, "modified", None)
-            # STIX 2.1 uses labels; 2.0 uses indicator_types; take whichever is populated.
+            # STIX 2.1 uses "labels", 2.0 uses "indicator_types"; take whichever exists
             raw_labels = list(getattr(obj, "labels", None) or getattr(obj, "indicator_types", None) or [])
-            # confidence is a native STIX integer (0-100); absent in 2.0.
+            # confidence is a STIX 2.1 integer (0 to 100); not present in 2.0
             confidence = getattr(obj, "confidence", None)
             if confidence is not None:
                 try:

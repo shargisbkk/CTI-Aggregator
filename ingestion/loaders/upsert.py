@@ -10,6 +10,12 @@ logger = logging.getLogger(__name__)
 
 BATCH_SIZE = 1000
 
+# raw SQL for bulk insert with conflict handling
+# on duplicate (ioc_type, ioc_value):
+#   first_seen takes the earliest timestamp (LEAST)
+#   last_seen takes the latest timestamp (GREATEST)
+#   confidence keeps the highest value (GREATEST ignores NULL)
+#   sources and labels merge both arrays, deduplicating via DISTINCT
 UPSERT_SQL = """
     INSERT INTO indicators_of_compromise
         (ioc_type, ioc_value, confidence, labels, sources, first_seen, last_seen, ingested_at)
@@ -17,7 +23,6 @@ UPSERT_SQL = """
     ON CONFLICT (ioc_type, ioc_value) DO UPDATE SET
         first_seen  = LEAST(indicators_of_compromise.first_seen, EXCLUDED.first_seen),
         last_seen   = GREATEST(indicators_of_compromise.last_seen, EXCLUDED.last_seen),
-        -- GREATEST ignores NULL, so a feed that omits confidence won't overwrite an enrichment-set value
         confidence  = GREATEST(indicators_of_compromise.confidence, EXCLUDED.confidence),
         ingested_at = NOW(),
         sources = COALESCE((
@@ -38,9 +43,10 @@ UPSERT_SQL = """
 
 
 def _ensure_aware(value) -> datetime | None:
-    # timestamps are already parsed by normalize_one(); this just guarantees tz-awareness
+    """Guarantee a datetime is timezone-aware before inserting into Postgres."""
     if value is None:
         return None
+    # handle pandas Timestamp objects
     if hasattr(value, "to_pydatetime"):
         value = value.to_pydatetime()
     if not isinstance(value, datetime):
@@ -49,6 +55,7 @@ def _ensure_aware(value) -> datetime | None:
 
 
 def _clean_conf(value):
+    """Coerce confidence to int or None for the DB column."""
     if value is None:
         return None
     try:
@@ -57,10 +64,11 @@ def _clean_conf(value):
         return None
 
 
+# max character length for a single label before truncation
 MAX_LABEL_LEN = 60
 
 def _truncate_labels(value) -> list:
-    # normalization (lowercase, dedup) is done upstream; this is a final length cap before the DB
+    """Cap each label string at MAX_LABEL_LEN before inserting into the DB."""
     if not value:
         return []
     if not isinstance(value, (list, tuple, set)):
@@ -69,9 +77,11 @@ def _truncate_labels(value) -> list:
 
 
 def _upsert_batch(rows: list[tuple]) -> None:
+    """Execute one batch INSERT with parameterized placeholders."""
     placeholders = ", ".join(
         ["(%s, %s, %s, COALESCE(%s::jsonb, '[]'::jsonb), COALESCE(%s::jsonb, '[]'::jsonb), %s, %s, NOW())"] * len(rows)
     )
+    # flatten all row tuples into a single params list for the query
     params = [val for row in rows for val in row]
     with connection.cursor() as cur:
         cur.execute(UPSERT_SQL.format(placeholders=placeholders), params)
@@ -86,8 +96,10 @@ def upsert_indicators(normalized_records: list[dict], source_name: str = "") -> 
     if not normalized_records:
         return 0
 
+    # snapshot count before insert to calculate how many new rows were created
     before = IndicatorOfCompromise.objects.count()
 
+    # build parameter tuples and flush in batches of BATCH_SIZE
     batch: list[tuple] = []
     for r in normalized_records:
         batch.append((
@@ -103,6 +115,7 @@ def upsert_indicators(normalized_records: list[dict], source_name: str = "") -> 
             _upsert_batch(batch)
             batch.clear()
 
+    # flush any remaining records that didn't fill a complete batch
     if batch:
         _upsert_batch(batch)
 

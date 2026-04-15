@@ -15,19 +15,20 @@ from ingestion.adapters.stix import extract_indicators
 
 logger = logging.getLogger(__name__)
 
+# required Accept header for TAXII 2.1 protocol
 TAXII_ACCEPT = "application/taxii+json; version=2.1"
 TAXII_HEADERS = {"Accept": TAXII_ACCEPT}
 
 
 def _resolve_url(base: str, url: str) -> str:
-    """Resolve a possibly-relative API root URL against the discovery base."""
+    """Resolve a possibly relative API root URL against the discovery base."""
     if url.startswith("http"):
         return url
     return urljoin(base, url)
 
 
 def _build_params(extra: dict | None = None, api_key: str = "") -> dict:
-    """Return a params dict, including the API key when provided."""
+    """Build query params, including the API key when provided."""
     params: dict = {}
     if api_key:
         params["key"] = api_key
@@ -37,7 +38,7 @@ def _build_params(extra: dict | None = None, api_key: str = "") -> dict:
 
 
 def _merge_headers(extra: dict | None) -> dict:
-    """Merge extra auth headers into the standard TAXII Accept header."""
+    """Combine auth headers with the standard TAXII Accept header."""
     if not extra:
         return TAXII_HEADERS
     return {**TAXII_HEADERS, **extra}
@@ -96,25 +97,26 @@ def get_objects(api_root_url: str, collection_id: str, auth: tuple[str, str] | N
             break
         env = r.json()
 
+        # empty envelope means no more data
         if not env.get("objects"):
             break
 
         yield env
 
-        # Body-based pagination (more/next in envelope)
+        # pagination style 1: body contains "more" flag and "next" cursor token
         if env.get("more") and env.get("next"):
             params = _build_params(base_extra, api_key)
             params["next"] = env["next"]
             continue
 
-        # Header-based pagination (X-TAXII-Date-Added-Last)
+        # pagination style 2: server sends date cursor in response header
         date_last = r.headers.get("X-TAXII-Date-Added-Last")
         if date_last and date_last != params.get("added_after"):
             params = _build_params(base_extra, api_key)
             params["added_after"] = date_last
             continue
 
-        break
+        break  # no pagination indicators found, we have all the data
 
 
 def fetch_taxii_raw(
@@ -138,7 +140,7 @@ def fetch_taxii_raw(
     """
     auth = (username, password) if username else None
 
-    # When a specific collection ID is given, use the URL directly as the API root
+    # if a specific collection ID is given, skip discovery and query directly
     if collection_id:
         api_root_url = discovery_url.rstrip("/")
         all_indicators = []
@@ -148,7 +150,7 @@ def fetch_taxii_raw(
             all_indicators.extend(extract_indicators(objects))
         return all_indicators
 
-    # Auto-discover API roots and iterate all readable collections
+    # no collection ID provided: discover all API roots and query every readable collection
     try:
         api_roots = discover_api_roots(discovery_url, auth, api_key, extra_headers)
     except Exception as e:

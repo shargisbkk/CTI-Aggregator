@@ -10,13 +10,17 @@ from ingestion.models import FeedSource
 
 
 class FeedSourceForm(forms.ModelForm):
+    """Custom admin form that exposes adapter-specific config fields as real form inputs
+    instead of requiring users to type raw JSON into the config field.
+    """
+    # API key is written to .env on save, never stored in the database
     api_key_input = forms.CharField(
         required=False,
         widget=forms.PasswordInput(render_value=False),
         label="API Key",
     )
 
-    # TAXII auth
+    # TAXII basic auth fields
     password_input = forms.CharField(
         required=False,
         widget=forms.PasswordInput(render_value=False),
@@ -24,11 +28,11 @@ class FeedSourceForm(forms.ModelForm):
     )
     auth_header = forms.CharField(required=False, widget=forms.TextInput())
 
-    # REST API (visible)
+    # REST API specific fields
     method       = forms.ChoiceField(choices=[("GET", "GET"), ("POST", "POST")], required=False)
     request_body = forms.CharField(required=False, widget=forms.Textarea(attrs={"rows": 4}))
 
-    # CSV (visible)
+    # CSV/TSV specific fields
     delimiter = forms.ChoiceField(
         choices=[(",", "Comma (,)"), ("\t", "Tab"), ("|", "Pipe (|)"), (";", "Semicolon (;)")],
         required=False,
@@ -37,7 +41,7 @@ class FeedSourceForm(forms.ModelForm):
     ioc_type_column  = forms.CharField(required=False, widget=forms.TextInput())
     ioc_type         = forms.CharField(required=False, widget=forms.TextInput())
 
-    # Advanced Config (collapsed, JSON-only overrides)
+    # advanced overrides (collapsed by default in the admin UI)
     data_path        = forms.CharField(required=False, widget=forms.TextInput())
     ioc_value_field  = forms.CharField(required=False, widget=forms.TextInput())
     ioc_type_field   = forms.CharField(required=False, widget=forms.TextInput())
@@ -81,6 +85,7 @@ class FeedSourceForm(forms.ModelForm):
         return val
 
     def save(self, commit=True):
+        """Merge form field values into the JSON config dict and write secrets to .env."""
         instance = super().save(commit=False)
         cfg      = dict(instance.config or {})
         adapter  = self.cleaned_data.get("adapter_type") or (instance.adapter_type if instance.pk else "")
@@ -132,7 +137,7 @@ class FeedSourceForm(forms.ModelForm):
         feed_name = self.cleaned_data.get("name", "").strip() or (instance.name if instance.pk else "")
         env_path  = str(settings.BASE_DIR / ".env")
 
-        # Write API key to .env if provided; never stored in DB.
+        # write API key to .env file (never stored in DB for security)
         key_value = self.cleaned_data.get("api_key_input", "").strip()
         if key_value and feed_name:
             env_var  = re.sub(r"[^a-zA-Z0-9]", "_", feed_name).upper().strip("_") + "_API_KEY"
@@ -140,7 +145,7 @@ class FeedSourceForm(forms.ModelForm):
             load_dotenv(env_path, override=True)
             instance.api_key_env = env_var
 
-        # Write TAXII password to .env if provided; never stored in DB.
+        # write TAXII password to .env file (same security pattern as API key)
         pw_value = self.cleaned_data.get("password_input", "").strip()
         if pw_value and feed_name:
             env_var = re.sub(r"[^a-zA-Z0-9]", "_", feed_name).upper().strip("_") + "_TAXII_PASSWORD"

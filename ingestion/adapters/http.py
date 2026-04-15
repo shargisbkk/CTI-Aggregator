@@ -11,23 +11,25 @@ import requests
 
 logger = logging.getLogger(__name__)
 
-# server-side status codes worth retrying
+# HTTP status codes that indicate temporary server issues worth retrying
 RETRYABLE_STATUS_CODES = {429, 500, 502, 503, 504}
 
 
 def request_with_retry(method, url, *, max_tries=5, **kwargs):
-    """Make an HTTP request with exponential backoff on 429/5xx/timeouts."""
-    delay = 2.0
+    """Make an HTTP request with exponential backoff on 429/5xx/timeouts.
+    Doubles the delay between each retry up to a 120 second cap.
+    """
+    delay = 2.0  # initial wait between retries (doubles each attempt)
 
     for attempt in range(1, max_tries + 1):
         try:
             r = requests.request(method, url, **kwargs)
 
-            # success
+            # 2xx = success, return immediately
             if 200 <= r.status_code < 300:
                 return r
 
-            # rate limited; use Retry-After if provided
+            # 429 = rate limited; respect the Retry-After header if present
             if r.status_code == 429:
                 if attempt >= max_tries:
                     r.raise_for_status()
@@ -43,7 +45,7 @@ def request_with_retry(method, url, *, max_tries=5, **kwargs):
                 delay = min(delay * 2, 120.0)
                 continue
 
-            # server error; retry if attempts left
+            # 5xx server error; retry if we have attempts left
             if r.status_code in RETRYABLE_STATUS_CODES and attempt < max_tries:
                 wait = delay + random.uniform(0, 0.5)
                 logger.warning("Server error %d, retrying in %.1fs (attempt %d/%d)",
@@ -52,13 +54,14 @@ def request_with_retry(method, url, *, max_tries=5, **kwargs):
                 delay = min(delay * 2, 120.0)
                 continue
 
-            # non-retryable (4xx etc.), raise now
+            # non-retryable status (4xx client errors), raise immediately
             r.raise_for_status()
 
         except requests.HTTPError:
-            # HTTPError from raise_for_status, don't retry
+            # raised by raise_for_status above, do not retry
             raise
         except requests.RequestException:
+            # network errors (timeouts, connection refused, DNS failures)
             if attempt >= max_tries:
                 raise
             wait = delay + random.uniform(0, 0.5)
