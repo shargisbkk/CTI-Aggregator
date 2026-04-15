@@ -330,9 +330,9 @@ body.dark-mode {
 }
 
 .dark-mode .table-custom th {
-    background-color: var(--clr-dark-surface-a0);
+    background-color: var(--clr-dark-surface-tonal-a0);
     color: var(--clr-dark-primary-a0);
-    border-color: var(--clr-dark-surface-tonal-a0);
+    border-color: var(--clr-dark-surface-tonal-a10);
 }
 
 .dark-mode .table-custom td {
@@ -429,8 +429,9 @@ body.dark-mode {
 .cve-id-link:link,
 .cve-id-link:visited,
 .cve-id-link:active {
-    color: #1a1a1a !important;
+    color: #111111 !important;
     text-decoration: none !important;
+    font-size: 1.05rem;
 }
 
 .cve-id-link:hover {
@@ -450,13 +451,14 @@ body.dark-mode {
 .cve-article-link:link,
 .cve-article-link:visited,
 .cve-article-link:active {
-    color: #4a4a4a !important;
+    color: #222222 !important;
     text-decoration: none !important;
+    font-size: 0.9rem;
 }
 
 .cve-article-link:hover {
     text-decoration: underline !important;
-    color: #1a1a1a !important;
+    color: #000000 !important;
 }
 
 .dark-mode .cve-article-link,
@@ -471,8 +473,8 @@ body.dark-mode {
 }
 
 .cve-article-time {
-    color: var(--clr-light-surface-a40);
-    font-size: 0.78rem;
+    color: #444444;
+    font-size: 0.82rem;
 }
 
 .dark-mode .cve-article-time {

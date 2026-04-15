@@ -93,5 +93,134 @@
         })();
     </script>
     <script src="{% static 'js/toggle-icons.js' %}"></script>
+
+    <!-- Ingestion results modal — shows on any page when background ingestion finishes -->
+    <div class="modal fade" id="ingestionResultsModal" tabindex="-1" aria-labelledby="ingestionResultsLabel" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="ingestionResultsLabel">
+                        <i class="fas fa-sync-alt me-2"></i>Ingestion Complete
+                    </h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body" id="ingestionResultsBody"></div>
+                <div class="modal-footer" id="ingestionResultsFooter">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <style>
+        .dark-mode .modal-content {
+            background-color: var(--clr-dark-surface-tonal-a10);
+            color: var(--clr-light-a0);
+            border-color: var(--clr-dark-surface-a30);
+        }
+        .dark-mode .modal-header,
+        .dark-mode .modal-footer {
+            border-color: var(--clr-dark-surface-a30);
+        }
+        .dark-mode .modal-header .btn-close {
+            filter: invert(1);
+        }
+        .ingestion-result-row {
+            display: flex;
+            align-items: center;
+            padding: 8px 0;
+            border-bottom: 1px solid var(--clr-light-surface-a20);
+        }
+        .dark-mode .ingestion-result-row {
+            border-color: var(--clr-dark-surface-tonal-a20);
+        }
+        .ingestion-result-row:last-child {
+            border-bottom: none;
+        }
+    </style>
+
+    <script>
+    // Poll for ingestion status on every page if ingestion is running
+    (function () {
+        if (localStorage.getItem('ingestion_polling') !== 'true') return;
+
+        const interval = setInterval(() => {
+            fetch('{% url "dashboard:dashboard-ingestion-status" %}')
+                .then(r => r.json())
+                .then(data => {
+                    if (data.status === 'done' || data.status === 'error' || data.status === 'idle') {
+                        clearInterval(interval);
+                        localStorage.removeItem('ingestion_polling');
+
+                        // Reset button if still on threat feeds page
+                        const btn = document.getElementById('updateAllFeedsBtn');
+                        if (btn) {
+                            btn.disabled = false;
+                            document.getElementById('buttonText').textContent = 'Update All Feeds';
+                            document.getElementById('loadingSpinner').style.display = 'none';
+                        }
+
+                        // Show results modal (skip if server lost track of the run)
+                        if (data.status === 'error') {
+                            showIngestionError('Ingestion failed. Check the server logs for details.');
+                        } else if (data.status === 'done') {
+                            showIngestionResults(data.results || []);
+                        }
+                    }
+                })
+                .catch(() => {});
+        }, 4000);
+    })();
+
+    // Show per-source results in the modal
+    function showIngestionResults(results) {
+        let bodyHtml = '';
+        let total = 0;
+
+        results.forEach(r => {
+            if (r.error) {
+                bodyHtml += `
+                    <div class="ingestion-result-row">
+                        <i class="fas fa-times-circle me-2" style="color: var(--clr-light-danger-a10); font-size: 1.1rem;"></i>
+                        <span class="fw-semibold">${r.name}</span>
+                        <span class="ms-auto text-muted small">${r.error}</span>
+                    </div>`;
+            } else {
+                total += r.added;
+                bodyHtml += `
+                    <div class="ingestion-result-row">
+                        <i class="fas fa-check-circle me-2" style="color: var(--clr-light-success-a10); font-size: 1.1rem;"></i>
+                        <span class="fw-semibold">${r.name}</span>
+                        <span class="ms-auto">
+                            <span class="badge" style="background-color: var(--clr-light-success-a0); color: #fff;">
+                                +${r.added.toLocaleString()} new
+                            </span>
+                        </span>
+                    </div>`;
+            }
+        });
+
+        document.getElementById('ingestionResultsBody').innerHTML =
+            bodyHtml || '<p class="text-muted mb-0">No results returned.</p>';
+        document.getElementById('ingestionResultsFooter').innerHTML = `
+            <span class="me-auto fw-semibold">Total: ${total.toLocaleString()} new indicators</span>
+            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+        `;
+
+        new bootstrap.Modal(document.getElementById('ingestionResultsModal')).show();
+    }
+
+    // Show error in the modal
+    function showIngestionError(message) {
+        document.getElementById('ingestionResultsBody').innerHTML = `
+            <div class="d-flex align-items-center">
+                <i class="fas fa-exclamation-triangle me-2" style="color: var(--clr-light-danger-a10); font-size: 1.1rem;"></i>
+                <span>${message}</span>
+            </div>`;
+        document.getElementById('ingestionResultsFooter').innerHTML =
+            '<button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>';
+        new bootstrap.Modal(document.getElementById('ingestionResultsModal')).show();
+    }
+    </script>
 </body>
 </html>

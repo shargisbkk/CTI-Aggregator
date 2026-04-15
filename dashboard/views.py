@@ -132,6 +132,23 @@ def indicators(request):
     elif conf == "low":
         query = query.filter(Q(confidence__lt=50) | Q(confidence__isnull=True))
 
+    # Time window filter on last_seen
+    timeframe = request.GET.get("timeframe", "").strip()
+    date_from = request.GET.get("date_from", "").strip()
+    date_to = request.GET.get("date_to", "").strip()
+
+    if timeframe == "24h":
+        query = query.filter(last_seen__gte=timezone.now() - timedelta(hours=24))
+    elif timeframe == "7d":
+        query = query.filter(last_seen__gte=timezone.now() - timedelta(days=7))
+    elif timeframe == "30d":
+        query = query.filter(last_seen__gte=timezone.now() - timedelta(days=30))
+    elif timeframe == "custom":
+        if date_from:
+            query = query.filter(last_seen__gte=date_from)
+        if date_to:
+            query = query.filter(last_seen__lte=date_to)
+
     #sort by most recently ingested so new indicators always appear at the top.
     #last_seen is null for some feeds (Emerging Threats has no timestamps) which
     #would sort those rows to the top under PostgreSQL default NULL ordering.
@@ -156,6 +173,9 @@ def indicators(request):
     if type_filter:  filter_params.append(("type", type_filter))
     if source_filter: filter_params.append(("source", source_filter))
     if conf:         filter_params.append(("confidence", conf))
+    if timeframe:    filter_params.append(("timeframe", timeframe))
+    if date_from:    filter_params.append(("date_from", date_from))
+    if date_to:      filter_params.append(("date_to", date_to))
     for lf in label_filters:
         filter_params.append(("label", lf))
     filter_qs = urlencode(filter_params)
@@ -168,6 +188,9 @@ def indicators(request):
         "current_type":   type_filter,
         "current_source": source_filter,
         "current_confidence": conf,
+        "current_timeframe": timeframe,
+        "current_date_from": date_from,
+        "current_date_to": date_to,
         "current_labels": label_filters,
         "filter_qs":      filter_qs,
     }
