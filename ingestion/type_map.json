@@ -14,6 +14,7 @@
 
     "domain":               "domain",
     "domain-name":          "domain",
+    "fqdn":                 "domain",
     "hostname":             "domain",
     "wildcard":             "domain",
 
@@ -29,20 +30,20 @@
 
     "hash":                 "hash",
     "file":                 "hash",
-    "md5":                  "hash",
-    "md5_hash":             "hash",
-    "sha1":                 "hash",
-    "sha1_hash":            "hash",
-    "sha256":               "hash",
-    "sha256_hash":          "hash",
-    "sha512":               "hash",
-    "filehash-md5":         "hash",
-    "filehash-sha1":        "hash",
-    "filehash-sha256":      "hash",
-    "filehash-sha512":      "hash",
-    "filename|md5":         "hash",
-    "filename|sha1":        "hash",
-    "filename|sha256":      "hash",
+    "md5":                  "md5",
+    "md5_hash":             "md5",
+    "filehash-md5":         "md5",
+    "filename|md5":         "md5",
+    "sha1":                 "sha1",
+    "sha1_hash":            "sha1",
+    "filehash-sha1":        "sha1",
+    "filename|sha1":        "sha1",
+    "sha256":               "sha256",
+    "sha256_hash":          "sha256",
+    "filehash-sha256":      "sha256",
+    "filename|sha256":      "sha256",
+    "sha512":               "sha512",
+    "filehash-sha512":      "sha512",
     "ssdeep":               "hash",
     "imphash":              "hash",
     "tlsh":                 "hash",
@@ -60,7 +61,6 @@
     "windows-registry-key": "regkey",
 
     "mutex":                "mutex",
-    "yara":                 "yara",
     "ssl_cert":             "ssl_cert",
     "sslcertfingerprint":   "ssl_cert",
     "ssl-cert-sha1":        "ssl_cert",
@@ -71,25 +71,15 @@
     "ja3s":                 "ja3",
     "ja3-fingerprint-md5":  "ja3",
 
-    "bitcoin-address":      "crypto",
-    "bitcoinaddress":       "crypto",
-    "btc":                  "crypto",
-    "xmr":                  "crypto",
-    "dash":                 "crypto",
-    "crypto-wallet":        "crypto",
+    "x509-fingerprint-sha1":   "ssl_cert",
+    "x509-fingerprint-sha256": "ssl_cert",
+    "x509-fingerprint-md5":    "ssl_cert",
 
-    "x509-fingerprint-sha1":    "ssl_cert",
-    "x509-fingerprint-sha256":  "ssl_cert",
-    "x509-fingerprint-md5":     "ssl_cert",
-
-    "mac-address":          "mac",
-    "mac address":          "mac",
-
-    "user-agent":           "user-agent",
-
-    "phone-number":         "phone",
-    "whois-phone":          "phone",
-
-    "sigma":                "sigma",
-    "snort":                "snort"
+    "btc":                    "crypto",
+    "btc_address":            "crypto",
+    "bitcoin":                "crypto",
+    "crypto-address":         "crypto",
+    "cryptocurrency-address": "crypto",
+    "xmr":                    "crypto",
+    "monero":                 "crypto"
 }

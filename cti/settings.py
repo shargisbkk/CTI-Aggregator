@@ -145,7 +145,13 @@ LOGIN_REDIRECT_URL = '/'
 LOGOUT_REDIRECT_URL = '/login/'
 
 # Feed API keys are stored in the DB (FeedSource table), managed via the settings page.
-# No feed-related env vars needed — .env is only for infrastructure (DB, SECRET_KEY, DEBUG).
+# No feed-related env vars needed; .env is only for infrastructure (DB, SECRET_KEY, DEBUG).
+
+# Path to the DB-IP Lite city database. Downloaded automatically via:
+#   python manage.py download_geoip   (local)
+#   entrypoint.sh                     (Docker)
+# The geoip/ directory is gitignored; never commit the .mmdb file.
+GEOIP_PATH = BASE_DIR / "geoip" / "dbip-city-lite.mmdb"
 
 # Logging Configuration
 # https://docs.djangoproject.com/en/5.2/topics/logging/
@@ -167,8 +173,10 @@ LOGGING = {
             "formatter": "verbose",
         },
         "file": {
-            "class": "logging.FileHandler",
+            "class": "logging.handlers.TimedRotatingFileHandler",
             "filename": str(LOG_DIR / "ingestion.txt"),
+            "when": "midnight",
+            "backupCount": 7,
             "formatter": "verbose",
         },
     },

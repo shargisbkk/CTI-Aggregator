@@ -32,9 +32,20 @@
 
     <div class="card shadow-sm p-3 mb-4">
 
-        <form method="get" class="row g-3">
+        <div class="d-flex justify-content-between align-items-center mb-3">
+            <span class="fw-semibold">Filters</span>
+            <button class="custom-collapse-btn"
+                    data-bs-toggle="collapse"
+                    data-bs-target="#filterCollapse"
+                    aria-expanded="true">
+                <i class="fa fa-chevron-up"></i>
+            </button>
+        </div>
 
-            <!-- Search input -->
+        <div id="filterCollapse" class="collapse show">
+        <form method="get" id="filterForm" class="row g-3">
+
+            <!-- Search input (matches value, type, and labels) -->
             <div class="col-md-3">
                 <input
                     type="text"
@@ -79,25 +90,45 @@
                 </select>
             </div>
 
-            <!-- Hidden label filter (set when clicking a label badge) -->
-            <input type="hidden" name="label" value="{{ current_label }}">
-
-            <!-- Filter buttons -->
+            <!-- Filter / Clear buttons -->
             <div class="col-md-3 d-flex gap-2">
                 <button class="btn btn-dark flex-grow-1">Filter</button>
                 <a href="{% url 'dashboard:dashboard-indicators' %}" class="btn btn-outline-secondary">Clear</a>
             </div>
 
-        </form>
+            <!-- Hidden inputs for currently active labels (preserved on form submit) -->
+            {% for l in current_labels %}
+                <input type="hidden" name="label" value="{{ l }}">
+            {% endfor %}
 
-        {% if current_label %}
-            <div class="mt-3 pt-2 border-top">
-                Filtering by label:
-                <span class="badge text-decoration-none" style="background-color: #d1ecf1; color: #0c5460;">{{ current_label }}</span>
-                <a href="?q={{ current_q }}&type={{ current_type }}&source={{ current_source }}&confidence={{ current_confidence }}"
-                   class="ms-2 small">Remove</a>
+            <!-- Label input — same width as search box -->
+            <div class="col-md-3">
+                <input type="text" id="labelInput"
+                       class="form-control"
+                       placeholder="Search labels..."
+                       onkeydown="if(event.key==='Enter'){event.preventDefault();addLabel();}">
             </div>
-        {% endif %}
+
+            <!-- Active label chips + clear (only shown when labels are active) -->
+            <div class="col d-flex flex-wrap align-items-center gap-2" style="min-height: 38px;">
+                {% for l in current_labels %}
+                    <span class="badge label-chip d-flex align-items-center gap-1"
+                          style="font-size:.85rem;">
+                        {{ l }}
+                        <button type="button"
+                                class="btn-close btn-close-sm ms-1"
+                                style="filter:invert(0.4);"
+                                onclick="removeLabel('{{ l|escapejs }}')"></button>
+                    </span>
+                {% endfor %}
+                {% if current_labels %}
+                    <a href="?q={{ current_q }}&type={{ current_type }}&source={{ current_source }}&confidence={{ current_confidence }}"
+                       class="btn btn-outline-secondary btn-sm">Clear</a>
+                {% endif %}
+            </div>
+
+        </form>
+        </div>
 
     </div>
 
@@ -109,18 +140,30 @@
 
     <div class="card shadow-sm p-3">
 
-        <table class="table table-hover align-middle table-custom">
+        <div class="table-responsive">
+        <table class="table table-hover align-middle table-custom" style="table-layout: fixed; width: 100%;">
+
+            <!-- All percentages so columns scale consistently with the viewport -->
+            <colgroup>
+                <col style="width: 6%;">
+                <col style="width: 28%;">
+                <col style="width: 9%;">
+                <col style="width: 22%;">
+                <col style="width: 11%;">
+                <col style="width: 12%;">
+                <col style="width: 12%;">
+            </colgroup>
 
             <!-- Table header -->
             <thead>
                 <tr>
-                    <th>Type</th>
+                    <th class="text-center">Type</th>
                     <th>Value</th>
-                    <th>Confidence</th>
-                    <th>Labels</th>
+                    <th class="text-center">Confidence</th>
+                    <th class="text-center">Labels</th>
                     <th>Source</th>
-                    <th>First Seen</th>
-                    <th>Last Seen</th>
+                    <th class="text-center">First Seen</th>
+                    <th class="text-center">Last Seen</th>
                 </tr>
             </thead>
 
@@ -130,9 +173,14 @@
                 {% for row in page_obj %}
 
                     <tr>
-                        <td><span class="badge bg-secondary">{{ row.ioc_type }}</span></td>
-                        <td class="text-break" style="max-width: 300px;">{{ row.ioc_value }}</td>
                         <td>
+                            <a href="#"
+                               onclick="setTypeFilter('{{ row.ioc_type|escapejs }}'); return false;"
+                               class="badge bg-secondary text-decoration-none"
+                               title="Filter by {{ row.ioc_type }}">{{ row.ioc_type }}</a>
+                        </td>
+                        <td style="overflow-wrap: break-word; word-break: break-all;">{{ row.ioc_value }}</td>
+                        <td class="text-center">
                             {% if row.confidence_level == "High" %}
                                 <span class="badge bg-danger">High ({{ row.confidence }})</span>
                             {% elif row.confidence_level == "Medium" %}
@@ -140,19 +188,41 @@
                             {% elif row.confidence_level == "Low" %}
                                 <span class="badge bg-success">Low ({{ row.confidence }})</span>
                             {% else %}
-                                <span class="text-muted">—</span>
+                                <span class="badge bg-secondary">None</span>
                             {% endif %}
                         </td>
                         <td>
                             {% for label in row.labels %}
-                                <a href="?label={{ label|urlencode }}"
-                                   class="badge text-decoration-none me-1"
-                                   style="background-color: #d1ecf1; color: #0c5460;">{{ label }}</a>
+                                {% if forloop.counter <= 4 %}
+                                    <a href="#"
+                                       title="{{ label }}"
+                                       onclick="appendLabelFilter('{{ label|escapejs }}'); return false;"
+                                       class="badge label-chip text-decoration-none me-1 mb-1"
+                                       style="max-width: 85px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; display: inline-block; vertical-align: middle;">{{ label }}</a>
+                                {% endif %}
                             {% endfor %}
+                            {% if row.labels|length > 4 %}
+                                <div class="dropdown d-inline-block mb-1">
+                                    <button type="button"
+                                            class="badge bg-secondary border-0"
+                                            data-bs-toggle="dropdown"
+                                            aria-expanded="false">+{{ row.labels|length|add:"-4" }}</button>
+                                    <ul class="dropdown-menu p-2" style="min-width: auto;">
+                                        {% for label in row.labels|slice:"4:" %}
+                                            <li class="mb-1">
+                                                <a class="badge label-chip text-decoration-none"
+                                                   href="#"
+                                                   title="{{ label }}"
+                                                   onclick="appendLabelFilter('{{ label|escapejs }}'); return false;">{{ label }}</a>
+                                            </li>
+                                        {% endfor %}
+                                    </ul>
+                                </div>
+                            {% endif %}
                         </td>
                         <td>{{ row.sources|join:", " }}</td>
-                        <td>{{ row.first_seen|date:"M d, Y g:i A" }}</td>
-                        <td>{{ row.last_seen|date:"M d, Y g:i A" }}</td>
+                        <td class="text-center">{{ row.first_seen|date:"n/j/y" }}<br><small class="text-muted">{{ row.first_seen|date:"g:i A" }}</small></td>
+                        <td class="text-center">{{ row.last_seen|date:"n/j/y" }}<br><small class="text-muted">{{ row.last_seen|date:"g:i A" }}</small></td>
                     </tr>
 
                 {% empty %}
@@ -169,6 +239,7 @@
             </tbody>
 
         </table>
+        </div>
 
 
         <!-- ==============================================
@@ -187,7 +258,7 @@
                     {% if page_obj.has_previous %}
                         <li class="page-item">
                             <a class="page-link"
-                               href="?page={{ page_obj.previous_page_number }}&q={{ current_q }}&type={{ current_type }}&source={{ current_source }}&confidence={{ current_confidence }}&label={{ current_label }}">
+                               href="?page={{ page_obj.previous_page_number }}&{{ filter_qs }}">
                                 Previous
                             </a>
                         </li>
@@ -202,7 +273,7 @@
                     {% if page_obj.has_next %}
                         <li class="page-item">
                             <a class="page-link"
-                               href="?page={{ page_obj.next_page_number }}&q={{ current_q }}&type={{ current_type }}&source={{ current_source }}&confidence={{ current_confidence }}&label={{ current_label }}">
+                               href="?page={{ page_obj.next_page_number }}&{{ filter_qs }}">
                                 Next
                             </a>
                         </li>
@@ -215,5 +286,52 @@
     </div>
 
 </div>
+
+<script>
+
+// Add the typed label to the active filter set and resubmit
+function addLabel() {
+    const input = document.getElementById('labelInput');
+    const val = input.value.trim();
+    if (!val) return;
+
+    const params = new URLSearchParams(window.location.search);
+    const existing = params.getAll('label');
+    if (!existing.includes(val)) {
+        params.append('label', val);
+    }
+    params.delete('page');
+    window.location.search = params.toString();
+}
+
+// Clicking a label badge in the table appends it to the active label set
+function appendLabelFilter(label) {
+    const params = new URLSearchParams(window.location.search);
+    const existing = params.getAll('label');
+    if (!existing.includes(label)) {
+        params.append('label', label);
+    }
+    params.delete('page');
+    window.location.search = params.toString();
+}
+
+// Clicking a type badge in the table sets the type filter
+function setTypeFilter(type) {
+    const params = new URLSearchParams(window.location.search);
+    params.set('type', type);
+    params.delete('page');
+    window.location.search = params.toString();
+}
+
+// Remove a single label from the active filter set
+function removeLabel(label) {
+    const params = new URLSearchParams(window.location.search);
+    const remaining = params.getAll('label').filter(l => l !== label);
+    params.delete('label');
+    remaining.forEach(l => params.append('label', l));
+    params.delete('page');
+    window.location.search = params.toString();
+}
+</script>
 
 {% endblock %}

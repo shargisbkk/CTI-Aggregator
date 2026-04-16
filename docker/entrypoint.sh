@@ -26,5 +26,8 @@ else
   echo "==> Superuser env vars not set; skipping superuser creation."
 fi
 
+echo "==> Downloading GeoIP database..."
+python manage.py download_geoip
+
 echo "==> Starting Django..."
 exec python manage.py runserver 0.0.0.0:8000

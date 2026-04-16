@@ -1,5 +1,5 @@
 """
-Adapter for MISP-format JSON event feeds.
+Generic adapter for MISP-format JSON event feeds.
 
 Covers: CIRCL MISP OSINT, Botvrij, Digital Side, any public MISP feed.
 
@@ -7,13 +7,10 @@ MISP feeds expose a manifest.json listing event UUIDs, then individual
 {uuid}.json files for each event. Each event contains an Attribute[] array
 with the actual indicators.
 
-Type mapping is handled by the universal type_map.json via normalize.
-This adapter only handles MISP-specific value parsing (composite types).
-
 Config keys (FeedSource.config):
     url             — base URL of the MISP feed (must end with /)
     timeout         — request timeout in seconds (default 120)
-    days            — only process events modified within this many days (default 30)
+    initial_days    — lookback window on the very first pull (default 180); ignored once last_pulled is set
     filter_to_ids   — only import attributes with to_ids=True (default true)
     max_events      — limit how many events to fetch per run (default 200)
     auth_header     — header name for API key auth, or null (default null)
@@ -22,115 +19,129 @@ Config keys (FeedSource.config):
 import logging
 from datetime import datetime, timedelta, timezone
 
-import requests
-
 from ingestion.adapters.base import FeedAdapter
+from ingestion.adapters.http import request_with_retry
 
 logger = logging.getLogger(__name__)
 
-
-def _split_composite_value(misp_type: str, value: str) -> str:
-    """Handle MISP composite types like 'filename|sha256' or 'ip-src|port'."""
-    if "|" not in value or "|" not in misp_type:
-        return value
-    parts = value.split("|", 1)
-    type_parts = misp_type.split("|", 1)
-    # For filename|hash composites, take the hash (second part)
-    if "filename" in type_parts[0]:
-        return parts[1] if len(parts) > 1 else parts[0]
-    # For ip|port composites, take the IP (first part)
-    return parts[0]
-
-
-def _extract_event_label(event: dict) -> str:
-    """Pull the event info string as a label, stripping common OSINT prefixes."""
-    label = (event.get("info") or "").strip()
-    for prefix in ("OSINT -", "OSINT:", "OSINT"):
-        if label.upper().startswith(prefix.upper()):
-            label = label[len(prefix):].strip()
-            break
-    return label.lower() if label else ""
+# Maps MISP threat_level_id to a numeric confidence score.
+# Level 4 (Undefined) is treated as unknown confidence.
+# Keys are ints; coerce before lookup since some MISP deployments serialize as strings.
+_THREAT_LEVEL_CONFIDENCE = {1: 80, 2: 60, 3: 40}
 
 
 class MispFeedAdapter(FeedAdapter):
-    requires_api_key = False
-    DEFAULT_CONFIG = {
-        "timeout": 120,
-        "days": 180,
-        "filter_to_ids": True,
-        "max_events": 200,
-        "static_labels": [],
-    }
+    def __init__(self, api_key="", since=None, config=None):
+        super().__init__(api_key, since, config)
+        self.source_name = self.config.get("_source_name", "misp")
 
-    def _fetch_json(self, url):
-        """GET a URL and return parsed JSON."""
-        headers = self._build_auth_headers()
-        r = requests.get(url, headers=headers, timeout=self.config["timeout"])
-        r.raise_for_status()
+    def _fetch_manifest(self, base_url, headers, timeout):
+        """Fetch and return the MISP feed manifest (uuid → event metadata)."""
+        manifest_url = base_url.rstrip("/") + "/manifest.json"
+        r = request_with_retry("GET", manifest_url, headers=headers, timeout=timeout)
         return r.json()
 
-    def _get_cutoff(self) -> float:
-        """Determine the timestamp cutoff for event filtering."""
-        if self.since:
-            return self.since.timestamp()
-        days = self.config["days"]
-        if days > 0:
-            return (datetime.now(timezone.utc) - timedelta(days=days)).timestamp()
-        return 0
+    def _fetch_event(self, base_url, uuid, headers, timeout):
+        """Fetch a single MISP event by UUID."""
+        event_url = base_url.rstrip("/") + f"/{uuid}.json"
+        r = request_with_retry("GET", event_url, headers=headers, timeout=timeout)
+        return r.json()
 
     def fetch_raw(self) -> list[dict]:
-        base_url = self.config["url"].rstrip("/")
-        filter_to_ids = self.config["filter_to_ids"]
-        max_events = self.config["max_events"]
-        cutoff_ts = self._get_cutoff()
+        base_url      = self.config["url"]
+        timeout       = self.config.get("timeout", 120)
+        initial_days  = self.config.get("initial_days")
+        filter_to_ids = self.config.get("filter_to_ids", True)
+        max_events    = self.config.get("max_events", 200)
 
-        # Fetch manifest and filter to recent events
+        headers = self._build_auth_headers()
+
+        # determine the cutoff timestamp for filtering events
+        if self.since:
+            cutoff_ts = self.since.timestamp()
+        elif initial_days:
+            cutoff_ts = (datetime.now(timezone.utc) - timedelta(days=int(initial_days))).timestamp()
+        else:
+            cutoff_ts = 0  # no restriction, fetch everything
+
+        # fetch the manifest (index of all event UUIDs and their timestamps)
         try:
-            manifest = self._fetch_json(f"{base_url}/manifest.json")
+            manifest = self._fetch_manifest(base_url, headers, timeout)
         except Exception:
             logger.exception("%s: failed to fetch manifest", self.source_name)
             return []
 
-        events = sorted(
-            [(uuid, float(meta.get("timestamp", 0)))
-             for uuid, meta in manifest.items()
-             if float(meta.get("timestamp", 0)) >= cutoff_ts],
-            key=lambda x: x[1], reverse=True,
-        )[:max_events]
+        # filter to events newer than cutoff, sorted most recent first
+        events = []
+        for uuid, meta in manifest.items():
+            ts = float(meta.get("timestamp", 0))
+            if ts >= cutoff_ts:
+                events.append((uuid, ts, meta))
+        events.sort(key=lambda x: x[1], reverse=True)
 
-        # Fetch each event and extract attributes
+        if max_events > 0:
+            events = events[:max_events]
+
+        # fetch each event individually and extract its attributes as indicators
         indicators = []
-        for uuid, _ in events:
+        for uuid, ts, meta in events:
             try:
-                data = self._fetch_json(f"{base_url}/{uuid}.json")
+                event_data = self._fetch_event(base_url, uuid, headers, timeout)
             except Exception:
                 logger.warning("%s: failed to fetch event %s, skipping", self.source_name, uuid)
                 continue
 
-            event = data.get("Event", data)
-            event_label = _extract_event_label(event)
+            # handle both wrapped {"Event": {...}} and bare event dict formats
+            event = event_data.get("Event", event_data)
+
+            # collect event-level tags (these apply to every attribute in this event)
+            seen_event_labels: set[str] = set()
+            event_labels: list[str] = []
+            for t in event.get("Tag", []):
+                name = t.get("name") if isinstance(t, dict) else None
+                if name and name not in seen_event_labels:
+                    seen_event_labels.add(name)
+                    event_labels.append(name)
+
+            # Coerce threat_level_id to int; some deployments serialize it as a string.
+            try:
+                threat_level = int(event.get("threat_level_id"))
+            except (TypeError, ValueError):
+                threat_level = None
+            confidence = _THREAT_LEVEL_CONFIDENCE.get(threat_level)
 
             for attr in event.get("Attribute", []):
                 if filter_to_ids and not attr.get("to_ids", False):
                     continue
 
                 misp_type = attr.get("type", "").lower()
-                value = _split_composite_value(misp_type, attr.get("value", "").strip())
+                value = attr.get("value", "").strip()
 
-                labels = list(self.config["static_labels"])
-                if event_label and event_label not in labels:
-                    labels.append(event_label)
-                category = (attr.get("category") or "").strip().lower()
-                if category and category not in labels:
-                    labels.append(category)
+                # split composite types like "ip-src|port" or "filename|hash"
+                if "|" in value and "|" in misp_type:
+                    parts = value.split("|", 1)
+                    type_parts = misp_type.split("|", 1)
+                    if "filename" in type_parts[0]:
+                        value = parts[1] if len(parts) > 1 else parts[0]
+                    else:
+                        value = parts[0]
 
+                # merge attribute-level tags with event-level tags, skip duplicates
+                attr_labels = [
+                    t["name"] for t in attr.get("Tag", [])
+                    if isinstance(t, dict) and t.get("name")
+                ]
+                labels = event_labels + [l for l in attr_labels if l not in seen_event_labels]
+
+                # use the attribute's own timestamp, not the event-level one
+                attr_ts = attr.get("timestamp")
                 indicators.append({
-                    "ioc_type": misp_type,
-                    "ioc_value": value,
-                    "labels": labels,
-                    "confidence": None,
-                    "first_seen": attr.get("first_seen") or attr.get("timestamp"),
-                    "last_seen": attr.get("last_seen") or attr.get("timestamp"),
+                    "ioc_type":   misp_type,
+                    "ioc_value":  value,
+                    "labels":     labels,
+                    "confidence": confidence,
+                    "first_seen": attr.get("first_seen") or attr_ts,
+                    "last_seen":  attr.get("last_seen"),
                 })
 
         return indicators

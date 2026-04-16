@@ -1,14 +1,6 @@
 from django.db import models
 from ingestion.models import *
 
-class HomePageModel(models.Model):
-    """
-    This model is not meant to be stored in the database. It serves as a container for data to be displayed on the homepage.
-    """
-    total_indicators = models.IntegerField(default=0)
-    indicators_by_type = models.JSONField(default=dict)
-    last_updated = models.DateTimeField(null=True, blank=True)
-    
 
 class ThreatFeed(models.Model):
 

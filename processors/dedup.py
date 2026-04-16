@@ -1,29 +1,35 @@
 import logging
 
-import pandas as pd
-
 logger = logging.getLogger(__name__)
 
 
 def dedup(records: list[dict]) -> list[dict]:
     """
-    Deduplicate a batch of parsed IOC dicts.
-
-    Converts timestamps to UTC, sorts by last_seen descending, then drops
-    duplicate (ioc_type, ioc_value) pairs keeping the freshest.
-    Returns a list of dicts ready for upsert_indicators().
+    Deduplicate a batch of parsed IOC dicts by (ioc_type, ioc_value),
+    keeping the record with the most recent last_seen.
+    Labels from every duplicate are merged onto the winner so that
+    context from all sightings is preserved.
     """
-    columns = ["ioc_type", "ioc_value", "confidence", "labels", "first_seen", "last_seen"]
-    df = pd.DataFrame(records, columns=columns)
+    # group records by (type, value) so duplicates collapse into one
+    seen: dict[tuple, dict] = {}
+    for r in records:
+        key = (r.get("ioc_type", ""), r.get("ioc_value", ""))
+        existing = seen.get(key)
+        if existing is None:
+            seen[key] = r
+        else:
+            # merge labels from both records, preserving order and removing dupes
+            merged_labels = list(dict.fromkeys(
+                (existing.get("labels") or []) + (r.get("labels") or [])
+            ))
+            # keep whichever record has the more recent last_seen timestamp
+            r_ts = r.get("last_seen")
+            e_ts = existing.get("last_seen")
+            if r_ts and (e_ts is None or r_ts > e_ts):
+                seen[key] = r
+            seen[key]["labels"] = merged_labels
 
-    for col in ("first_seen", "last_seen"):
-        df[col] = pd.to_datetime(df[col], utc=True, errors="coerce")
-
-    before = len(df)
-    df = df.sort_values("last_seen", ascending=False)
-    df = df.drop_duplicates(subset=["ioc_type", "ioc_value"], keep="first")
-    after = len(df)
-
-    logger.info("dedup: %d -> %d (removed %d duplicates)", before, after, before - after)
-
-    return df.reset_index(drop=True).to_dict("records")
+    before = len(records)
+    result = list(seen.values())
+    logger.info("dedup: %d -> %d (removed %d duplicates)", before, len(result), before - len(result))
+    return result

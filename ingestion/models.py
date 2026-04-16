@@ -15,6 +15,7 @@ class IndicatorOfCompromise(models.Model):
     sources      = models.JSONField(default=list, blank=True)
     first_seen   = models.DateTimeField(null=True, blank=True)
     last_seen    = models.DateTimeField(null=True, blank=True)
+    ingested_at  = models.DateTimeField(auto_now=True)
 
     class Meta:
         db_table = "indicators_of_compromise"
@@ -25,37 +26,61 @@ class IndicatorOfCompromise(models.Model):
 
     @property
     def confidence_level(self):
-        """Map numeric confidence to High / Medium / Low."""
         if self.confidence is None:
-            return "Low"
+            return "Unknown"
         for label, display, low, high in self.CONFIDENCE_LEVELS:
             if low <= self.confidence <= high:
                 return display
         return "Unknown"
 
+class GeoEnrichment(models.Model):
+    """Geo-location data for IP indicators, populated at ingestion time."""
+    indicator    = models.OneToOneField(
+        IndicatorOfCompromise,
+        on_delete=models.CASCADE,
+        related_name="geo",
+    )
+    country        = models.CharField(max_length=100, blank=True, default="")
+    country_code   = models.CharField(max_length=4, blank=True, default="")
+    continent_code = models.CharField(max_length=2, blank=True, default="")
+    city           = models.CharField(max_length=100, blank=True, default="")
+    latitude       = models.FloatField(null=True, blank=True)
+    longitude      = models.FloatField(null=True, blank=True)
+    enriched_at    = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        db_table = "geo_enrichments"
+
+    def __str__(self):
+        return f"{self.indicator} in {self.country_code or '??'}"
+
+
 class FeedSource(models.Model):
     """
-    DB-stored credentials + config for all feed sources.
-    The adapter_type dropdown selects the generic transport adapter.
-    The config JSONField holds source-specific settings (url, field_map, etc.).
+    Represents a single threat intelligence feed source.
+    Configure feeds through the Django admin — no code changes needed.
+    adapter_type determines which ingestion adapter is used.
     """
     ADAPTER_CHOICES = [
-        ("json", "JSON API"),
-        ("csv", "CSV/TSV File"),
-        ("text", "Plain Text List"),
-        ("misp", "MISP Feed"),
+        ("text",  "Plain Text List"),
+        ("csv",   "CSV / TSV File"),
+        ("misp",  "MISP Feed"),
         ("taxii", "TAXII 2.1 Server"),
+        ("json",  "REST API"),
     ]
 
-    name = models.CharField(max_length=64, unique=True)
+    name         = models.CharField(max_length=64, unique=True)
     adapter_type = models.CharField(max_length=16, choices=ADAPTER_CHOICES, default="json")
-    requires_api_key = models.BooleanField(default=True)
-    api_key = models.TextField(blank=True, default="")
-    is_enabled = models.BooleanField(default=True)
-    config = models.JSONField(blank=True, default=dict)
-    last_pulled = models.DateTimeField(null=True, blank=True)
-    updated_at = models.DateTimeField(auto_now=True)
-    sourceurl = models.CharField(blank=True)
+    url           = models.CharField(max_length=512, blank=True, default="")
+    api_key_env   = models.CharField(max_length=64, blank=True, default="")
+    auth_header   = models.CharField(max_length=64, blank=True, default="")
+    username      = models.CharField(max_length=256, blank=True, default="")
+    password_env  = models.CharField(max_length=64, blank=True, default="")
+    collection_id = models.CharField(max_length=256, blank=True, default="")
+    is_enabled   = models.BooleanField(default=True)
+    config       = models.JSONField(blank=True, default=dict)
+    last_pulled  = models.DateTimeField(null=True, blank=True)
+    updated_at   = models.DateTimeField(auto_now=True)
 
     def save(self, *args, **kwargs):
         self.name = self.name.strip()

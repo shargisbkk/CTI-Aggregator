@@ -357,3 +357,66 @@ body.dark-mode {
     Primary - #4770b0
     Surface - #121212
 */
+
+/* ====================================
+    Dark mode overrides for Bootstrap
+==================================== */
+
+.dark-mode .text-muted {
+    color: var(--clr-dark-surface-a40) !important;
+}
+
+.dark-mode .form-control,
+.dark-mode .form-select {
+    background-color: var(--clr-dark-surface-a20);
+    color: var(--clr-light-a0);
+    border-color: var(--clr-dark-surface-a30);
+}
+
+.dark-mode .form-control::placeholder {
+    color: var(--clr-dark-surface-a40);
+}
+
+/* ====================================
+    Label chips (indicators page)
+==================================== */
+
+.label-chip {
+    background-color: #d1ecf1;
+    color: #0c5460;
+}
+
+.dark-mode .label-chip {
+    background-color: var(--clr-dark-info-a0);
+    color: var(--clr-dark-info-a20);
+}
+
+/* Truncate long labels inside the table only — filter chips at the top are unaffected */
+.table .label-chip {
+    max-width: 120px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    vertical-align: middle;
+}
+
+/* Label overflow dropdown — tonal background instead of Bootstrap white */
+.dropdown-menu {
+    background-color: var(--clr-light-surface-tonal-a0);
+    border-color: var(--clr-light-surface-a30);
+}
+
+.dark-mode .dropdown-menu {
+    background-color: var(--clr-dark-surface-tonal-a10);
+    border-color: var(--clr-dark-surface-tonal-a20);
+}
+
+.dark-mode .dropdown-item {
+    color: var(--clr-light-a0);
+}
+
+.dark-mode .dropdown-item:hover,
+.dark-mode .dropdown-item:focus {
+    background-color: var(--clr-dark-surface-tonal-a20);
+    color: var(--clr-light-a0);
+}

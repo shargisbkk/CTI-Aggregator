@@ -58,12 +58,18 @@ urlpatterns = [
     ),
 
     path(
+        "feeds/status/",
+        views.ingestion_status,
+        name="dashboard-ingestion-status"
+    ),
+
+    path(
         "toggle-theme/",
         views.toggle_theme,
         name="toggle-theme"
     ),
 
-    # Other Patters (used for passing data into js scripts)
+    # Other Patterns (used for passing data into js scripts)
     path(
         "api/threat-confidence-chart-data/",
         views.threat_confidence_chart_data,

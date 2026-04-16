@@ -1,13 +1,6 @@
 """
-Abstract base for all feed adapters.
-
-Each adapter handles one transport/format (JSON API, CSV, MISP, etc.).
-Subclasses implement fetch_raw() to fetch data and parse it into raw
-indicator dicts with 6 standard keys: ioc_type, ioc_value, labels,
-confidence, first_seen, last_seen.
-
-Normalization (type mapping, label cleaning) lives in processors.normalize
-and runs as a separate pipeline step.
+Base adapter interface. All feed adapters extend FeedAdapter and implement fetch_raw().
+Adding a new transport type means adding a new subclass, not changing existing code.
 """
 
 import logging
@@ -15,30 +8,72 @@ from abc import ABC, abstractmethod
 from datetime import datetime
 from typing import Optional
 
+from processors.normalize import normalize_one
+
 logger = logging.getLogger(__name__)
 
 
 class FeedAdapter(ABC):
     """Base class for all feed adapters. Subclasses implement fetch_raw()."""
 
-    requires_api_key: bool = True
-    DEFAULT_CONFIG: dict = {}
+    source_name: str = ""
 
     def __init__(self, api_key: str = "", since: Optional[datetime] = None, config: Optional[dict] = None):
         self._api_key = (api_key or "").strip()
-        self.since = since
-        self.config = {**self.DEFAULT_CONFIG, **(config or {})}
-        self.source_name = self.config.get("_source_name", "")
+        self.since    = since
+        self.config   = config or {}
 
     def _build_auth_headers(self) -> dict:
-        """Build HTTP auth headers from config. Returns empty dict if no auth needed."""
+        """Build auth headers from config if auth_header and api_key are both set."""
         headers = {}
         auth_header = self.config.get("auth_header")
         if auth_header and self._api_key:
             headers[auth_header] = self._api_key
         return headers
 
+    def normalize_record(self, raw: dict) -> Optional[dict]:
+        """Normalize a raw indicator dict via processors.normalize."""
+        return normalize_one(raw)
+
+    def ingest(self) -> Optional[list[dict]]:
+        """Fetch and normalize records. Skips bad records so one failure won't drop the batch."""
+        try:
+            raw_records = self.fetch_raw()
+        except Exception:
+            logger.exception("%s: fetch_raw() failed", self.source_name)
+            return None  # None = fetch failed; [] = no data
+
+        indicators = []
+        skipped = 0
+        for raw in raw_records:
+            try:
+                rec = self.normalize_record(raw)
+                if rec is not None:
+                    indicators.append(rec)
+            except Exception:
+                skipped += 1
+                continue
+
+        if skipped:
+            logger.warning("%s: skipped %d bad records", self.source_name, skipped)
+        logger.info("%s: normalized %d indicators from %d raw records",
+                    self.source_name, len(indicators), len(raw_records))
+        return indicators
+
     @abstractmethod
     def fetch_raw(self) -> list[dict]:
-        """Fetch from the source and return raw indicator dicts."""
+        """
+        Fetch from the source and return raw indicator dicts.
+
+        Each dict must follow this schema (normalize_one() handles the rest):
+            ioc_type  (str)            raw type string; mapped via type_map.json
+            ioc_value (str)            the indicator value
+            labels    (list[str])      optional tags/categories
+            confidence (int|None)      optional 0-100 score
+            first_seen (str|datetime|int|None)  optional; any parseable timestamp
+            last_seen  (str|datetime|int|None)  optional; any parseable timestamp
+
+        Unknown ioc_type values fall back to value-based inference (_classify_value).
+        Records with no resolvable type are silently dropped by normalize_one().
+        """
         ...
