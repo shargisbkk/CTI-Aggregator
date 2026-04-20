@@ -17,3 +17,6 @@ Password: change-me
 Upon entering these, you will be dropped to the home page. Currently, you have 0 indicators, and 3 active threat feeds, because we have pre-seeded a few for you. Navigate to the Threat Feeds page to see them - as well as 2 deactivated feeds. These need to be filled out with your personal API keys for the sites, which you can sign up for on their sites. Once done, you can edit them on your [Admin Page](http://localhost:8000/admin/ingestion/feedsource).
 
 From there, just hit Update All Feeds, and then wait for them to populate.
+
+# Next Steps
+You can then go to the Analysis page and look over the data, or alter your sources on the admin page from there! If you would like to add new sources, please refer to the [Documentation](CITATION NEEDED) for more assistance, or put in an issue within this repo. Thanks for using the CTI Aggregator!
