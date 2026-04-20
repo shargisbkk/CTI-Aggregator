@@ -42,7 +42,6 @@
         <a href="{% url 'dashboard:dashboard-indicators' %}" class="{% if '/indicators' in request.path %}active{% endif %}">Indicators</a>
         <a href="{% url 'dashboard:dashboard-threat-feeds' %}" class="{% if '/threat-feeds' in request.path %}active{% endif %}">Threat Feeds</a>
         <a href="{% url 'dashboard:dashboard-analytics' %}" class="{% if '/analytics' in request.path %}active{% endif %}">Analytics</a>
-        <!-- <a href="{% url 'dashboard:dashboard-settings' %}" class="{% if '/settings' in request.path %}active{% endif %}">Settings</a> -->
     </div>
 
 
@@ -94,7 +93,7 @@
     </script>
     <script src="{% static 'js/toggle-icons.js' %}"></script>
 
-    <!-- Ingestion results modal — shows on any page when background ingestion finishes -->
+    <!-- Ingestion results modal, shows on any page when background ingestion finishes -->
     <div class="modal fade" id="ingestionResultsModal" tabindex="-1" aria-labelledby="ingestionResultsLabel" aria-hidden="true">
         <div class="modal-dialog modal-dialog-centered">
             <div class="modal-content">
@@ -140,39 +139,7 @@
     </style>
 
     <script>
-    // Poll for ingestion status on every page if ingestion is running
-    (function () {
-        if (localStorage.getItem('ingestion_polling') !== 'true') return;
-
-        const interval = setInterval(() => {
-            fetch('{% url "dashboard:dashboard-ingestion-status" %}')
-                .then(r => r.json())
-                .then(data => {
-                    if (data.status === 'done' || data.status === 'error' || data.status === 'idle') {
-                        clearInterval(interval);
-                        localStorage.removeItem('ingestion_polling');
-
-                        // Reset button if still on threat feeds page
-                        const btn = document.getElementById('updateAllFeedsBtn');
-                        if (btn) {
-                            btn.disabled = false;
-                            document.getElementById('buttonText').textContent = 'Update All Feeds';
-                            document.getElementById('loadingSpinner').style.display = 'none';
-                        }
-
-                        // Show results modal (skip if server lost track of the run)
-                        if (data.status === 'error') {
-                            showIngestionError('Ingestion failed. Check the server logs for details.');
-                        } else if (data.status === 'done') {
-                            showIngestionResults(data.results || []);
-                        }
-                    }
-                })
-                .catch(() => {});
-        }, 4000);
-    })();
-
-    // Show per-source results in the modal
+    //show per source ingestion results in the modal
     function showIngestionResults(results) {
         let bodyHtml = '';
         let total = 0;
@@ -207,10 +174,20 @@
             <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
         `;
 
+        localStorage.removeItem('ingestion_running');
+        //reset threat feeds button if we're on that page
+        var tfBtn = document.getElementById('updateAllFeedsBtn');
+        if (tfBtn) {
+            tfBtn.disabled = false;
+            var txt = document.getElementById('buttonText');
+            var spin = document.getElementById('loadingSpinner');
+            if (txt) txt.textContent = 'Update All Feeds';
+            if (spin) spin.style.display = 'none';
+        }
         new bootstrap.Modal(document.getElementById('ingestionResultsModal')).show();
     }
 
-    // Show error in the modal
+    //show error in the modal
     function showIngestionError(message) {
         document.getElementById('ingestionResultsBody').innerHTML = `
             <div class="d-flex align-items-center">
@@ -219,8 +196,44 @@
             </div>`;
         document.getElementById('ingestionResultsFooter').innerHTML =
             '<button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>';
+        localStorage.removeItem('ingestion_running');
+        //reset threat feeds button if we're on that page
+        var tfBtn = document.getElementById('updateAllFeedsBtn');
+        if (tfBtn) {
+            tfBtn.disabled = false;
+            var txt = document.getElementById('buttonText');
+            var spin = document.getElementById('loadingSpinner');
+            if (txt) txt.textContent = 'Update All Feeds';
+            if (spin) spin.style.display = 'none';
+        }
         new bootstrap.Modal(document.getElementById('ingestionResultsModal')).show();
     }
+
+    //poll for background ingestion results, reachable from any page so the click handler can kick it off
+    window.pollIngestionStatus = function () {
+        if (localStorage.getItem('ingestion_running') !== 'true') return;
+
+        fetch('{% url "dashboard:dashboard-ingestion-status" %}')
+            .then(r => r.json())
+            .then(data => {
+                if (data.status === 'success') {
+                    showIngestionResults(data.results || []);
+                } else if (data.status === 'error') {
+                    showIngestionError(data.message || 'Ingestion failed.');
+                } else if (data.status === 'running') {
+                    //still running, check again in 3 seconds
+                    setTimeout(window.pollIngestionStatus, 3000);
+                } else {
+                    //idle with no results, clear the flag
+                    localStorage.removeItem('ingestion_running');
+                }
+            })
+            .catch(() => {
+                setTimeout(window.pollIngestionStatus, 5000);
+            });
+    };
+    //kick off on every page load in case a background ingestion was already in flight
+    window.pollIngestionStatus();
     </script>
 </body>
 </html>

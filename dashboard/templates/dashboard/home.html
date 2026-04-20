@@ -47,7 +47,9 @@
                         <div class="{% if not forloop.last %}mb-3 pb-3 border-bottom{% endif %}">
 
                             <div class="d-flex align-items-center flex-wrap gap-2 mb-3">
-                                <a href="{% url 'dashboard:dashboard-indicators' %}?q={{ cve.cve_id }}"
+                                <a href="https://nvd.nist.gov/vuln/detail/{{ cve.cve_id }}"
+                                   target="_blank"
+                                   rel="noopener"
                                    class="fw-bold cve-id-link"
                                    style="font-size: 1rem;">
                                     {{ cve.cve_id }}

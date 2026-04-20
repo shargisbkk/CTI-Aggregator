@@ -58,8 +58,8 @@ urlpatterns = [
     ),
 
     path(
-        "feeds/status/",
-        views.ingestion_status,
+        "feeds/ingestion-status/",
+        views.check_ingestion_status,
         name="dashboard-ingestion-status"
     ),
 

@@ -103,5 +103,5 @@ class Command(BaseCommand):
                 results.append({"name": source.name, "added": 0, "error": str(e)[:120]})
 
         # store results in cache so the dashboard can show per source breakdown
-        cache.set("ingestion_results", results, timeout=300)
+        cache.set("ingestion_results", results, timeout=600)
         self.stdout.write(self.style.SUCCESS(f"\nDone. {total} total new indicators saved."))

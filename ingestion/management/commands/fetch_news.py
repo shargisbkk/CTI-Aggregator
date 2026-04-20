@@ -7,7 +7,7 @@ from django.db import connection
 from django.utils import timezone
 from email.utils import parsedate_to_datetime
 
-from ingestion.models import ThreatArticle
+from ingestion.models import IndicatorOfCompromise, ThreatArticle
 
 
 GOOGLE_NEWS_URL = (
@@ -35,90 +35,106 @@ class Command(BaseCommand):
 
     def add_arguments(self, parser):
         parser.add_argument(
-            "--days", type=int, default=30,
-            help="Look back this many days for recently ingested CVEs (default: 30).",
+            "--days", type=int, default=7,
+            help="Look back this many days for the most frequent CVEs (default: 7).",
         )
         parser.add_argument(
-            "--limit", type=int, default=10,
-            help="Max number of CVEs to search for (default: 10).",
+            "--top", type=int, default=3,
+            help="Number of top CVEs to fetch articles for (default: 3).",
+        )
+        parser.add_argument(
+            "--articles", type=int, default=3,
+            help="Max number of articles to save per CVE (default: 3).",
         )
 
     def handle(self, *args, **opts):
         days = opts["days"]
-        limit = opts["limit"]
+        top_n = opts["top"]
+        max_articles = opts["articles"]
+        freshness_days = 30
 
-        cves = self._get_recent_cves(days, limit)
-        if not cves:
+        cve_ids = self._get_top_cves(days, top_n)
+        if not cve_ids:
             self.stdout.write(self.style.WARNING(
                 f"No CVEs ingested in the last {days} days."
             ))
             return
 
-        self.stdout.write(f"Found {len(cves)} recent CVEs to search:")
-        for cve_id, labels in cves:
-            self.stdout.write(f"  {cve_id.upper()}  ({', '.join(labels[:3])})")
+        self.stdout.write(f"Top {len(cve_ids)} CVEs from last {days} days: {', '.join(cve_ids)}")
 
-        saved = 0
-        for cve_id, labels in cves:
-            url = GOOGLE_NEWS_URL.format(query=cve_id.upper())
+        cutoff = timezone.now() - timedelta(days=freshness_days)
+        total_saved = 0
+
+        for cve_id in cve_ids:
+            url = GOOGLE_NEWS_URL.format(query=cve_id)
             feed = feedparser.parse(url)
+            time.sleep(1)
 
             if not feed.entries:
-                self.stdout.write(f"  {cve_id.upper()}: no articles found")
+                self.stdout.write(f"  {cve_id}: no articles found")
                 continue
 
-            for entry in feed.entries[:5]:
+            # Keep entries that mention the CVE in the title and were published within 30 days
+            matched = []
+            for entry in feed.entries:
                 title = entry.get("title", "")[:300]
-                # Only save articles that mention the CVE in the title
-                if cve_id.upper() not in title.upper():
+                if cve_id not in title.upper():
+                    continue
+                pub_date = _parse_published(entry)
+                if pub_date and pub_date < cutoff:
                     continue
                 link = entry.get("link", "")[:700]
                 if not link:
                     continue
-                _, created = ThreatArticle.objects.update_or_create(
-                    url=link,
-                    defaults={
-                        "title": title,
-                        "source_name": "Google News",
-                        "matched_label": cve_id.upper(),
-                        "published_at": _parse_published(entry),
-                    },
-                )
-                if created:
-                    saved += 1
+                matched.append((entry, title, link, pub_date))
 
-            self.stdout.write(
-                f"  {cve_id.upper()}: {len(feed.entries)} articles found"
+            # Sort by published date descending, keep only top N
+            matched.sort(
+                key=lambda m: m[3] or timezone.datetime.min.replace(
+                    tzinfo=timezone.utc
+                ),
+                reverse=True,
             )
-            time.sleep(0.3)
+            matched = matched[:max_articles]
 
-        # Clean up articles older than 30 days
-        cutoff = timezone.now() - timedelta(days=30)
-        stale = ThreatArticle.objects.filter(fetched_at__lt=cutoff).delete()[0]
+            # Wipe old articles for this CVE so the table stays fresh
+            ThreatArticle.objects.filter(matched_label=cve_id).delete()
+
+            # Look up the indicator once so new rows get the FK set for cascade delete
+            indicator = IndicatorOfCompromise.objects.filter(
+                ioc_type="cve", ioc_value=cve_id.lower()
+            ).first()
+
+            for entry, title, link, pub_date in matched:
+                ThreatArticle.objects.create(
+                    url=link,
+                    title=title,
+                    source_name="Google News",
+                    matched_label=cve_id,
+                    matched_indicator=indicator,
+                    published_at=pub_date,
+                )
+                total_saved += 1
+
+            self.stdout.write(f"  {cve_id}: {len(matched)} recent articles saved")
+
+        # Also remove any articles older than 30 days for CVEs we didn't touch
+        stale = ThreatArticle.objects.filter(published_at__lt=cutoff).delete()[0]
 
         self.stdout.write(self.style.SUCCESS(
-            f"Done. {saved} new articles saved, {stale} stale removed."
+            f"Done. {total_saved} articles saved, {stale} stale removed."
         ))
 
-    def _get_recent_cves(self, days, limit):
-        # Get recently ingested CVEs with their labels
+    def _get_top_cves(self, days, limit):
+        """Return the CVEs that appear most frequently in the last N days."""
         with connection.cursor() as cur:
             cur.execute("""
-                SELECT ioc_value, labels
+                SELECT UPPER(ioc_value), COUNT(*) AS cnt
                 FROM indicators_of_compromise
                 WHERE ioc_type = 'cve'
                   AND ingested_at >= NOW() - INTERVAL '%s days'
-                ORDER BY ingested_at DESC
+                GROUP BY UPPER(ioc_value)
+                ORDER BY cnt DESC
                 LIMIT %s
             """, [days, limit])
-            results = []
-            for row in cur.fetchall():
-                cve_id = row[0]
-                raw_labels = row[1] if row[1] else []
-                labels = [
-                    l for l in raw_labels
-                    if isinstance(l, str) and len(l) > 3
-                    and not l.lower().startswith("cve-")
-                ]
-                results.append((cve_id, labels))
-            return results
+            return [row[0] for row in cur.fetchall()]

@@ -2,7 +2,7 @@ from django.contrib.auth.decorators import login_required
 from django.shortcuts import render, redirect
 from django.utils import timezone
 from django.core.paginator import Paginator
-from django.db.models import Q, Count, Max
+from django.db.models import Q, Count, Max, F
 from django.views.decorators.http import require_POST
 from django.http import JsonResponse
 from django.core.management import call_command
@@ -36,12 +36,15 @@ def home(request):
                     .count()
                     )
 
-    # Most recent 50 indicators
-    recent_indicators = IndicatorOfCompromise.objects.order_by('-last_seen')[:50]
+    # Most recent 50 indicators, nulls last so feeds without timestamps don't dominate
+    recent_indicators = IndicatorOfCompromise.objects.order_by(
+        F('last_seen').desc(nulls_last=True),
+        '-ingested_at',
+    )[:50]
 
-    # Last time IOC records were updated
-    last_updated = IndicatorOfCompromise.objects.aggregate(
-        last_updated=Max("last_seen")
+    # Last time any feed was pulled
+    last_updated = FeedSource.objects.aggregate(
+        last_updated=Max("last_pulled")
     )["last_updated"]
 
     # CVE news: recent CVEs ordered by newest article first
@@ -149,10 +152,8 @@ def indicators(request):
         if date_to:
             query = query.filter(last_seen__lte=date_to)
 
-    #sort by most recently ingested so new indicators always appear at the top.
-    #last_seen is null for some feeds (Emerging Threats has no timestamps) which
-    #would sort those rows to the top under PostgreSQL default NULL ordering.
-    query = query.order_by("-ingested_at", "-id")
+    # Sort by last_seen (nulls last) then ingested_at as tiebreaker
+    query = query.order_by(F('last_seen').desc(nulls_last=True), '-ingested_at', '-id')
 
     paginator = Paginator(query, 50)
     page_obj = paginator.get_page(request.GET.get("page"))
@@ -234,91 +235,77 @@ def threat_feeds(request):
 @login_required
 @require_POST
 def update_all_feeds(request):
-    """
-    Run ingest_all in a background thread so the page doesn't hang.
-    Progress appears in docker compose logs.
-    """
     import threading
     from django.core.cache import cache
 
-    def run():
-        import logging
-        import traceback
-        from django.core.management import call_command
-        logger = logging.getLogger(__name__)
+    #run ingestion in a background thread so the user can navigate freely
+    def run_ingestion():
         try:
-            cache.set("ingestion_status", "running", timeout=3600)
-            call_command('ingest_all')
-            cache.set("ingestion_status", "done", timeout=120)
+            output = StringIO()
+            call_command('ingest_all', stdout=output)
+            results = cache.get("ingestion_results", [])
+            cache.delete("ingestion_results")
+            cache.set("ingestion_pending", {"status": "success", "results": results}, timeout=600)
         except Exception as e:
-            logger.error("ingest_all crashed: %s\n%s", e, traceback.format_exc())
-            cache.set("ingestion_status", "error", timeout=120)
+            cache.set("ingestion_pending", {"status": "error", "message": str(e)[:200]}, timeout=600)
 
-    t = threading.Thread(target=run, daemon=True)
-    t.start()
-
-    return JsonResponse({
-        "status": "started",
-        "message": "Ingestion started in background. Check logs for progress.",
-    })
+    cache.set("ingestion_running", True, timeout=600)
+    threading.Thread(target=run_ingestion, daemon=True).start()
+    return JsonResponse({"status": "started"})
 
 
 @login_required
-def ingestion_status(request):
-    """Poll endpoint that returns current ingestion status and per-source results from cache."""
+def check_ingestion_status(request):
     from django.core.cache import cache
-    status = cache.get("ingestion_status", "idle")
-    if status == "done":
-        results = cache.get("ingestion_results", [])
-        return JsonResponse({"status": "done", "results": results})
-    return JsonResponse({"status": status})
+
+    #check if background ingestion has finished
+    pending = cache.get("ingestion_pending")
+    if pending is not None:
+        cache.delete("ingestion_pending")
+        cache.delete("ingestion_running")
+        return JsonResponse(pending)
+
+    running = cache.get("ingestion_running", False)
+    return JsonResponse({"status": "running" if running else "idle"})
 
 
 # ======================================================
 # ANALYTICS VIEW
 # ======================================================
 
-# Function to grab data for charts in analytics view 
+#chart data endpoint for analytics
 @login_required
 def threat_confidence_chart_data(request):
-    # Pull data query for confidence
+    #count indicators by confidence level
     data = (
         IndicatorOfCompromise.objects
         .values('confidence')
         .annotate(value=Count('confidence'))
         .order_by('-confidence')
     )
-    # Format used by ECharts (json)
+    #format for ECharts
     chart_data = [{"value": item["value"], "name": item["confidence"]} for item in data]
     return JsonResponse(chart_data, safe=False)
 
-# Actual Analytics view
 @login_required
 def analytics(request):
 
-    # ----------------------------
-    # Summary stats
-    # ----------------------------
-
-    # Pulls all records from the IndicatorsOfCompromise table in cti_db and uses the model from 
-    # ingestion.models.py.
+    #summary stats
     count_records = IndicatorOfCompromise.objects.count()
-    # Queryable records variable
     all_records = IndicatorOfCompromise.objects.all()
 
-    # Confidence level, set to 75
+    #indicators with confidence 95 or higher
     high_confidence = IndicatorOfCompromise.objects.filter(
         confidence__gte=95
     ).count()
 
-    # Recent this week, wait for timestamp
-    # new_this_week = IndicatorOfCompromise.objects.filter().count()
+    #indicators seen in the last 7 days
     last_seen_this_week = (IndicatorOfCompromise.objects
                            .filter(last_seen__gte=timezone.now() - timedelta(days=7))
                            .count()
     )
 
-    # Unnest the JSONB sources array to count per source name
+    #top sources by indicator count
     with connection.cursor() as cur:
         cur.execute("""
             SELECT elem AS source_name, COUNT(*) AS count
@@ -352,11 +339,10 @@ def analytics(request):
         .annotate(count=Count("country"))
         .order_by("-count")
     )
-#===========================================================================================================
-    # Create map with these counts too
+    #build the world map from country counts
     country_rows = list(top_countries_sources)
     country_df = pd.DataFrame(country_rows)
-    # Sanitation for country names
+    #clean country names
     if len(country_rows) > 0:
         country_df['country'] = country_df['country'].astype(str).str.strip()
         country_df = country_df[country_df['country'] != '']          # drop blanks
@@ -372,9 +358,6 @@ def analytics(request):
         world_map_json = "{}"
     else:
         country_df['iso3'] = country_df['country'].apply(name_to_iso3)
-        unmapped = country_df[country_df['iso3'].isna()]['country'].unique().tolist()
-        if unmapped:
-            print('Unmapped country names for choropleth:', unmapped)
         country_df = country_df.dropna(subset=['iso3'])
 
         if country_df.empty:
@@ -399,22 +382,20 @@ def analytics(request):
                 font_color='white',
             )
             world_map_json = country_fig.to_json()
-    #print("country_df sample:", country_df[['country','iso3','count']].head(20).to_dict(orient='records'))
 
-    # PLOTLY QUERIES
-    # Query for confidence values and their count from iocs
+    #confidence donut chart
     conf_query = (
         IndicatorOfCompromise.objects
         .values("confidence")
         .annotate(count=Count("confidence"))
         .order_by("-confidence")
     )
-    # Materialize query so when we pull data, Django doesnt run the query again
+    #materialize to avoid re-querying
     conf_rows = list(conf_query)
-    # Create a labels and values list from the query
+    #split into labels and values
     conf_labels = [str(r["confidence"]) if r["confidence"] is not None else "None" for r in conf_rows]
     conf_values = [r["count"] for r in conf_rows]
-    # Figure from Plotly Graph Objects import
+    #build the donut chart
     conf_figure = go.Figure(data=[go.Pie(labels=conf_labels, values=conf_values, hole=0.4)])
     conf_figure.update_layout(
         template="plotly_dark", 
@@ -424,7 +405,6 @@ def analytics(request):
         plot_bgcolor="#26343d",
         font_color="white",
         margin=dict(t=80,b=20,l=20,r=20))
-#===========================================================================================================
 
     context = {
         "total_indicators":     count_records,

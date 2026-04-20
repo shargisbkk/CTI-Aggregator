@@ -136,8 +136,8 @@ document.addEventListener('DOMContentLoaded', function() {
     const buttonText = document.getElementById('buttonText');
     const loadingSpinner = document.getElementById('loadingSpinner');
 
-    // If ingestion is already running (user navigated away and back), show spinner
-    if (localStorage.getItem('ingestion_polling') === 'true') {
+    //if ingestion is already running, show spinner state
+    if (localStorage.getItem('ingestion_running') === 'true') {
         updateBtn.disabled = true;
         buttonText.textContent = 'Updating...';
         loadingSpinner.style.display = 'inline-block';
@@ -164,24 +164,30 @@ document.addEventListener('DOMContentLoaded', function() {
         .then(response => response.json())
         .then(data => {
             if (data.status === 'started') {
-                // Store polling flag so base.html picks it up on any page
-                localStorage.setItem('ingestion_polling', 'true');
+                //base.html poller handles everything from here
+                localStorage.setItem('ingestion_running', 'true');
+                //kick the poller directly so the modal shows on this page without a navigation
+                if (window.pollIngestionStatus) window.pollIngestionStatus();
             } else {
-                updateBtn.disabled = false;
-                buttonText.textContent = 'Update All Feeds';
-                loadingSpinner.style.display = 'none';
+                showIngestionError(data.message || 'Failed to start ingestion.');
+                resetButton();
             }
         })
         .catch(error => {
             console.error('Error:', error);
-            updateBtn.disabled = false;
-            buttonText.textContent = 'Update All Feeds';
-            loadingSpinner.style.display = 'none';
+            showIngestionError('An error occurred while starting ingestion.');
+            resetButton();
         });
     });
+
+    function resetButton() {
+        updateBtn.disabled = false;
+        buttonText.textContent = 'Update All Feeds';
+        loadingSpinner.style.display = 'none';
+    }
+
 });
 
-// Get CSRF token from cookies
 function getCookie(name) {
     let cookieValue = null;
     if (document.cookie && document.cookie !== '') {

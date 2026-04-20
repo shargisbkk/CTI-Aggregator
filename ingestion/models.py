@@ -34,13 +34,13 @@ class IndicatorOfCompromise(models.Model):
         return "Unknown"
 
 class GeoEnrichment(models.Model):
-    #Geo-location data for IP indicators, populated at ingestion time."""
+    #geo location data for IP indicators
     indicator    = models.OneToOneField(
         IndicatorOfCompromise,
         on_delete=models.CASCADE,
         related_name="geo",
     )
-    #all the information we have in the table for enriched ip addresses 
+    #fields for enriched IP addresses
     country        = models.CharField(max_length=100, blank=True, default="")
     country_code   = models.CharField(max_length=4, blank=True, default="")
     continent_code = models.CharField(max_length=2, blank=True, default="")
@@ -56,7 +56,7 @@ class GeoEnrichment(models.Model):
         return f"{self.indicator} in {self.country_code or '??'}"
 
 
-#the actual table of sources (seeded with 6 to start)
+#feed source config, seeded by migration 0002
 class FeedSource(models.Model):
 
     ADAPTER_CHOICES = [
@@ -94,6 +94,15 @@ class ThreatArticle(models.Model):
     url           = models.URLField(max_length=700, unique=True)
     source_name   = models.CharField(max_length=100)
     matched_label = models.CharField(max_length=200, db_index=True)
+    # FK so deleting the indicator cascades its articles away
+    matched_indicator = models.ForeignKey(
+        "IndicatorOfCompromise",
+        on_delete=models.CASCADE,
+        related_name="articles",
+        null=True,
+        blank=True,
+        db_index=True,
+    )
     published_at  = models.DateTimeField(null=True, blank=True)
     fetched_at    = models.DateTimeField(auto_now_add=True)
 
