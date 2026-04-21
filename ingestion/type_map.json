@@ -28,8 +28,6 @@
     "email-src":            "email",
     "email-dst":            "email",
 
-    "hash":                 "hash",
-    "file":                 "hash",
     "md5":                  "md5",
     "md5_hash":             "md5",
     "filehash-md5":         "md5",
@@ -44,10 +42,10 @@
     "filename|sha256":      "sha256",
     "sha512":               "sha512",
     "filehash-sha512":      "sha512",
-    "ssdeep":               "hash",
-    "imphash":              "hash",
-    "tlsh":                 "hash",
-    "pehash":               "hash",
+    "ssdeep":               "ssdeep",
+    "imphash":              "imphash",
+    "tlsh":                 "tlsh",
+    "pehash":               "pehash",
 
     "filename":             "file",
     "filepath":             "file",
