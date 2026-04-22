@@ -10,6 +10,7 @@ Usage:
     python manage.py purge_stale --dry-run    # preview without deleting
 """
 
+import logging
 from datetime import timedelta
 
 from django.core.management.base import BaseCommand
@@ -17,6 +18,8 @@ from django.db.models import Q
 from django.utils import timezone
 
 from ingestion.models import IndicatorOfCompromise
+
+logger = logging.getLogger(__name__)
 
 
 class Command(BaseCommand):
@@ -46,14 +49,12 @@ class Command(BaseCommand):
         count = to_delete.count()
 
         if opts["dry_run"]:
-            self.stdout.write(f"Would delete {count:,} stale indicators (last seen before {cutoff:%b %d, %Y %I:%M %p}).")
+            logger.info(f"Would delete {count:,} stale indicators (last seen before {cutoff:%b %d, %Y %I:%M %p}).")
             return
 
         if count == 0:
-            self.stdout.write("No stale indicators to remove.")
+            logger.info("No stale indicators to remove.")
             return
 
         deleted, _ = to_delete.delete()
-        self.stdout.write(self.style.SUCCESS(
-            f"Purged {deleted:,} indicators not seen since {cutoff:%b %d, %Y %I:%M %p}."
-        ))
+        logger.info(f"Purged {deleted:,} indicators not seen since {cutoff:%b %d, %Y %I:%M %p}.")

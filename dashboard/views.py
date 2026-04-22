@@ -10,7 +10,6 @@ from django.db import connection
 from urllib.parse import urlencode
 from datetime import timedelta
 from ingestion.models import FeedSource, IndicatorOfCompromise, GeoEnrichment, ThreatArticle
-from io import StringIO
 import plotly.graph_objects as go
 import plotly.express as px
 import pandas as pd
@@ -80,6 +79,35 @@ def home(request):
             "articles": articles,
         })
 
+    #list each day's rotated ingestion log file so the dashboard card can
+    #offer them as downloads, ordered oldest first by actual date
+    from datetime import date as _date
+    from django.conf import settings
+    log_dir = settings.BASE_DIR / "logs"
+    log_entries = []
+    if log_dir.exists():
+        found = []
+        for p in log_dir.glob("ingestion.txt*"):
+            name = p.name
+            if name == "ingestion.txt":
+                slug = "today"
+                file_date = _date.today()
+            else:
+                #rotated files carry a trailing ISO date suffix
+                slug = name.rsplit(".", 1)[-1]
+                try:
+                    file_date = _date.fromisoformat(slug)
+                except (ValueError, TypeError):
+                    file_date = None
+            found.append((file_date, slug))
+
+        #sort by date ascending so oldest is first, unparsable names go to top
+        found.sort(key=lambda row: row[0] or _date.min)
+        for file_date, slug in found:
+            #plain %d stays zero padded so this works on Windows too
+            label = file_date.strftime("%B %d, %Y") if file_date else slug
+            log_entries.append({"label": label, "slug": slug})
+
     context = {
         "total_indicators": total_indicators,
         "feed_count": feed_count,
@@ -87,6 +115,7 @@ def home(request):
         "last_updated": last_updated,
         "recent_indicators": recent_indicators,
         "cve_news": cve_news,
+        "log_entries": log_entries,
     }
 
     return render(request, "dashboard/home.html", context)
@@ -240,14 +269,25 @@ def update_all_feeds(request):
 
     #run ingestion in a background thread so the user can navigate freely
     def run_ingestion():
+        from ingestion.models import ScheduledTask
+        from ingestion.scheduler import _capture_logs
         try:
-            output = StringIO()
-            call_command('ingest_all', stdout=output)
+            with _capture_logs() as buf:
+                call_command('ingest_all')
             results = cache.get("ingestion_results", [])
             cache.delete("ingestion_results")
             cache.set("ingestion_pending", {"status": "success", "results": results}, timeout=600)
+            status, message = "success", buf.getvalue()[-500:]
         except Exception as e:
             cache.set("ingestion_pending", {"status": "error", "message": str(e)[:200]}, timeout=600)
+            status, message = "error", str(e)[:500]
+
+        #keep the schedule card in sync
+        ScheduledTask.objects.filter(command="ingest_all").update(
+            last_run=timezone.now(),
+            last_status=status,
+            last_message=message,
+        )
 
     cache.set("ingestion_running", True, timeout=600)
     threading.Thread(target=run_ingestion, daemon=True).start()
@@ -436,6 +476,41 @@ def settings(request):
         request,
         "dashboard/settings.html"
     )
+
+
+# ======================================================
+# INGESTION LOG DOWNLOAD
+# Sends a day's log file as a save-as download
+# ======================================================
+
+@login_required
+def logs_download(request, slug):
+    import re
+    from django.conf import settings as dj_settings
+    from django.http import FileResponse, Http404
+
+    log_dir = dj_settings.BASE_DIR / "logs"
+
+    #accept only the word today or an ISO date string, blocks path traversal
+    if slug == "today":
+        path = log_dir / "ingestion.txt"
+        filename = "ingestion-today.txt"
+    elif re.fullmatch(r"\d{4}-\d{2}-\d{2}", slug):
+        path = log_dir / f"ingestion.txt.{slug}"
+        filename = f"ingestion-{slug}.txt"
+    else:
+        raise Http404
+
+    if not path.exists():
+        raise Http404
+
+    #confirm the resolved path is inside the logs folder
+    try:
+        path.resolve().relative_to(log_dir.resolve())
+    except ValueError:
+        raise Http404
+
+    return FileResponse(path.open("rb"), as_attachment=True, filename=filename)
 
 
 # ======================================================

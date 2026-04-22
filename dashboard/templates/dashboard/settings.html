@@ -4,49 +4,294 @@
 {% block content %}
 <div class="container-fluid">
 
-    <h2 class="fw-bold mb-4">Settings</h2>
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h2 class="fw-bold">Scheduled Tasks</h2>
+        <a href="/admin/ingestion/scheduledtask/" class="btn btn-outline-primary btn-sm">
+            <i class="fas fa-cog me-1"></i> Manage in Admin
+        </a>
+    </div>
 
     <div class="row g-4">
 
-        <!-- System Settings -->
-        <div class="col-md-6">
-            <div class="card shadow-sm p-4">
-                <h5 class="fw-bold mb-3">System Settings</h5>
+        <!-- card 1: feed ingestion -->
+        <div class="col-lg-4 col-md-6">
+            <div class="card shadow-sm h-100 schedule-card">
+                <div class="card-body d-flex flex-column p-4">
 
-                <form>
-                    <div class="mb-3">
-                        <label class="form-label">Default Confidence Threshold</label>
-                        <input type="number" class="form-control" value="50">
+                    <div class="d-flex align-items-center mb-2">
+                        <div class="schedule-icon me-3">
+                            <i class="fas fa-sync-alt"></i>
+                        </div>
+                        <div class="flex-grow-1">
+                            <h5 class="fw-bold mb-0">Feed Ingestion</h5>
+                            <small class="text-muted">Pulls new indicators from all enabled feeds</small>
+                        </div>
+                        {% if ingest_all.is_enabled %}
+                        <span class="badge bg-success">Enabled</span>
+                        {% else %}
+                        <span class="badge bg-secondary">Disabled</span>
+                        {% endif %}
                     </div>
 
-                    <div class="mb-3">
-                        <label class="form-label">Enable Auto-Ingestion</label>
-                        <select class="form-select">
-                            <option>Enabled</option>
-                            <option>Disabled</option>
-                        </select>
+                    <hr class="my-3">
+
+                    <div class="schedule-detail mb-2">
+                        <span class="detail-label">Frequency</span>
+                        <span class="detail-value">{{ ingest_all.get_frequency_display }}</span>
                     </div>
 
-                    <div class="mb-3">
-                        <label class="form-label">Theme</label>
-                        <div>
-                            <a href="{% url 'dashboard:toggle-theme' %}" class="btn btn-dark">
-                                {% if request.COOKIES.theme == 'dark' %}
-                                    Disable Dark Mode
-                                {% else %}
-                                    Enable Dark Mode
-                                {% endif %}
-                            </a>
+                    {% if ingest_all.frequency == "weekly" and ingest_all.day_of_week != None %}
+                    <div class="schedule-detail mb-2">
+                        <span class="detail-label">Day</span>
+                        <span class="detail-value">{{ day_names|slice:ingest_all.day_of_week|last }}</span>
+                    </div>
+                    {% endif %}
+
+                    {% if ingest_all.frequency != "every_6h" and ingest_all.frequency != "every_12h" %}
+                    <div class="schedule-detail mb-2">
+                        <span class="detail-label">Time</span>
+                        <span class="detail-value">{{ ingest_all.time_of_day|time:"g:i A" }}</span>
+                    </div>
+                    {% endif %}
+
+                    {% if ingest_all.last_run %}
+                    <div class="mt-auto pt-3">
+                        <div class="schedule-status-bar">
+                            <i class="fas fa-clock me-1"></i>
+                            <span>{{ ingest_all.last_run|date:"M d, Y g:i A" }}</span>
+                            <span class="badge ms-2 {% if ingest_all.last_status == 'success' %}bg-success{% elif ingest_all.last_status == 'error' %}bg-danger{% else %}bg-secondary{% endif %}">
+                                {{ ingest_all.last_status|default:"pending" }}
+                            </span>
                         </div>
                     </div>
+                    {% endif %}
 
+                    <div class="mt-auto pt-2 text-end">
+                        <a href="/admin/ingestion/scheduledtask/{{ ingest_all.pk }}/change/"
+                           class="btn btn-sm btn-outline-primary">
+                            <i class="fas fa-pen me-1"></i> Edit
+                        </a>
+                    </div>
 
-                    <button class="btn btn-dark">Update Settings</button>
-                </form>
+                </div>
+            </div>
+        </div>
+
+        <!-- card 2: purge stale indicators -->
+        <div class="col-lg-4 col-md-6">
+            <div class="card shadow-sm h-100 schedule-card">
+                <div class="card-body d-flex flex-column p-4">
+
+                    <div class="d-flex align-items-center mb-2">
+                        <div class="schedule-icon purge-icon me-3">
+                            <i class="fas fa-trash-alt"></i>
+                        </div>
+                        <div class="flex-grow-1">
+                            <h5 class="fw-bold mb-0">Purge Stale Indicators</h5>
+                            <small class="text-muted">Removes indicators not seen in a configurable window</small>
+                        </div>
+                        {% if purge_stale.is_enabled %}
+                        <span class="badge bg-success">Enabled</span>
+                        {% else %}
+                        <span class="badge bg-secondary">Disabled</span>
+                        {% endif %}
+                    </div>
+
+                    <hr class="my-3">
+
+                    <div class="schedule-detail mb-2">
+                        <span class="detail-label">Frequency</span>
+                        <span class="detail-value">{{ purge_stale.get_frequency_display }}</span>
+                    </div>
+
+                    <div class="schedule-detail mb-2">
+                        <span class="detail-label">Day of Month</span>
+                        <span class="detail-value">{{ purge_stale.day_of_month|default:1 }}</span>
+                    </div>
+
+                    <div class="schedule-detail mb-2">
+                        <span class="detail-label">Time</span>
+                        <span class="detail-value">{{ purge_stale.time_of_day|time:"g:i A" }}</span>
+                    </div>
+
+                    <div class="schedule-detail mb-2">
+                        <span class="detail-label">Remove older than</span>
+                        <span class="detail-value">{{ purge_stale.args_json.days|default:180 }} days</span>
+                    </div>
+
+                    {% if purge_stale.last_run %}
+                    <div class="mt-auto pt-3">
+                        <div class="schedule-status-bar">
+                            <i class="fas fa-clock me-1"></i>
+                            <span>{{ purge_stale.last_run|date:"M d, Y g:i A" }}</span>
+                            <span class="badge ms-2 {% if purge_stale.last_status == 'success' %}bg-success{% elif purge_stale.last_status == 'error' %}bg-danger{% else %}bg-secondary{% endif %}">
+                                {{ purge_stale.last_status|default:"pending" }}
+                            </span>
+                        </div>
+                    </div>
+                    {% endif %}
+
+                    <div class="mt-auto pt-2 text-end">
+                        <a href="/admin/ingestion/scheduledtask/{{ purge_stale.pk }}/change/"
+                           class="btn btn-sm btn-outline-primary">
+                            <i class="fas fa-pen me-1"></i> Edit
+                        </a>
+                    </div>
+
+                </div>
+            </div>
+        </div>
+
+        <!-- card 3: fetch CVE news -->
+        <div class="col-lg-4 col-md-6">
+            <div class="card shadow-sm h-100 schedule-card">
+                <div class="card-body d-flex flex-column p-4">
+
+                    <div class="d-flex align-items-center mb-2">
+                        <div class="schedule-icon news-icon me-3">
+                            <i class="fas fa-newspaper"></i>
+                        </div>
+                        <div class="flex-grow-1">
+                            <h5 class="fw-bold mb-0">Fetch CVE News</h5>
+                            <small class="text-muted">Searches for recent articles about trending CVEs</small>
+                        </div>
+                        {% if fetch_news.is_enabled %}
+                        <span class="badge bg-success">Enabled</span>
+                        {% else %}
+                        <span class="badge bg-secondary">Disabled</span>
+                        {% endif %}
+                    </div>
+
+                    <hr class="my-3">
+
+                    <div class="schedule-detail mb-2">
+                        <span class="detail-label">Frequency</span>
+                        <span class="detail-value">{{ fetch_news.get_frequency_display }}</span>
+                    </div>
+
+                    {% if fetch_news.frequency == "weekly" and fetch_news.day_of_week != None %}
+                    <div class="schedule-detail mb-2">
+                        <span class="detail-label">Day</span>
+                        <span class="detail-value">{{ day_names|slice:fetch_news.day_of_week|last }}</span>
+                    </div>
+                    {% endif %}
+
+                    <div class="schedule-detail mb-2">
+                        <span class="detail-label">Time</span>
+                        <span class="detail-value">{{ fetch_news.time_of_day|time:"g:i A" }}</span>
+                    </div>
+
+                    <hr class="my-3">
+
+                    <div class="schedule-detail mb-2">
+                        <span class="detail-label">Search CVEs from last</span>
+                        <span class="detail-value">{{ fetch_news.args_json.days|default:7 }} days</span>
+                    </div>
+
+                    <div class="schedule-detail mb-2">
+                        <span class="detail-label">Top CVEs to search</span>
+                        <span class="detail-value">{{ fetch_news.args_json.top|default:3 }}</span>
+                    </div>
+
+                    <div class="schedule-detail mb-2">
+                        <span class="detail-label">Articles per CVE</span>
+                        <span class="detail-value">{{ fetch_news.args_json.articles|default:3 }}</span>
+                    </div>
+
+                    {% if fetch_news.last_run %}
+                    <div class="mt-auto pt-3">
+                        <div class="schedule-status-bar">
+                            <i class="fas fa-clock me-1"></i>
+                            <span>{{ fetch_news.last_run|date:"M d, Y g:i A" }}</span>
+                            <span class="badge ms-2 {% if fetch_news.last_status == 'success' %}bg-success{% elif fetch_news.last_status == 'error' %}bg-danger{% else %}bg-secondary{% endif %}">
+                                {{ fetch_news.last_status|default:"pending" }}
+                            </span>
+                        </div>
+                    </div>
+                    {% endif %}
+
+                    <div class="mt-auto pt-2 text-end">
+                        <a href="/admin/ingestion/scheduledtask/{{ fetch_news.pk }}/change/"
+                           class="btn btn-sm btn-outline-primary">
+                            <i class="fas fa-pen me-1"></i> Edit
+                        </a>
+                    </div>
+
+                </div>
             </div>
         </div>
 
     </div>
 
 </div>
+
+<style>
+    .schedule-card {
+        transition: box-shadow 0.2s ease;
+    }
+    .schedule-card:hover {
+        box-shadow: 0 0.25rem 1rem rgba(0, 0, 0, 0.12) !important;
+    }
+    .dark-mode .schedule-card:hover {
+        box-shadow: 0 0.25rem 1rem rgba(0, 0, 0, 0.4) !important;
+    }
+
+    .schedule-icon {
+        width: 44px;
+        height: 44px;
+        border-radius: 10px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 1.1rem;
+        background-color: var(--clr-light-primary-a0);
+        color: #fff;
+        flex-shrink: 0;
+    }
+    .purge-icon {
+        background-color: var(--clr-light-danger-a0);
+    }
+    .news-icon {
+        background-color: var(--clr-light-success-a0);
+    }
+
+    .schedule-detail {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 0.35rem 0;
+    }
+    .detail-label {
+        font-size: 0.85rem;
+        color: #6c757d;
+    }
+    .detail-value {
+        font-size: 0.85rem;
+        font-weight: 600;
+    }
+    .dark-mode .detail-label {
+        color: var(--clr-dark-surface-a40);
+    }
+
+    .schedule-status-bar {
+        font-size: 0.8rem;
+        padding: 0.5rem 0.75rem;
+        border-radius: 6px;
+        background-color: var(--clr-light-surface-a10);
+        color: #555;
+    }
+    .dark-mode .schedule-status-bar {
+        background-color: var(--clr-dark-surface-tonal-a0);
+        color: var(--clr-dark-surface-a40);
+    }
+
+    .schedule-card hr {
+        border-color: var(--clr-light-surface-a20);
+        opacity: 0.6;
+    }
+    .dark-mode .schedule-card hr {
+        border-color: var(--clr-dark-surface-a30);
+    }
+</style>
+
 {% endblock %}

@@ -1,3 +1,4 @@
+import logging
 import time
 from datetime import timedelta
 
@@ -8,6 +9,8 @@ from django.utils import timezone
 from email.utils import parsedate_to_datetime
 
 from ingestion.models import IndicatorOfCompromise, ThreatArticle
+
+logger = logging.getLogger(__name__)
 
 
 GOOGLE_NEWS_URL = (
@@ -55,12 +58,10 @@ class Command(BaseCommand):
 
         cve_ids = self._get_top_cves(days, top_n)
         if not cve_ids:
-            self.stdout.write(self.style.WARNING(
-                f"No CVEs ingested in the last {days} days."
-            ))
+            logger.warning(f"No CVEs ingested in the last {days} days.")
             return
 
-        self.stdout.write(f"Top {len(cve_ids)} CVEs from last {days} days: {', '.join(cve_ids)}")
+        logger.info(f"Top {len(cve_ids)} CVEs from last {days} days: {', '.join(cve_ids)}")
 
         cutoff = timezone.now() - timedelta(days=freshness_days)
         total_saved = 0
@@ -71,7 +72,7 @@ class Command(BaseCommand):
             time.sleep(1)
 
             if not feed.entries:
-                self.stdout.write(f"  {cve_id}: no articles found")
+                logger.info(f"{cve_id}: no articles found")
                 continue
 
             # Keep entries that mention the CVE in the title and were published within 30 days
@@ -116,14 +117,12 @@ class Command(BaseCommand):
                 )
                 total_saved += 1
 
-            self.stdout.write(f"  {cve_id}: {len(matched)} recent articles saved")
+            logger.info(f"{cve_id}: {len(matched)} recent articles saved")
 
         # Also remove any articles older than 30 days for CVEs we didn't touch
         stale = ThreatArticle.objects.filter(published_at__lt=cutoff).delete()[0]
 
-        self.stdout.write(self.style.SUCCESS(
-            f"Done. {total_saved} articles saved, {stale} stale removed."
-        ))
+        logger.info(f"Done. {total_saved} articles saved, {stale} stale removed.")
 
     def _get_top_cves(self, days, limit):
         """Return the CVEs that appear most frequently in the last N days."""

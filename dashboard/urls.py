@@ -46,6 +46,7 @@ urlpatterns = [
         name="dashboard-settings"
     ),
 
+
     # ------------------------------
     # Actions
     # ------------------------------
@@ -61,6 +62,12 @@ urlpatterns = [
         "feeds/ingestion-status/",
         views.check_ingestion_status,
         name="dashboard-ingestion-status"
+    ),
+
+    path(
+        "logs/<str:slug>/download/",
+        views.logs_download,
+        name="dashboard-logs-download"
     ),
 
     path(
