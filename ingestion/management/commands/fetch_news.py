@@ -1,4 +1,5 @@
 import logging
+import re
 import time
 from datetime import timedelta
 
@@ -75,11 +76,14 @@ class Command(BaseCommand):
                 logger.info(f"{cve_id}: no articles found")
                 continue
 
-            # Keep entries that mention the CVE in the title and were published within 30 days
+            # Tolerant title match: catches "CVE-X-Y", "CVE X-Y", "CVEX-Y", "CVE/X/Y"
+            year, num = cve_id.split("-")[1], cve_id.split("-")[2]
+            title_pat = re.compile(rf"CVE[\s\-/]*{year}[\s\-/]*{num}\b", re.IGNORECASE)
+
             matched = []
             for entry in feed.entries:
                 title = entry.get("title", "")[:300]
-                if cve_id not in title.upper():
+                if not title_pat.search(title):
                     continue
                 pub_date = _parse_published(entry)
                 if pub_date and pub_date < cutoff:
@@ -119,21 +123,21 @@ class Command(BaseCommand):
 
             logger.info(f"{cve_id}: {len(matched)} recent articles saved")
 
-        # Also remove any articles older than 30 days for CVEs we didn't touch
-        stale = ThreatArticle.objects.filter(published_at__lt=cutoff).delete()[0]
-
-        logger.info(f"Done. {total_saved} articles saved, {stale} stale removed.")
+        # Cap the table at the freshness window so the widget never carries stale rows
+        purged = ThreatArticle.objects.filter(published_at__lt=cutoff).delete()[0]
+        logger.info(f"Done. {total_saved} articles saved, {purged} stale purged.")
 
     def _get_top_cves(self, days, limit):
         """Return the CVEs that appear most frequently in the last N days."""
         with connection.cursor() as cur:
+            # Tie-break by recency so the picker is stable when many CVEs share count=1
             cur.execute("""
-                SELECT UPPER(ioc_value), COUNT(*) AS cnt
+                SELECT UPPER(ioc_value), COUNT(*) AS cnt, MAX(ingested_at) AS recent
                 FROM indicators_of_compromise
                 WHERE ioc_type = 'cve'
                   AND ingested_at >= NOW() - INTERVAL '%s days'
                 GROUP BY UPPER(ioc_value)
-                ORDER BY cnt DESC
+                ORDER BY cnt DESC, recent DESC
                 LIMIT %s
             """, [days, limit])
             return [row[0] for row in cur.fetchall()]
