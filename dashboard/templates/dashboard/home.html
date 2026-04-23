@@ -36,10 +36,10 @@
      CVE NEWS WIDGET
 =================================================== -->
 <div class="row mt-4 g-4">
-    <div class="col-md-8">
+    <div class="col-lg-6">
         <div class="card shadow-sm p-4">
 
-            <h5 class="fw-bold card-title mb-3">🔥 Trending CVEs in the News</h5>
+            <h5 class="fw-bold card-title mb-4">🔥 Trending CVEs in the News</h5>
 
             {% if cve_news %}
                 <div class="cve-news-scroll">
@@ -83,29 +83,6 @@
                 </p>
             {% endif %}
 
-        </div>
-    </div>
-
-    <div class="col-md-4">
-        <div class="card shadow-sm p-4">
-            <h5 class="fw-bold card-title mb-3">📋 Ingestion Log</h5>
-            {% if log_entries %}
-                <ul class="list-unstyled mb-0">
-                    {% for e in log_entries %}
-                        <li class="mb-3">
-                            <a href="{% url 'dashboard:dashboard-logs-download' e.slug %}"
-                               class="cve-article-link d-block"
-                               style="font-size: 0.9rem; line-height: 1.3;">
-                                {{ e.label }}
-                            </a>
-                        </li>
-                    {% endfor %}
-                </ul>
-            {% else %}
-                <p class="text-muted mb-0">
-                    No logs yet. Files will populate after the first scheduled or manual ingestion run.
-                </p>
-            {% endif %}
         </div>
     </div>
 </div>

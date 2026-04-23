@@ -65,12 +65,6 @@ urlpatterns = [
     ),
 
     path(
-        "logs/<str:slug>/download/",
-        views.logs_download,
-        name="dashboard-logs-download"
-    ),
-
-    path(
         "toggle-theme/",
         views.toggle_theme,
         name="toggle-theme"

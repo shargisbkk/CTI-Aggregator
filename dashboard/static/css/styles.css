@@ -483,6 +483,6 @@ body.dark-mode {
 }
 
 .cve-news-scroll {
-    max-height: 460px;
+    max-height: 540px;
     overflow-y: auto;
 }
