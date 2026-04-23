@@ -10,7 +10,6 @@ from django.db import connection
 from urllib.parse import urlencode
 from datetime import timedelta
 from ingestion.models import FeedSource, IndicatorOfCompromise, GeoEnrichment, ThreatArticle
-from io import StringIO
 import plotly.graph_objects as go
 import plotly.express as px
 import pandas as pd
@@ -243,14 +242,25 @@ def update_all_feeds(request):
 
     #run ingestion in a background thread so the user can navigate freely
     def run_ingestion():
+        from ingestion.models import ScheduledTask
+        from ingestion.scheduler import _capture_logs
         try:
-            output = StringIO()
-            call_command('ingest_all', stdout=output)
+            with _capture_logs() as buf:
+                call_command('ingest_all')
             results = cache.get("ingestion_results", [])
             cache.delete("ingestion_results")
             cache.set("ingestion_pending", {"status": "success", "results": results}, timeout=600)
+            status, message = "success", buf.getvalue()[-500:]
         except Exception as e:
             cache.set("ingestion_pending", {"status": "error", "message": str(e)[:200]}, timeout=600)
+            status, message = "error", str(e)[:500]
+
+        #keep the schedule card in sync
+        ScheduledTask.objects.filter(command="ingest_all").update(
+            last_run=timezone.now(),
+            last_status=status,
+            last_message=message,
+        )
 
     cache.set("ingestion_running", True, timeout=600)
     threading.Thread(target=run_ingestion, daemon=True).start()

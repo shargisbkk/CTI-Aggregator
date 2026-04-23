@@ -1,0 +1,408 @@
+{% extends "admin/base_site.html" %}
+{% load i18n %}
+
+{% block title %}Scheduled Tasks{% endblock %}
+{% block content_title %}<h1>Scheduled Tasks</h1>{% endblock %}
+
+{% block content %}
+<form method="post">{% csrf_token %}
+<div class="sc-cards">
+
+    <!-- card 1: feed ingestion -->
+    {% with t=tasks.ingest_all %}
+    <div class="sc-card">
+        <div class="sc-header">
+            <div class="sc-icon sc-icon-ingest">&#x21bb;</div>
+            <div class="sc-header-text">
+                <div class="sc-title">Feed Ingestion</div>
+                <div class="sc-desc">Pulls indicators from all enabled feeds</div>
+            </div>
+            <a href="{% url 'admin:scheduledtask_run_now' 'ingest_all' %}" class="sc-run-btn"
+               onclick="return confirm('Run Feed Ingestion now?');">
+                &#x25b6; Run Now
+            </a>
+        </div>
+
+        <hr class="sc-hr">
+
+        <label class="sc-toggle">
+            <input type="checkbox" name="ingest_all_enabled" {% if t.is_enabled %}checked{% endif %}>
+            <span>Enabled</span>
+        </label>
+
+        <div class="sc-label">Frequency</div>
+        {% for val, label in freq_choices %}
+        <label class="sc-radio">
+            <input type="radio" name="ingest_all_frequency" value="{{ val }}"
+                   class="freq-radio" data-target="ingest_all"
+                   {% if t.frequency == val %}checked{% endif %}>
+            <span>{{ label }}</span>
+        </label>
+        {% endfor %}
+
+        <div class="sc-dow" id="ingest_all_dow_wrap">
+            <div class="sc-label">Day of Week</div>
+            <div class="sc-pills">
+                {% for dval, dlabel in dow_choices %}
+                <input type="radio" name="ingest_all_day_of_week" value="{{ dval }}"
+                       id="ia_dow_{{ dval }}" class="sc-pill-input"
+                       {% if t.day_of_week == dval %}checked{% endif %}>
+                <label for="ia_dow_{{ dval }}" class="sc-pill">{{ dlabel }}</label>
+                {% endfor %}
+            </div>
+        </div>
+
+        <div class="sc-time" id="ingest_all_time_wrap">
+            <div class="sc-label">Time</div>
+            <input type="time" name="ingest_all_time" value="{{ t.time_of_day|time:'H:i' }}" class="sc-input-time">
+        </div>
+
+        {% if t.last_run %}
+        <div class="sc-status">
+            <span>&#x1f552; {{ t.last_run|date:"M d, Y g:i A" }}</span>
+            <span class="sc-status-pill {% if t.last_status == 'success' %}sc-ok{% elif t.last_status == 'error' %}sc-err{% else %}sc-na{% endif %}">
+                {{ t.last_status|default:"pending" }}
+            </span>
+        </div>
+        {% endif %}
+    </div>
+    {% endwith %}
+
+    <!-- card 2: purge stale -->
+    {% with t=tasks.purge_stale %}
+    <div class="sc-card">
+        <div class="sc-header">
+            <div class="sc-icon sc-icon-purge">&#x1f5d1;</div>
+            <div class="sc-header-text">
+                <div class="sc-title">Purge Stale Indicators</div>
+                <div class="sc-desc">Removes indicators past the age threshold</div>
+            </div>
+            <a href="{% url 'admin:scheduledtask_run_now' 'purge_stale' %}" class="sc-run-btn"
+               onclick="return confirm('Run Purge Stale Indicators now? This will delete old records.');">
+                &#x25b6; Run Now
+            </a>
+        </div>
+
+        <hr class="sc-hr">
+
+        <label class="sc-toggle">
+            <input type="checkbox" name="purge_stale_enabled" {% if t.is_enabled %}checked{% endif %}>
+            <span>Enabled</span>
+        </label>
+
+        <div class="sc-label">Frequency</div>
+        {% for val, label in freq_choices_purge %}
+        <label class="sc-radio">
+            <input type="radio" name="purge_stale_frequency" value="{{ val }}"
+                   class="freq-radio" data-target="purge_stale"
+                   {% if t.frequency == val %}checked{% endif %}>
+            <span>{{ label }}</span>
+        </label>
+        {% endfor %}
+
+        <div class="sc-dow" id="purge_stale_dow_wrap">
+            <div class="sc-label">Day of Week</div>
+            <div class="sc-pills">
+                {% for dval, dlabel in dow_choices %}
+                <input type="radio" name="purge_stale_day_of_week" value="{{ dval }}"
+                       id="ps_dow_{{ dval }}" class="sc-pill-input"
+                       {% if t.day_of_week == dval %}checked{% endif %}>
+                <label for="ps_dow_{{ dval }}" class="sc-pill">{{ dlabel }}</label>
+                {% endfor %}
+            </div>
+        </div>
+
+        <div id="purge_stale_dom_wrap">
+            <div class="sc-label">Day of Month</div>
+            <input type="number" name="purge_stale_day_of_month" min="1" max="28"
+                   value="{{ t.day_of_month|default:1 }}" class="sc-input-num">
+        </div>
+
+        <div class="sc-time" id="purge_stale_time_wrap">
+            <div class="sc-label">Time</div>
+            <input type="time" name="purge_stale_time" value="{{ t.time_of_day|time:'H:i' }}" class="sc-input-time">
+        </div>
+
+        <hr class="sc-hr">
+
+        <div class="sc-label">Remove indicators older than</div>
+        <div class="sc-inline">
+            <input type="number" name="purge_stale_days" min="30" max="730"
+                   value="{{ t.args_json.days|default:180 }}" class="sc-input-num">
+            <span class="sc-unit">days</span>
+        </div>
+
+        {% if t.last_run %}
+        <div class="sc-status">
+            <span>&#x1f552; {{ t.last_run|date:"M d, Y g:i A" }}</span>
+            <span class="sc-status-pill {% if t.last_status == 'success' %}sc-ok{% elif t.last_status == 'error' %}sc-err{% else %}sc-na{% endif %}">
+                {{ t.last_status|default:"pending" }}
+            </span>
+        </div>
+        {% endif %}
+    </div>
+    {% endwith %}
+
+    <!-- card 3: fetch CVE news -->
+    {% with t=tasks.fetch_news %}
+    <div class="sc-card">
+        <div class="sc-header">
+            <div class="sc-icon sc-icon-news">&#x1f4f0;</div>
+            <div class="sc-header-text">
+                <div class="sc-title">Fetch CVE News</div>
+                <div class="sc-desc">Searches for articles about trending CVEs</div>
+            </div>
+            <a href="{% url 'admin:scheduledtask_run_now' 'fetch_news' %}" class="sc-run-btn"
+               onclick="return confirm('Run Fetch CVE News now?');">
+                &#x25b6; Run Now
+            </a>
+        </div>
+
+        <hr class="sc-hr">
+
+        <label class="sc-toggle">
+            <input type="checkbox" name="fetch_news_enabled" {% if t.is_enabled %}checked{% endif %}>
+            <span>Enabled</span>
+        </label>
+
+        <div class="sc-label">Frequency</div>
+        {% for val, label in freq_choices %}
+        <label class="sc-radio">
+            <input type="radio" name="fetch_news_frequency" value="{{ val }}"
+                   class="freq-radio" data-target="fetch_news"
+                   {% if t.frequency == val %}checked{% endif %}>
+            <span>{{ label }}</span>
+        </label>
+        {% endfor %}
+
+        <div class="sc-dow" id="fetch_news_dow_wrap">
+            <div class="sc-label">Day of Week</div>
+            <div class="sc-pills">
+                {% for dval, dlabel in dow_choices %}
+                <input type="radio" name="fetch_news_day_of_week" value="{{ dval }}"
+                       id="fn_dow_{{ dval }}" class="sc-pill-input"
+                       {% if t.day_of_week == dval %}checked{% endif %}>
+                <label for="fn_dow_{{ dval }}" class="sc-pill">{{ dlabel }}</label>
+                {% endfor %}
+            </div>
+        </div>
+
+        <div class="sc-time" id="fetch_news_time_wrap">
+            <div class="sc-label">Time</div>
+            <input type="time" name="fetch_news_time" value="{{ t.time_of_day|time:'H:i' }}" class="sc-input-time">
+        </div>
+
+        <hr class="sc-hr">
+        <div class="sc-label">What to Fetch</div>
+
+        <div style="margin-bottom:8px;">
+            <label class="sc-sublabel">Search CVEs from the last</label>
+            <div class="sc-inline">
+                <input type="number" name="fetch_news_days" min="1" max="90"
+                       value="{{ t.args_json.days|default:7 }}" class="sc-input-num">
+                <span class="sc-unit">days</span>
+            </div>
+        </div>
+
+        <div style="display:flex;gap:16px;margin-bottom:6px;">
+            <div>
+                <label class="sc-sublabel">Top CVEs</label>
+                <input type="number" name="fetch_news_top" min="1" max="10"
+                       value="{{ t.args_json.top|default:3 }}" class="sc-input-num">
+            </div>
+            <div>
+                <label class="sc-sublabel">Articles each</label>
+                <input type="number" name="fetch_news_articles" min="1" max="10"
+                       value="{{ t.args_json.articles|default:3 }}" class="sc-input-num">
+            </div>
+        </div>
+
+        {% if t.last_run %}
+        <div class="sc-status">
+            <span>&#x1f552; {{ t.last_run|date:"M d, Y g:i A" }}</span>
+            <span class="sc-status-pill {% if t.last_status == 'success' %}sc-ok{% elif t.last_status == 'error' %}sc-err{% else %}sc-na{% endif %}">
+                {{ t.last_status|default:"pending" }}
+            </span>
+        </div>
+        {% endif %}
+
+    </div>
+    {% endwith %}
+
+</div>
+
+<!-- save / cancel -->
+<div class="submit-row" style="margin-top:4px;">
+    <input type="submit" value="Save" class="default">
+    <a href="{% url 'admin:index' %}" class="sc-cancel">Cancel</a>
+</div>
+</form>
+
+<style>
+/* card grid */
+.sc-cards {
+    display: flex; flex-wrap: wrap; gap: 24px; padding: 10px 0 20px;
+}
+.sc-card {
+    flex: 1 1 300px; max-width: 400px;
+    background: var(--body-bg, #fff);
+    color: var(--body-fg, #333);
+    border: 1px solid var(--hairline-color, #ddd);
+    border-radius: 12px; padding: 22px;
+    display: flex; flex-direction: column;
+    box-shadow: 0 1px 4px rgba(0,0,0,0.06);
+    transition: box-shadow 0.2s;
+}
+.sc-card:hover { box-shadow: 0 4px 14px rgba(0,0,0,0.1); }
+
+/* header row */
+.sc-header { display: flex; align-items: center; gap: 12px; margin-bottom: 4px; }
+.sc-header-text { flex-grow: 1; }
+.sc-icon {
+    width: 40px; height: 40px; border-radius: 10px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 1.1rem; color: #fff; flex-shrink: 0;
+}
+.sc-icon-ingest { background: #417690; }
+.sc-icon-purge  { background: #ba2121; }
+.sc-icon-news   { background: #28a745; }
+.sc-title { font-weight: 700; font-size: 1rem; color: var(--body-fg, #333); }
+.sc-desc  { font-size: 0.78rem; color: var(--body-quiet-color, #999); }
+
+
+/* divider */
+.sc-hr { border-color: var(--hairline-color, #ddd); opacity: 0.5; margin: 10px 0; }
+
+/* toggle */
+.sc-toggle {
+    display: flex; align-items: center; gap: 8px;
+    margin-bottom: 10px; font-size: 0.9rem; font-weight: 600; cursor: pointer;
+    color: var(--body-fg, #333);
+}
+
+/* field labels */
+.sc-label {
+    font-size: 0.82rem; font-weight: 600;
+    color: var(--body-fg, #333); margin-bottom: 4px; margin-top: 6px;
+}
+.sc-sublabel { font-size: 0.82rem; color: var(--body-quiet-color, #666); display: block; margin-bottom: 2px; }
+
+/* radio rows */
+.sc-radio {
+    display: flex; align-items: center; gap: 6px;
+    font-size: 0.85rem; margin-bottom: 2px; cursor: pointer;
+    color: var(--body-fg, #333);
+}
+
+/* day of week pills */
+.sc-pills { display: flex; flex-wrap: wrap; gap: 4px; }
+.sc-pill-input { display: none; }
+.sc-pill {
+    display: inline-block; padding: 4px 10px; border-radius: 14px;
+    border: 1px solid var(--hairline-color, #ccc);
+    font-size: 0.78rem; cursor: pointer;
+    color: var(--body-fg, #555); background: transparent;
+    transition: all 0.15s;
+}
+.sc-pill:hover { border-color: var(--link-fg, #417690); color: var(--link-fg, #417690); }
+.sc-pill-input:checked + .sc-pill {
+    background: var(--link-fg, #417690); border-color: var(--link-fg, #417690); color: #fff;
+}
+
+/* inputs */
+.sc-input-time, .sc-input-num {
+    border: 1px solid var(--border-color, #ccc); border-radius: 4px;
+    padding: 4px 8px; font-size: 0.85rem;
+    background: var(--body-bg, #fff); color: var(--body-fg, #333);
+}
+.sc-input-time { width: 120px; }
+.sc-input-num  { width: 72px; }
+.sc-input-time:focus, .sc-input-num:focus {
+    outline: none; border-color: var(--link-fg, #417690);
+    box-shadow: 0 0 0 2px rgba(65,118,144,0.15);
+}
+
+/* inline field + unit */
+.sc-inline { display: flex; align-items: center; gap: 6px; }
+.sc-unit { font-size: 0.85rem; color: var(--body-quiet-color, #666); }
+
+/* last run status bar */
+.sc-status {
+    font-size: 0.85rem; padding: 8px 10px; border-radius: 6px;
+    background: var(--darkened-bg, #f8f8f8);
+    color: var(--body-fg, #333);
+    display: flex; align-items: center; gap: 6px;
+    margin-top: 14px;
+}
+.sc-status-pill {
+    margin-left: auto; padding: 2px 8px; border-radius: 10px;
+    font-size: 0.7rem; font-weight: 600; color: #fff;
+}
+.sc-ok  { background: #28a745; }
+.sc-err { background: #dc3545; }
+.sc-na  { background: #6c757d; }
+
+/* run now button */
+.sc-run-btn {
+    display: inline-block; padding: 4px 12px;
+    border: 1px solid var(--link-fg, #417690); border-radius: 6px;
+    color: var(--link-fg, #417690); font-size: 0.78rem; font-weight: 600;
+    text-decoration: none; transition: all 0.15s; white-space: nowrap;
+}
+.sc-run-btn:hover { background: var(--link-fg, #417690); color: #fff; }
+
+/* cancel button */
+.sc-cancel {
+    display: inline-block; padding: 10px 20px;
+    border: 1px solid var(--hairline-color, #999); border-radius: 4px;
+    color: var(--body-quiet-color, #666); font-size: 0.8125rem;
+    text-decoration: none; margin-left: 8px;
+    background: var(--body-bg, #fff); cursor: pointer;
+}
+.sc-cancel:hover { background: var(--darkened-bg, #f0f0f0); color: var(--body-fg, #333); }
+
+/* responsive: stack cards on narrow screens */
+@media (max-width: 900px) {
+    .sc-cards { flex-direction: column; }
+    .sc-card { max-width: 100%; }
+}
+</style>
+
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+    function updateVisibility() {
+        document.querySelectorAll('.freq-radio').forEach(function (radio) {
+            if (!radio.checked) return;
+            var target = radio.dataset.target;
+            var freq = radio.value;
+
+            //time: hide for interval frequencies
+            var timeWrap = document.getElementById(target + '_time_wrap');
+            if (timeWrap) {
+                timeWrap.style.display = (freq === 'every_6h' || freq === 'every_12h') ? 'none' : '';
+            }
+
+            //day of week: only show for weekly
+            var dowWrap = document.getElementById(target + '_dow_wrap');
+            if (dowWrap) {
+                dowWrap.style.display = freq === 'weekly' ? '' : 'none';
+                if (freq !== 'weekly') {
+                    dowWrap.querySelectorAll('.sc-pill-input').forEach(function (r) { r.checked = false; });
+                }
+            }
+
+            //day of month: only show for monthly (purge card)
+            var domWrap = document.getElementById(target + '_dom_wrap');
+            if (domWrap) {
+                domWrap.style.display = freq === 'monthly' ? '' : 'none';
+            }
+        });
+    }
+
+    updateVisibility();
+    document.querySelectorAll('.freq-radio').forEach(function (r) {
+        r.addEventListener('change', updateVisibility);
+    });
+});
+</script>
+{% endblock %}

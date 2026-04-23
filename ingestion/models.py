@@ -112,3 +112,39 @@ class ThreatArticle(models.Model):
 
     def __str__(self):
         return f"{self.matched_label}: {self.title[:60]}"
+
+
+class ScheduledTask(models.Model):
+    #one row per schedulable management command
+
+    COMMAND_CHOICES = [
+        ("ingest_all",  "Feed Ingestion"),
+        ("purge_stale", "Purge Stale Indicators"),
+        ("fetch_news",  "Fetch CVE News"),
+    ]
+
+    FREQUENCY_CHOICES = [
+        ("every_6h",  "Every 6 Hours"),
+        ("every_12h", "Every 12 Hours"),
+        ("daily",     "Daily"),
+        ("weekly",    "Weekly"),
+        ("monthly",   "Monthly"),
+    ]
+
+    command      = models.CharField(max_length=32, unique=True, choices=COMMAND_CHOICES)
+    frequency    = models.CharField(max_length=16, choices=FREQUENCY_CHOICES, default="daily")
+    day_of_week  = models.IntegerField(null=True, blank=True)
+    time_of_day  = models.TimeField(default="02:00")
+    day_of_month = models.IntegerField(default=1)
+    args_json    = models.JSONField(default=dict, blank=True)
+    is_enabled   = models.BooleanField(default=True)
+    last_run     = models.DateTimeField(null=True, blank=True)
+    last_status  = models.CharField(max_length=16, blank=True, default="")
+    last_message = models.TextField(blank=True, default="")
+    updated_at   = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        db_table = "scheduled_tasks"
+
+    def __str__(self):
+        return f"{self.get_command_display()} ({self.frequency})"

@@ -41,7 +41,7 @@ INSTALLED_APPS = [
     'dashboard',
     'accounts',
     'api',
-    'ingestion',
+    'ingestion.apps.IngestionConfig',
     'processors',
     'scripts',
 ]

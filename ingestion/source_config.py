@@ -2,7 +2,7 @@
 
 import importlib
 
-# Adding a new transport pattern in the future means adding one entry here + one adapter file. So far we cover 
+# Adding a new feed in the future means adding one entry here + one adapter file. So far we cover 
 # most of the types here and the inheritance from the base class allows it to get the normalization, deduplication, and enrichment 
 # automatically 
 ADAPTER_TYPES = {

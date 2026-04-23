@@ -6,7 +6,7 @@ from django.conf import settings
 from django.contrib import admin
 from dotenv import load_dotenv, set_key
 
-from ingestion.models import FeedSource
+from ingestion.models import FeedSource, ScheduledTask
 
 
 class FeedSourceForm(forms.ModelForm):
@@ -194,3 +194,133 @@ class FeedSourceAdmin(admin.ModelAdmin):
     class Media:
         css = {"all": ("ingestion/admin/css/feed_source_admin.css",)}
         js  = ("ingestion/admin/js/feed_source_admin.js",)
+
+
+DAY_OF_WEEK_CHOICES = [
+    (0, "Mon"), (1, "Tue"), (2, "Wed"),
+    (3, "Thu"), (4, "Fri"), (5, "Sat"), (6, "Sun"),
+]
+
+FREQ_CHOICES = [
+    ("every_6h", "Every 6 Hours"), ("every_12h", "Every 12 Hours"),
+    ("daily", "Daily"), ("weekly", "Weekly"),
+]
+FREQ_CHOICES_PURGE = [("weekly", "Weekly"), ("monthly", "Monthly")]
+
+#all editing happens on the changelist page via cards
+@admin.register(ScheduledTask)
+class ScheduledTaskAdmin(admin.ModelAdmin):
+    change_list_template = "admin/ingestion/scheduledtask/change_list.html"
+
+    def has_add_permission(self, request):
+        return False
+
+    def has_delete_permission(self, request, obj=None):
+        return False
+
+    def get_urls(self):
+        from django.urls import path
+        urls = super().get_urls()
+        custom = [
+            path("run-now/<str:command>/", self.admin_site.admin_view(self.run_now_view), name="scheduledtask_run_now"),
+        ]
+        return custom + urls
+
+    def run_now_view(self, request, command):
+        #handles the Run Now button. bypasses the scheduler and calls the
+        #command inline, so it works even when Enabled is unchecked.
+        from django.shortcuts import redirect
+        from django.contrib import messages
+        from django.utils import timezone
+        from django.core.management import call_command
+        from ingestion.scheduler import _capture_logs
+
+        valid = dict(ScheduledTask.COMMAND_CHOICES)
+        if command not in valid:
+            messages.error(request, f"Unknown command: {command}")
+            return redirect("admin:ingestion_scheduledtask_changelist")
+
+        task = ScheduledTask.objects.get(command=command)
+        try:
+            with _capture_logs() as buf:
+                call_command(command, **(task.args_json or {}))
+            task.last_status = "success"
+            task.last_message = buf.getvalue()[-500:]
+        except Exception as exc:
+            task.last_status = "error"
+            task.last_message = str(exc)[:500]
+
+        task.last_run = timezone.now()
+        task.save(update_fields=["last_run", "last_status", "last_message"])
+
+        if task.last_status == "success":
+            messages.success(request, f"{valid[command]} completed successfully.")
+        else:
+            messages.error(request, f"{valid[command]} failed: {task.last_message[:100]}")
+
+        return redirect("admin:ingestion_scheduledtask_changelist")
+
+    def save_model(self, request, obj, form, change):
+        #fires on the per row change form. reload so the new values take
+        #effect without a restart.
+        super().save_model(request, obj, form, change)
+        from ingestion.scheduler import reload_scheduler
+        reload_scheduler()
+
+    def changelist_view(self, request, extra_context=None):
+        from django.shortcuts import redirect
+        from django.contrib import messages
+
+        extra_context = extra_context or {}
+        tasks = {t.command: t for t in ScheduledTask.objects.all()}
+
+        #POST means the Save button was clicked. GET just renders the page.
+        if request.method == "POST":
+            for cmd in ("ingest_all", "purge_stale", "fetch_news"):
+                task = tasks.get(cmd)
+                if not task:
+                    continue
+
+                task.is_enabled = request.POST.get(f"{cmd}_enabled") == "on"
+                task.frequency = request.POST.get(f"{cmd}_frequency", task.frequency)
+
+                time_val = request.POST.get(f"{cmd}_time", "")
+                if time_val:
+                    task.time_of_day = time_val
+
+                dow = request.POST.get(f"{cmd}_day_of_week", "")
+                task.day_of_week = int(dow) if dow.isdigit() else None
+
+                #only update day_of_month for cards that actually expose the input
+                if f"{cmd}_day_of_month" in request.POST:
+                    dom = request.POST.get(f"{cmd}_day_of_month", "")
+                    task.day_of_month = int(dom) if dom.isdigit() else 1
+
+                #command specific args
+                args = {}
+                if cmd == "purge_stale":
+                    d = request.POST.get("purge_stale_days", "180")
+                    args["days"] = int(d) if d.isdigit() else 180
+
+                if cmd == "fetch_news":
+                    d = request.POST.get("fetch_news_days", "7")
+                    t2 = request.POST.get("fetch_news_top", "3")
+                    a = request.POST.get("fetch_news_articles", "3")
+                    args["days"] = int(d) if d.isdigit() else 7
+                    args["top"] = int(t2) if t2.isdigit() else 3
+                    args["articles"] = int(a) if a.isdigit() else 3
+
+                task.args_json = args
+                task.save()
+
+            #one reload covers all three cards
+            from ingestion.scheduler import reload_scheduler
+            reload_scheduler()
+            messages.success(request, "Scheduled tasks updated.")
+            return redirect("admin:ingestion_scheduledtask_changelist")
+
+        extra_context["tasks"] = tasks
+        extra_context["freq_choices"] = FREQ_CHOICES
+        extra_context["freq_choices_purge"] = FREQ_CHOICES_PURGE
+        extra_context["dow_choices"] = DAY_OF_WEEK_CHOICES
+        return super().changelist_view(request, extra_context)

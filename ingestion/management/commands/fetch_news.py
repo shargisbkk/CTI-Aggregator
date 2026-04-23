@@ -1,3 +1,4 @@
+import logging
 import re
 import time
 from datetime import timedelta
@@ -9,6 +10,8 @@ from django.utils import timezone
 from email.utils import parsedate_to_datetime
 
 from ingestion.models import IndicatorOfCompromise, ThreatArticle
+
+logger = logging.getLogger(__name__)
 
 
 GOOGLE_NEWS_URL = (
@@ -56,12 +59,10 @@ class Command(BaseCommand):
 
         cve_ids = self._get_top_cves(days, top_n)
         if not cve_ids:
-            self.stdout.write(self.style.WARNING(
-                f"No CVEs ingested in the last {days} days."
-            ))
+            logger.warning(f"No CVEs ingested in the last {days} days.")
             return
 
-        self.stdout.write(f"Top {len(cve_ids)} CVEs from last {days} days: {', '.join(cve_ids)}")
+        logger.info(f"Top {len(cve_ids)} CVEs from last {days} days: {', '.join(cve_ids)}")
 
         cutoff = timezone.now() - timedelta(days=freshness_days)
         total_saved = 0
@@ -72,12 +73,21 @@ class Command(BaseCommand):
             time.sleep(1)
 
             if not feed.entries:
-                self.stdout.write(f"  {cve_id}: no articles found")
+                logger.info(f"{cve_id}: no articles found")
                 continue
 
             # Tolerant title match: catches "CVE-X-Y", "CVE X-Y", "CVEX-Y", "CVE/X/Y"
-            year, num = cve_id.split("-")[1], cve_id.split("-")[2]
-            title_pat = re.compile(rf"CVE[\s\-/]*{year}[\s\-/]*{num}\b", re.IGNORECASE)
+            parts = cve_id.split("-")
+            if len(parts) < 3:
+                logger.warning(f"Skipping malformed CVE ID: {cve_id}")
+                continue
+            year_raw, num_raw = parts[1], parts[2]
+            if not (year_raw.isdigit() and num_raw.isdigit()):
+                logger.warning(f"Skipping malformed CVE ID: {cve_id}")
+                continue
+            year = re.escape(year_raw)
+            num = re.escape(num_raw)
+            title_pat = re.compile(rf"(?<!\w)CVE[\s\-/]*{year}[\s\-/]*{num}\b", re.IGNORECASE)
 
             matched = []
             for entry in feed.entries:
@@ -120,18 +130,16 @@ class Command(BaseCommand):
                 )
                 total_saved += 1
 
-            self.stdout.write(f"  {cve_id}: {len(matched)} recent articles saved")
+            logger.info(f"{cve_id}: {len(matched)} recent articles saved")
 
         # Cap the table at the freshness window so the widget never carries stale rows
         purged = ThreatArticle.objects.filter(published_at__lt=cutoff).delete()[0]
-        self.stdout.write(self.style.SUCCESS(
-            f"Done. {total_saved} articles saved, {purged} stale purged."
-        ))
+        logger.info(f"Done. {total_saved} articles saved, {purged} stale purged.")
 
     def _get_top_cves(self, days, limit):
         """Return the CVEs that appear most frequently in the last N days."""
         with connection.cursor() as cur:
-            # Tie-break by recency so the picker is stable when many CVEs share count=1
+            # Tie-break by recency for stable ordering when CVEs share the same count
             cur.execute("""
                 SELECT UPPER(ioc_value), COUNT(*) AS cnt, MAX(ingested_at) AS recent
                 FROM indicators_of_compromise
