@@ -1,7 +1,5 @@
-"""
-Base adapter interface. All feed adapters extend FeedAdapter and implement fetch_raw().
-Adding a new transport type means adding a new subclass, not changing existing code.
-"""
+# base adapter interface — all feed adapters extend this and implement fetch_raw()
+# adding a new transport type means adding a new subclass, not changing existing code
 
 import logging
 from abc import ABC, abstractmethod
@@ -14,7 +12,7 @@ logger = logging.getLogger(__name__)
 
 
 class FeedAdapter(ABC):
-    """Base class for all feed adapters. Subclasses implement fetch_raw()."""
+    # all adapters inherit from this — subclasses just implement fetch_raw()
 
     source_name: str = ""
 
@@ -24,7 +22,7 @@ class FeedAdapter(ABC):
         self.config   = config or {}
 
     def _build_auth_headers(self) -> dict:
-        """Build auth headers from config if auth_header and api_key are both set."""
+        # builds auth headers if both auth_header and api_key are set
         headers = {}
         auth_header = self.config.get("auth_header")
         if auth_header and self._api_key:
@@ -32,11 +30,11 @@ class FeedAdapter(ABC):
         return headers
 
     def normalize_record(self, raw: dict) -> Optional[dict]:
-        """Normalize a raw indicator dict via processors.normalize."""
+        # runs a raw dict through the normalizer
         return normalize_one(raw)
 
     def ingest(self) -> Optional[list[dict]]:
-        """Fetch and normalize records. Skips bad records so one failure won't drop the batch."""
+        # fetches and normalizes records, skips bad ones so one failure doesn't drop the batch
         try:
             raw_records = self.fetch_raw()
         except Exception:
@@ -62,18 +60,6 @@ class FeedAdapter(ABC):
 
     @abstractmethod
     def fetch_raw(self) -> list[dict]:
-        """
-        Fetch from the source and return raw indicator dicts.
-
-        Each dict must follow this schema (normalize_one() handles the rest):
-            ioc_type  (str)            raw type string; mapped via type_map.json
-            ioc_value (str)            the indicator value
-            labels    (list[str])      optional tags/categories
-            confidence (int|None)      optional 0-100 score
-            first_seen (str|datetime|int|None)  optional; any parseable timestamp
-            last_seen  (str|datetime|int|None)  optional; any parseable timestamp
-
-        Unknown ioc_type values fall back to value-based inference (_classify_value).
-        Records with no resolvable type are silently dropped by normalize_one().
-        """
+        # return raw indicator dicts — normalize_one() handles the rest
+        # each dict needs: ioc_type, ioc_value, labels, confidence, first_seen, last_seen
         ...

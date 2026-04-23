@@ -1,18 +1,6 @@
-"""
-Adapter for REST APIs (GET and POST).
-
-Config keys:
-    data_path        — dot-notation path to the indicator array (required)
-    ioc_value_field  — field containing the IOC value (required)
-    ioc_type_field   — field containing the IOC type
-    next_page_path   — field containing the next-page URL
-    method           — HTTP method, default GET
-    request_body     — JSON body for POST requests
-    since_param      — query param name for incremental pulls
-    since_format     — strftime format for since value
-    initial_days     — lookback window on first pull; if absent, no since param is sent and the feed returns everything
-    expand_path      — sub-array field within each parent record
-"""
+# adapter for REST APIs (GET and POST)
+# config: data_path, ioc_value_field, ioc_type_field, next_page_path,
+#         method, request_body, since_param, since_format, initial_days, expand_path
 
 import logging
 from datetime import datetime, timedelta, timezone as dt_timezone
@@ -24,7 +12,7 @@ logger = logging.getLogger(__name__)
 
 
 def _resolve_path(data, path: str):
-    """Walk a dot-notation path through nested dicts/lists and return the value."""
+    # walks a dot-notation path like "data.items" through nested dicts/lists
     if not path:
         return data
     for key in path.split("."):
@@ -48,9 +36,7 @@ def _resolve_path(data, path: str):
 
 
 def _extract_labels(record: dict, fields: list) -> list:
-    """Pull label values from a record given a list of field names.
-    Handles strings, lists of strings, and lists of objects.
-    """
+    # pulls label values from a record — handles strings, lists, and dicts
     labels = []
     for f in fields:
         val = record.get(f)
@@ -139,11 +125,7 @@ class RestFeedAdapter(FeedAdapter):
                         if not isinstance(child, dict):
                             continue
                         row_type = (child.get(ioc_type_field, "") if ioc_type_field else "") or static_ioc_type
-                        raw_conf = child.get(confidence_field) if confidence_field else None
-                        try:
-                            confidence = int(raw_conf) if raw_conf is not None else None
-                        except (TypeError, ValueError):
-                            confidence = None
+                        confidence = child.get(confidence_field) if confidence_field else None
                         indicators.append({
                             "ioc_value":  child.get(ioc_value_field, ""),
                             "ioc_type":   row_type,
@@ -165,11 +147,7 @@ class RestFeedAdapter(FeedAdapter):
                         })
                         continue
                     row_type = (entry.get(ioc_type_field, "") if ioc_type_field else "") or static_ioc_type
-                    raw_conf = entry.get(confidence_field) if confidence_field else None
-                    try:
-                        confidence = int(raw_conf) if raw_conf is not None else None
-                    except (TypeError, ValueError):
-                        confidence = None
+                    confidence = entry.get(confidence_field) if confidence_field else None
                     indicators.append({
                         "ioc_value":  entry.get(ioc_value_field, ""),
                         "ioc_type":   row_type,

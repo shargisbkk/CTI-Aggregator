@@ -1,7 +1,4 @@
-"""
-HTTP helper with automatic retry on transient failures (429, 5xx, timeouts).
-Drop-in replacement for requests.get/post.
-"""
+# HTTP helper — retries automatically on 429, 5xx, and timeouts
 
 import logging
 import random
@@ -16,9 +13,7 @@ RETRYABLE_STATUS_CODES = {429, 500, 502, 503, 504}
 
 
 def request_with_retry(method, url, *, max_tries=5, **kwargs):
-    """Make an HTTP request with exponential backoff on 429/5xx/timeouts.
-    Doubles the delay between each retry up to a 120 second cap.
-    """
+    # makes a request with exponential backoff, doubles delay each retry up to 120s
     delay = 2.0  # initial wait between retries (doubles each attempt)
 
     for attempt in range(1, max_tries + 1):

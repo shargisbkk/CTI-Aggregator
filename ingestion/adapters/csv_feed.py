@@ -1,18 +1,7 @@
-"""
-Adapter for CSV and TSV feeds.
-
-Config keys (FeedSource.config):
-    ioc_value_column  — column name or zero-based index for the indicator value (required)
-    ioc_type_column   — column name or zero-based index for the indicator type (optional)
-    ioc_type          — fixed IOC type for all rows when ioc_type_column is absent
-    label_columns     — list of column names/indices whose values become labels
-    confidence_column — column name or index for a confidence value; accepts numbers or high/medium/low text
-    first_seen_column — column name or index for the first-seen timestamp (optional)
-    last_seen_column  — column name or index for the last-seen timestamp (optional)
-    skip_header       — True/False; defaults to True
-    delimiter         — column separator character, default ","
-    comment_char      — lines starting with this are skipped, default "#"
-"""
+# adapter for CSV and TSV feeds
+# config: ioc_value_column, ioc_type_column, ioc_type, label_columns,
+#         confidence_column, first_seen_column, last_seen_column,
+#         skip_header, delimiter, comment_char
 
 import csv
 import io
@@ -23,21 +12,8 @@ from ingestion.adapters.http import request_with_retry
 
 logger = logging.getLogger(__name__)
 
-# Maps text confidence levels to numeric scores for feeds that use words instead of numbers.
-_TEXT_CONFIDENCE = {
-    "critical":  95,
-    "very high": 95,
-    "high":      80,
-    "medium":    60,
-    "moderate":  60,
-    "low":       40,
-}
-
-
 def _resolve_column(header_row: list[str] | None, col_spec) -> int | None:
-    """Convert a column spec (name or zero-based index) to a numeric column index.
-    Supports both integer indices and header name lookups.
-    """
+    # turns a column name or index into a numeric index
     if col_spec is None or col_spec == "":
         return None
     if isinstance(col_spec, int):
@@ -54,19 +30,6 @@ def _resolve_column(header_row: list[str] | None, col_spec) -> int | None:
         if name in normalized:
             return normalized.index(name)
     return None
-
-
-def _parse_confidence(raw) -> int | None:
-    """Convert a raw confidence value to an integer score.
-    Handles numeric strings and text levels (high/medium/low).
-    """
-    if raw is None:
-        return None
-    try:
-        return int(raw)
-    except (TypeError, ValueError):
-        pass
-    return _TEXT_CONFIDENCE.get(str(raw).strip().lower())
 
 
 class CsvFeedAdapter(FeedAdapter):
@@ -142,7 +105,7 @@ class CsvFeedAdapter(FeedAdapter):
 
             confidence = None
             if confidence_col is not None and confidence_col < len(row):
-                confidence = _parse_confidence(row[confidence_col].strip())
+                confidence = row[confidence_col].strip() or None
 
             first_seen = row[first_seen_col].strip() if first_seen_col is not None and first_seen_col < len(row) else None
             last_seen  = row[last_seen_col].strip()  if last_seen_col  is not None and last_seen_col  < len(row) else None

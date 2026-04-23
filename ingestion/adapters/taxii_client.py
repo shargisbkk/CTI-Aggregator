@@ -1,11 +1,5 @@
-"""
-Shared TAXII 2.1 protocol handler used by TAXIIAdapter.
-
-Supports two pagination styles:
-  - Body-based:   envelope contains "more" and "next" fields
-  - Header-based: server returns X-TAXII-Date-Added-Last, used as
-                   the next added_after value (e.g. MITRE ATT&CK)
-"""
+# TAXII 2.1 protocol handler — handles discovery, collections, and pagination
+# supports body-based (more/next) and header-based (X-TAXII-Date-Added-Last) pagination
 
 import logging
 from urllib.parse import urljoin
@@ -21,14 +15,14 @@ TAXII_HEADERS = {"Accept": TAXII_ACCEPT}
 
 
 def _resolve_url(base: str, url: str) -> str:
-    """Resolve a possibly relative API root URL against the discovery base."""
+    # resolves a relative API root URL against the discovery base
     if url.startswith("http"):
         return url
     return urljoin(base, url)
 
 
 def _build_params(extra: dict | None = None, api_key: str = "") -> dict:
-    """Build query params, including the API key when provided."""
+    # builds query params, adds api key if provided
     params: dict = {}
     if api_key:
         params["key"] = api_key
@@ -38,7 +32,7 @@ def _build_params(extra: dict | None = None, api_key: str = "") -> dict:
 
 
 def _merge_headers(extra: dict | None) -> dict:
-    """Combine auth headers with the standard TAXII Accept header."""
+    # merges auth headers with the required TAXII Accept header
     if not extra:
         return TAXII_HEADERS
     return {**TAXII_HEADERS, **extra}
@@ -46,7 +40,7 @@ def _merge_headers(extra: dict | None) -> dict:
 
 def discover_api_roots(discovery_url: str, auth: tuple[str, str] | None,
                        api_key: str = "", extra_headers: dict | None = None) -> list[str]:
-    """GET the discovery endpoint and return the list of API root URLs."""
+    # hits the discovery endpoint and returns the list of API root URLs
     r = request_with_retry("GET", discovery_url, headers=_merge_headers(extra_headers),
                            auth=auth, params=_build_params(api_key=api_key), timeout=60)
     data = r.json()
@@ -61,7 +55,7 @@ def discover_api_roots(discovery_url: str, auth: tuple[str, str] | None,
 
 def list_collections(api_root_url: str, auth: tuple[str, str] | None,
                      api_key: str = "", extra_headers: dict | None = None) -> list[dict]:
-    """List all collections at an API root."""
+    # lists all collections at an API root
     url = api_root_url.rstrip("/") + "/collections/"
     r = request_with_retry("GET", url, headers=_merge_headers(extra_headers), auth=auth,
                            params=_build_params(api_key=api_key), timeout=60)
@@ -71,13 +65,7 @@ def list_collections(api_root_url: str, auth: tuple[str, str] | None,
 def get_objects(api_root_url: str, collection_id: str, auth: tuple[str, str] | None,
                 added_after: str | None, api_key: str = "",
                 extra_headers: dict | None = None):
-    """
-    Page through a TAXII collection, yielding one envelope at a time.
-
-    Handles both pagination styles:
-      1. Body-based (more/next in JSON envelope)
-      2. Header-based (X-TAXII-Date-Added-Last for cursor pagination)
-    """
+    # pages through a collection, yielding one envelope at a time
     url = api_root_url.rstrip("/") + f"/collections/{collection_id}/objects/"
     base_extra = {"match[type]": "indicator"}
     if added_after:
@@ -128,16 +116,8 @@ def fetch_taxii_raw(
     collection_id: str = "",
     extra_headers: dict | None = None,
 ) -> list[dict]:
-    """
-    Query a TAXII 2.1 server and return raw indicator dicts.
-
-    Supports two auth styles:
-      - Basic auth (username/password)
-      - API key as query parameter (e.g. Pulsedive)
-
-    If collection_id is provided, only that collection is queried.
-    Otherwise, discovers all collections and queries each one.
-    """
+    # queries a TAXII server and returns raw indicator dicts
+    # if collection_id is set, queries just that one — otherwise discovers all collections
     auth = (username, password) if username else None
 
     # if a specific collection ID is given, skip discovery and query directly

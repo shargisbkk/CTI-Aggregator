@@ -1,7 +1,5 @@
-"""
-Adapter for TAXII 2.1 servers (MITRE ATT&CK, etc.).
-Delegates to taxii_client.py for discovery, pagination, and STIX parsing.
-"""
+# adapter for TAXII 2.1 servers (MITRE ATT&CK, etc.)
+# delegates to taxii_client for discovery, pagination, and STIX parsing
 
 from ingestion.adapters.base import FeedAdapter
 from ingestion.adapters.taxii_client import fetch_taxii_raw
