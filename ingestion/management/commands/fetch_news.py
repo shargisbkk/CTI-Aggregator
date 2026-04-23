@@ -81,9 +81,13 @@ class Command(BaseCommand):
             if len(parts) < 3:
                 logger.warning(f"Skipping malformed CVE ID: {cve_id}")
                 continue
-            year = re.escape(parts[1])
-            num = re.escape(parts[2])
-            title_pat = re.compile(rf"CVE[\s\-/]*{year}[\s\-/]*{num}\b", re.IGNORECASE)
+            year_raw, num_raw = parts[1], parts[2]
+            if not (year_raw.isdigit() and num_raw.isdigit()):
+                logger.warning(f"Skipping malformed CVE ID: {cve_id}")
+                continue
+            year = re.escape(year_raw)
+            num = re.escape(num_raw)
+            title_pat = re.compile(rf"(?<!\w)CVE[\s\-/]*{year}[\s\-/]*{num}\b", re.IGNORECASE)
 
             matched = []
             for entry in feed.entries:
@@ -135,7 +139,7 @@ class Command(BaseCommand):
     def _get_top_cves(self, days, limit):
         """Return the CVEs that appear most frequently in the last N days."""
         with connection.cursor() as cur:
-            # Tie-break by recency so the picker is stable when many CVEs share count=1
+            # Tie-break by recency for stable ordering when CVEs share the same count
             cur.execute("""
                 SELECT UPPER(ioc_value), COUNT(*) AS cnt, MAX(ingested_at) AS recent
                 FROM indicators_of_compromise
