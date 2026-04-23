@@ -77,7 +77,12 @@ class Command(BaseCommand):
                 continue
 
             # Tolerant title match: catches "CVE-X-Y", "CVE X-Y", "CVEX-Y", "CVE/X/Y"
-            year, num = cve_id.split("-")[1], cve_id.split("-")[2]
+            parts = cve_id.split("-")
+            if len(parts) < 3:
+                logger.warning(f"Skipping malformed CVE ID: {cve_id}")
+                continue
+            year = re.escape(parts[1])
+            num = re.escape(parts[2])
             title_pat = re.compile(rf"CVE[\s\-/]*{year}[\s\-/]*{num}\b", re.IGNORECASE)
 
             matched = []
