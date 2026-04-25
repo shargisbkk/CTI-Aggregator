@@ -15,6 +15,31 @@ logger = logging.getLogger(__name__)
 # we convert string levels to numbers first since some MISP servers send them as text.
 _THREAT_LEVEL_CONFIDENCE = {1: 80, 2: 60, 3: 40}
 
+# tag namespaces we strip out before saving as labels.
+# these describe sharing rules, analyst workflow, or how the data was collected,
+# not what the indicator actually is, so they pollute the labels column.
+_NOISE_TAG_PREFIXES = (
+    "tlp:",                  #Traffic Light Protocol sharing classifications
+    "workflow:",             #analyst workflow state
+    "admiralty-scale:",      #source reliability rating
+    "estimative-language:",  #analytical confidence wording
+    "false-positive:",       #known false positive markers
+    "veris:",                #incident framework metadata
+    "osint:source-type",     #where the data came from
+    "osint:lifetime",        #how long the data is considered valid
+    "misp:",                 #MISP admin metadata like event-type, automation-level, threat-level
+    "type:osint",            #provenance category, not a threat description
+)
+
+
+def _is_useful_label(tag: str) -> bool:
+    #drop tags that describe how the data was shared or analyzed, not what it is
+    tag_lower = tag.lower()
+    for prefix in _NOISE_TAG_PREFIXES:
+        if tag_lower.startswith(prefix):
+            return False
+    return True
+
 
 class MispFeedAdapter(FeedAdapter):
     def __init__(self, api_key="", since=None, config=None):
@@ -81,11 +106,13 @@ class MispFeedAdapter(FeedAdapter):
             event = event_data.get("Event", event_data)
 
             # collect event-level tags (these apply to every attribute in this event)
+            # noise tags like TLP and workflow markers are dropped here so they
+            # never reach the labels column.
             seen_event_labels: set[str] = set()
             event_labels: list[str] = []
             for t in event.get("Tag", []):
                 name = t.get("name") if isinstance(t, dict) else None
-                if name and name not in seen_event_labels:
+                if name and name not in seen_event_labels and _is_useful_label(name):
                     seen_event_labels.add(name)
                     event_labels.append(name)
 
@@ -112,10 +139,10 @@ class MispFeedAdapter(FeedAdapter):
                     else:
                         value = parts[0]
 
-                # merge attribute-level tags with event-level tags, skip duplicates
+                # merge attribute-level tags with event-level tags, skip duplicates and noise
                 attr_labels = [
                     t["name"] for t in attr.get("Tag", [])
-                    if isinstance(t, dict) and t.get("name")
+                    if isinstance(t, dict) and t.get("name") and _is_useful_label(t["name"])
                 ]
                 labels = event_labels + [l for l in attr_labels if l not in seen_event_labels]
 
