@@ -175,3 +175,19 @@ def normalize_one(raw: dict) -> Optional[dict]:
         "first_seen": _parse_ts(raw.get("first_seen")),
         "last_seen":  _parse_ts(raw.get("last_seen")),
     }
+
+
+def normalize_batch(records: list[dict], source_name: str) -> list[dict]:
+    out, skipped = [], 0
+    for r in records:
+        try:
+            n = normalize_one(r)
+            if n is not None:
+                out.append(n)
+        except Exception:
+            skipped += 1
+    if skipped:
+        logger.warning("%s: skipped %d bad records", source_name, skipped)
+    logger.info("%s: normalized %d indicators from %d raw records",
+                source_name, len(out), len(records))
+    return out

@@ -1,6 +1,6 @@
-# adapter for MISP-format JSON event feeds (CIRCL, Botvrij, Digital Side, etc.)
-# fetches manifest.json to get event UUIDs, then each event's attributes become indicators
-# config: url, timeout, initial_days, filter_to_ids, max_events, auth_header
+# adapter for MISP-format JSON event feeds like CIRCL, Botvrij, Digital Side
+# first fetches the index file that lists every event ID, then loads each event and turns its attributes into indicators
+# config keys: url, timeout, initial_days, filter_to_ids, max_events, auth_header
 
 import logging
 from datetime import datetime, timedelta, timezone
@@ -10,9 +10,9 @@ from ingestion.adapters.http import request_with_retry
 
 logger = logging.getLogger(__name__)
 
-# Maps MISP threat_level_id to a numeric confidence score.
-# Level 4 (Undefined) is treated as unknown confidence.
-# Keys are ints; coerce before lookup since some MISP deployments serialize as strings.
+# turns the MISP threat level number into a confidence score.
+# level 4 (Undefined) gets no confidence at all.
+# we convert string levels to numbers first since some MISP servers send them as text.
 _THREAT_LEVEL_CONFIDENCE = {1: 80, 2: 60, 3: 40}
 
 
@@ -22,13 +22,13 @@ class MispFeedAdapter(FeedAdapter):
         self.source_name = self.config.get("_source_name", "misp")
 
     def _fetch_manifest(self, base_url, headers, timeout):
-        # grabs the manifest listing all event UUIDs
+        # fetches the index file that lists every event ID
         manifest_url = base_url.rstrip("/") + "/manifest.json"
         r = request_with_retry("GET", manifest_url, headers=headers, timeout=timeout)
         return r.json()
 
     def _fetch_event(self, base_url, uuid, headers, timeout):
-        # fetches one event by its UUID
+        # fetches one event by its ID
         event_url = base_url.rstrip("/") + f"/{uuid}.json"
         r = request_with_retry("GET", event_url, headers=headers, timeout=timeout)
         return r.json()
@@ -50,7 +50,7 @@ class MispFeedAdapter(FeedAdapter):
         else:
             cutoff_ts = 0  # no restriction, fetch everything
 
-        # fetch the manifest (index of all event UUIDs and their timestamps)
+        # fetch the index file that lists every event ID and when it was published
         try:
             manifest = self._fetch_manifest(base_url, headers, timeout)
         except Exception:
@@ -77,7 +77,7 @@ class MispFeedAdapter(FeedAdapter):
                 logger.warning("%s: failed to fetch event %s, skipping", self.source_name, uuid)
                 continue
 
-            # handle both wrapped {"Event": {...}} and bare event dict formats
+            # handle both shapes the server sends back: with a top-level "Event" wrapper, or without
             event = event_data.get("Event", event_data)
 
             # collect event-level tags (these apply to every attribute in this event)
@@ -89,7 +89,7 @@ class MispFeedAdapter(FeedAdapter):
                     seen_event_labels.add(name)
                     event_labels.append(name)
 
-            # Coerce threat_level_id to int; some deployments serialize it as a string.
+            # convert the threat level into a number; some servers send it as text.
             try:
                 threat_level = int(event.get("threat_level_id"))
             except (TypeError, ValueError):

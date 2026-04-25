@@ -1,5 +1,5 @@
-# TAXII 2.1 protocol handler — handles discovery, collections, and pagination
-# supports body-based (more/next) and header-based (X-TAXII-Date-Added-Last) pagination
+#TAXII 2.1 protocol handler. handles discovery, collections, and pagination.
+#supports body-based (more/next) and header-based (X-TAXII-Date-Added-Last) pagination.
 
 import logging
 from urllib.parse import urljoin
@@ -9,20 +9,18 @@ from ingestion.adapters.stix import extract_indicators
 
 logger = logging.getLogger(__name__)
 
-# required Accept header for TAXII 2.1 protocol
+#required Accept header for TAXII 2.1 protocol
 TAXII_ACCEPT = "application/taxii+json; version=2.1"
 TAXII_HEADERS = {"Accept": TAXII_ACCEPT}
 
 
 def _resolve_url(base: str, url: str) -> str:
-    # resolves a relative API root URL against the discovery base
     if url.startswith("http"):
         return url
     return urljoin(base, url)
 
 
 def _build_params(extra: dict | None = None, api_key: str = "") -> dict:
-    # builds query params, adds api key if provided
     params: dict = {}
     if api_key:
         params["key"] = api_key
@@ -32,7 +30,6 @@ def _build_params(extra: dict | None = None, api_key: str = "") -> dict:
 
 
 def _merge_headers(extra: dict | None) -> dict:
-    # merges auth headers with the required TAXII Accept header
     if not extra:
         return TAXII_HEADERS
     return {**TAXII_HEADERS, **extra}
@@ -40,7 +37,6 @@ def _merge_headers(extra: dict | None) -> dict:
 
 def discover_api_roots(discovery_url: str, auth: tuple[str, str] | None,
                        api_key: str = "", extra_headers: dict | None = None) -> list[str]:
-    # hits the discovery endpoint and returns the list of API root URLs
     r = request_with_retry("GET", discovery_url, headers=_merge_headers(extra_headers),
                            auth=auth, params=_build_params(api_key=api_key), timeout=60)
     data = r.json()
@@ -50,12 +46,16 @@ def discover_api_roots(discovery_url: str, auth: tuple[str, str] | None,
     if default and default not in roots:
         roots.insert(0, default)
 
+    #some TAXII servers point you straight at the API root with no api_roots key.
+    #treat the URL itself as the api root in that case.
+    if not roots:
+        return [discovery_url.rstrip("/")]
+
     return [_resolve_url(discovery_url, root) for root in roots]
 
 
 def list_collections(api_root_url: str, auth: tuple[str, str] | None,
                      api_key: str = "", extra_headers: dict | None = None) -> list[dict]:
-    # lists all collections at an API root
     url = api_root_url.rstrip("/") + "/collections/"
     r = request_with_retry("GET", url, headers=_merge_headers(extra_headers), auth=auth,
                            params=_build_params(api_key=api_key), timeout=60)
@@ -65,7 +65,7 @@ def list_collections(api_root_url: str, auth: tuple[str, str] | None,
 def get_objects(api_root_url: str, collection_id: str, auth: tuple[str, str] | None,
                 added_after: str | None, api_key: str = "",
                 extra_headers: dict | None = None):
-    # pages through a collection, yielding one envelope at a time
+    #hands back one page of results at a time so the caller can read them as they come
     url = api_root_url.rstrip("/") + f"/collections/{collection_id}/objects/"
     base_extra = {"match[type]": "indicator"}
     if added_after:
@@ -85,26 +85,26 @@ def get_objects(api_root_url: str, collection_id: str, auth: tuple[str, str] | N
             break
         env = r.json()
 
-        # empty envelope means no more data
+        #an empty page means there is no more data to read
         if not env.get("objects"):
             break
 
         yield env
 
-        # pagination style 1: body contains "more" flag and "next" cursor token
+        #pagination style 1: body has more flag and next cursor token
         if env.get("more") and env.get("next"):
             params = _build_params(base_extra, api_key)
             params["next"] = env["next"]
             continue
 
-        # pagination style 2: server sends date cursor in response header
+        #pagination style 2: server sends date cursor in response header
         date_last = r.headers.get("X-TAXII-Date-Added-Last")
         if date_last and date_last != params.get("added_after"):
             params = _build_params(base_extra, api_key)
             params["added_after"] = date_last
             continue
 
-        break  # no pagination indicators found, we have all the data
+        break  #no pagination indicators, we have all the data
 
 
 def fetch_taxii_raw(
@@ -116,11 +116,9 @@ def fetch_taxii_raw(
     collection_id: str = "",
     extra_headers: dict | None = None,
 ) -> list[dict]:
-    # queries a TAXII server and returns raw indicator dicts
-    # if collection_id is set, queries just that one — otherwise discovers all collections
+    #if collection_id is set, queries just that one. otherwise discovers all collections.
     auth = (username, password) if username else None
 
-    # if a specific collection ID is given, skip discovery and query directly
     if collection_id:
         api_root_url = discovery_url.rstrip("/")
         all_indicators = []
@@ -130,7 +128,6 @@ def fetch_taxii_raw(
             all_indicators.extend(extract_indicators(objects))
         return all_indicators
 
-    # no collection ID provided: discover all API roots and query every readable collection
     try:
         api_roots = discover_api_roots(discovery_url, auth, api_key, extra_headers)
     except Exception as e:
@@ -164,7 +161,7 @@ def fetch_taxii_raw(
 
     if failed_roots == len(api_roots):
         raise RuntimeError(
-            f"TAXII: could not reach any collections at {discovery_url} — "
+            f"TAXII: could not reach any collections at {discovery_url}; "
             "check URL and credentials"
         )
 
