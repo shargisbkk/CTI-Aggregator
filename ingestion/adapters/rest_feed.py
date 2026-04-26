@@ -12,12 +12,12 @@ logger = logging.getLogger(__name__)
 
 
 def _resolve_path(data, path: str):
-    # walks a dot-notation path like "data.items" through nested dicts/lists
+    # walks a path like "data.items" through nested groups, picking each piece by name
     if not path:
         return data
     for key in path.split("."):
         if isinstance(data, list):
-            # Flatten: collect the value of `key` from every dict in the list
+            # pull the value at this name from every item in the list and combine them
             result = []
             for item in data:
                 if isinstance(item, dict):
@@ -36,7 +36,7 @@ def _resolve_path(data, path: str):
 
 
 def _extract_labels(record: dict, fields: list) -> list:
-    # pulls label values from a record — handles strings, lists, and dicts
+    # pulls label values from a single record. handles values that are text, lists, or nested groups.
     labels = []
     for f in fields:
         val = record.get(f)
@@ -81,7 +81,7 @@ class RestFeedAdapter(FeedAdapter):
                 f"{self.source_name}: ioc_value_field must be set in config for REST sources"
             )
 
-        # build request headers and incremental pull params
+        # set up the request headers and the URL setting that limits results to recent items
         headers     = self._build_auth_headers()
         base_params = {}
         since_param  = self.config.get("since_param")

@@ -10,12 +10,12 @@ logger = logging.getLogger(__name__)
 
 BATCH_SIZE = 1000
 
-# raw SQL for bulk insert with conflict handling
-# on duplicate (ioc_type, ioc_value):
-#   first_seen takes the earliest timestamp (LEAST)
-#   last_seen takes the latest timestamp (GREATEST)
-#   confidence keeps the highest value (GREATEST ignores NULL)
-#   sources and labels merge both arrays, deduplicating via DISTINCT
+# the SQL below saves rows in bulk and handles duplicates.
+# when a row with the same type and value already exists:
+#   keep the earlier first-seen date
+#   keep the later last-seen date
+#   keep the higher confidence number
+#   combine the source names and labels from both, removing repeats
 UPSERT_SQL = """
     INSERT INTO indicators_of_compromise
         (ioc_type, ioc_value, confidence, labels, sources, first_seen, last_seen, ingested_at)
@@ -43,10 +43,10 @@ UPSERT_SQL = """
 
 
 def _ensure_aware(value) -> datetime | None:
-    """Guarantee a datetime is timezone-aware before inserting into Postgres."""
+    """Make sure a date has timezone info attached before saving it to the database."""
     if value is None:
         return None
-    # handle pandas Timestamp objects
+    # convert date objects from the pandas data library into plain Python dates
     if hasattr(value, "to_pydatetime"):
         value = value.to_pydatetime()
     if not isinstance(value, datetime):
@@ -55,7 +55,7 @@ def _ensure_aware(value) -> datetime | None:
 
 
 def _clean_conf(value):
-    """Coerce confidence to int or None for the DB column."""
+    """Turn the confidence into a number, or nothing if it cannot be read as one."""
     if value is None:
         return None
     try:
@@ -64,11 +64,10 @@ def _clean_conf(value):
         return None
 
 
-# max character length for a single label before truncation
 MAX_LABEL_LEN = 60
 
 def _truncate_labels(value) -> list:
-    """Cap each label string at MAX_LABEL_LEN before inserting into the DB."""
+    """Cut each label down to 60 characters before saving it."""
     if not value:
         return []
     if not isinstance(value, (list, tuple, set)):
@@ -77,11 +76,11 @@ def _truncate_labels(value) -> list:
 
 
 def _upsert_batch(rows: list[tuple]) -> None:
-    """Execute one batch INSERT with parameterized placeholders."""
+    """Save one group of rows to the database in a single query."""
     placeholders = ", ".join(
         ["(%s, %s, %s, COALESCE(%s::jsonb, '[]'::jsonb), COALESCE(%s::jsonb, '[]'::jsonb), %s, %s, NOW())"] * len(rows)
     )
-    # flatten all row tuples into a single params list for the query
+    #lay out every row's values in one long list so the query can fill its blanks in order
     params = [val for row in rows for val in row]
     with connection.cursor() as cur:
         cur.execute(UPSERT_SQL.format(placeholders=placeholders), params)
@@ -89,25 +88,30 @@ def _upsert_batch(rows: list[tuple]) -> None:
 
 def upsert_indicators(normalized_records: list[dict], source_name: str = "") -> int:
     """
-    Batch upsert into Postgres. Merge rules on conflict:
-    first_seen=LEAST, last_seen=GREATEST, confidence=GREATEST,
-    sources=union, labels=union.
+    Save indicators to the database in bulk. When a row with the same type and
+    value already exists, keep the earlier first-seen date, the later last-seen
+    date, the higher confidence, and combine the source names and labels from
+    both sides without repeats.
     """
     if not normalized_records:
         return 0
 
-    # snapshot count before insert to calculate how many new rows were created
+    # count the table before saving so we can tell how many rows were brand new
     before = IndicatorOfCompromise.objects.count()
 
-    # build parameter tuples and flush in batches of BATCH_SIZE
+    #collect rows; save them to the database in groups of 1000 to keep each query small
     batch: list[tuple] = []
     for r in normalized_records:
+        #tuple order has to match the placeholders in UPSERT_SQL — don't reorder
         batch.append((
             r["ioc_type"],
             r["ioc_value"],
             _clean_conf(r.get("confidence")),
+            #labels and sources are jsonb columns, so serialize the lists to JSON text
             json.dumps(_truncate_labels(r.get("labels"))),
+            #wrap source in a list so the array-merge in UPSERT_SQL can union them
             json.dumps([source_name] if source_name else []),
+            #Postgres rejects naive datetimes; _ensure_aware tags missing tz as UTC
             _ensure_aware(r.get("first_seen")),
             _ensure_aware(r.get("last_seen")),
         ))
@@ -115,7 +119,7 @@ def upsert_indicators(normalized_records: list[dict], source_name: str = "") -> 
             _upsert_batch(batch)
             batch.clear()
 
-    # flush any remaining records that didn't fill a complete batch
+    #save any leftover rows that did not fill a full group of 1000
     if batch:
         _upsert_batch(batch)
 

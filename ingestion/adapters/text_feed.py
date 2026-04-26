@@ -24,7 +24,7 @@ class TextFeedAdapter(FeedAdapter):
         comment_chars = tuple(self.config["comment_char"]) if "comment_char" in self.config \
                         else ("#", ";")
 
-        # Compile once outside the loop.
+        # do this once before the loop so we do not redo it on every line
         comment_pattern = re.compile("[" + re.escape("".join(comment_chars)) + "]")
 
         headers = self._build_auth_headers()

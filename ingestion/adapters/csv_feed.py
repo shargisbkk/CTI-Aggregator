@@ -13,17 +13,14 @@ from ingestion.adapters.http import request_with_retry
 logger = logging.getLogger(__name__)
 
 def _resolve_column(header_row: list[str] | None, col_spec) -> int | None:
-    # turns a column name or index into a numeric index
     if col_spec is None or col_spec == "":
         return None
     if isinstance(col_spec, int):
         return col_spec
-    # try parsing as a number first
     try:
         return int(col_spec)
     except (ValueError, TypeError):
         pass
-    # fall back to looking up the name in the header row
     if header_row:
         normalized = [h.strip().lower() for h in header_row]
         name = str(col_spec).strip().lower()
@@ -60,7 +57,6 @@ class CsvFeedAdapter(FeedAdapter):
         headers = self._build_auth_headers()
         r = request_with_retry("GET", url, headers=headers, timeout=timeout)
 
-        # filter out comment lines and parse CSV
         raw_lines = [
             line for line in io.StringIO(r.text)
             if not (comment_char and line.startswith(comment_char))
@@ -69,11 +65,9 @@ class CsvFeedAdapter(FeedAdapter):
         if not all_rows:
             return []
 
-        # separate header from data rows
         header_row = all_rows[0] if skip_header else None
         rows       = all_rows[1:] if skip_header else all_rows
 
-        # resolve all column specs to numeric indices
         ioc_value_col  = _resolve_column(header_row, ioc_value_col_spec)
         ioc_type_col   = _resolve_column(header_row, ioc_type_col_spec)
         label_cols     = [_resolve_column(header_row, s) for s in label_col_specs]
