@@ -390,8 +390,8 @@ def analytics(request):
                 template='plotly_dark',
                 geo=dict(projection_type='natural earth'),
                 margin=dict(t=30, b=10, l=10, r=10),
-                paper_bgcolor='#26343d',
-                plot_bgcolor='#26343d',
+                paper_bgcolor='rgba(0,0,0,0)',
+                plot_bgcolor='rgba(0,0,0,0)',
                 font_color='white',
             )
             world_map_json = country_fig.to_json()
@@ -414,10 +414,13 @@ def analytics(request):
         template="plotly_dark", 
         title_text="Threat Confidence by Count", 
         title_x=0.5,
-        paper_bgcolor="#26343d",
-        plot_bgcolor="#26343d",
+        paper_bgcolor="rgba(0,0,0,0)",
+        plot_bgcolor="rgba(0,0,0,0)",
         font_color="white",
         margin=dict(t=80,b=20,l=20,r=20))
+
+    # Pass the current theme to the template
+    current_theme = request.COOKIES.get("theme", "light")
 
     context = {
         "total_indicators":     count_records,
@@ -428,7 +431,8 @@ def analytics(request):
         "top_ioc_types":        top_ioc_types,
         "top_countries":        top_countries_sources,
         "threat_conf_fig_json": conf_figure.to_json(),
-        "world_map_json":       world_map_json
+        "world_map_json":       world_map_json,
+        "current_theme":         current_theme,
     }
 
     return render(
