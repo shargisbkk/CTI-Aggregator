@@ -34,10 +34,9 @@ Analytics
     =================================================== -->
 
     <div class="row g-4 mb-4">
-
-        <!-- Total indicators -->
-        <div class="col-md-4">
-            <div class="card shadow-sm p-3">
+        <div class="col-md-6 d-flex flex-column">
+            <!-- Total indicators -->
+            <div class="card shadow-sm p-3 mb-3 h-100">
                 <h6 class="card-title">
                     Total Indicators
                 </h6>
@@ -45,11 +44,9 @@ Analytics
                     {{ total_indicators }}
                 </h2>
             </div>
-        </div>
 
-        <!-- High confidence -->
-        <div class="col-md-4">
-            <div class="card shadow-sm p-3">
+            <!-- High confidence -->
+            <div class="card shadow-sm p-3 mb-3 h-100">
                 <h6 class="card-title">
                     High Confidence
                 </h6>
@@ -57,11 +54,9 @@ Analytics
                     {{ high_confidence }}
                 </h2>
             </div>
-        </div>
 
-        <!-- New this week -->
-        <div class="col-md-4">
-            <div class="card shadow-sm p-3">
+            <!-- New this week -->
+            <div class="card shadow-sm p-3 h-100">
                 <h6 class="card-title">
                     Last Seen This Week
                 </h6>
@@ -71,6 +66,15 @@ Analytics
             </div>
         </div>
 
+        <div class="col-md-6">
+            <!-- Threat confidence chart -->
+            <div class="card shadow-sm p-4 mb-4 h-100">
+                <div id="threat-confidence-container"
+                    style="width:100%; resize:vertical; overflow:auto; min-height:240px; max-height:800px;">
+                    <div id="threat-confidence-chart" style="width:100%; height:400px;"></div>
+                </div>
+            </div>
+        </div>
     </div>
 
     <!-- ==================================================
@@ -83,7 +87,7 @@ Analytics
     =================================================== -->
 
         <div class="col-xl-4">
-            <div class="card shadow-sm p-4 mb-4">
+            <div class="card shadow-sm p-4 mb-4" style="height: 30rem;"> <!-- Set fixed height using rem -->
 
                 <h5 class="fw-bold card-title mb-3">
                     Top Sources by Indicator Volume
@@ -92,7 +96,8 @@ Analytics
                         <i class="fa fa-chevron-up"></i>
                     </button>
                 </h5>
-                <div id="topSourcesTable" class="collapse show">
+                <div id="topSourcesTable" class="collapse show"
+                    style="overflow-y: auto; max-height: calc(30rem - 4rem);"> <!-- Enable vertical scrolling -->
                     <table class="table table-hover table-custom">
 
                         <thead>
@@ -111,7 +116,7 @@ Analytics
                                 <td>{{ source.source_name }}</td>
 
                                 <td>
-                                    <a href="#" target="_blank">
+                                    <a href="{% url 'dashboard:dashboard-threat-feeds' %}">
                                         Feed URLs
                                     </a>
                                 </td>
@@ -143,7 +148,7 @@ Analytics
     =================================================== -->
 
         <div class="col-xl-4">
-            <div class="card shadow-sm p-4 mb-4">
+            <div class="card shadow-sm p-4 mb-4" style="height: 30rem;"> <!-- Set fixed height using rem -->
 
                 <h5 class="fw-bold card-title mb-3">
                     Top IOC Types by Count
@@ -152,7 +157,8 @@ Analytics
                         <i class="fa fa-chevron-up"></i>
                     </button>
                 </h5>
-                <div id="topTypesTable" class="collapse show">
+                <div id="topTypesTable" class="collapse show" style="overflow-y: auto; max-height: calc(30rem - 4rem);">
+                    <!-- Enable vertical scrolling -->
                     <table class="table table-hover table-custom">
 
                         <thead>
@@ -191,12 +197,9 @@ Analytics
             </div>
         </div>
 
-        <!--
-        Placeholder for testing enrichment table----------------------------------------------
-    -->
-
+        <!-- THE BIG TABLE FOR IOC COUNTRIES COUNT -->
         <div class="col-xl-4">
-            <div class="card shadow-sm p-4 mb-4">
+            <div class="card shadow-sm p-4 mb-4" style="height: 30rem;"> <!-- Set fixed height using rem -->
 
                 <h5 class="fw-bold card-title mb-3">
                     Top Countries by IOC Count
@@ -206,7 +209,8 @@ Analytics
                     </button>
                 </h5>
 
-                <div id="topCountriesTable" class="collapse show">
+                <div id="topCountriesTable" class="collapse show"
+                    style="overflow-y: auto; max-height: calc(30rem - 4rem);"> <!-- Enable vertical scrolling -->
                     <table class="table table-hover table-custom">
 
                         <thead>
@@ -239,19 +243,11 @@ Analytics
     =================================================== -->
     <div class="row">
 
-        <!-- Threat confidence chart -->
-        <div class="col-xl-4">
-            <div class="card shadow-sm p-4 mb-4">
-                <div id="threat-confidence-container" style="width:100%; resize:vertical; overflow:auto; min-height:240px; max-height:800px;">
-                    <div id="threat-confidence-chart" style="width:100%; height:400px;"></div>
-                </div>
-            </div>
-        </div>
-
         <!-- World Map -->
-        <div class="col-xl-8">
+        <div class="col-xl-12">
             <div class="card shadow-sm p-4 mb-4">
-                <div id="world-container" style="width:100%; resize:vertical; overflow:auto; min-height:480px; max-height:1600px;">
+                <div id="world-container"
+                    style="width:100%; resize:vertical; overflow:auto; min-height:480px; max-height:1600px;">
                     <div id="world-map-chart" style="width:100%; height:800px;"></div>
                 </div>
             </div>
@@ -276,9 +272,16 @@ Analytics
         }
 
         const chartEl = document.getElementById('threat-confidence-chart');
+        const container = document.getElementById('threat-confidence-container');
+
+        // Set a neutral font color that works in both light and dark modes
+        const fontColor = '#808080'; // Neutral gray
+        fig.layout.font.color = fontColor;
+
+        // Render the chart
         Plotly.newPlot(chartEl, fig.data, fig.layout, { responsive: true });
 
-        const container = document.getElementById('threat-confidence-container');
+        // Resize observer for responsiveness
         if (window.ResizeObserver) {
             const ro = new ResizeObserver(() => Plotly.Plots.resize(chartEl));
             ro.observe(container);
@@ -286,23 +289,30 @@ Analytics
             window.addEventListener('resize', () => Plotly.Plots.resize(chartEl));
         }
     })();
-    (function(){
+    (function () {
         const raw = '{{ world_map_json|default:"{}"|escapejs }}';
-        if(!raw || raw === '{}') return;
+        if (!raw || raw === '{}') return;
 
         let fig;
-        try{
+        try {
             fig = JSON.parse(raw);
-        }catch(err){
+        } catch (err) {
             console.error('Invalid JSON for world_map_json', err, raw);
             return;
         }
 
         const chartEl = document.getElementById('world-map-chart');
-        Plotly.newPlot(chartEl, fig.data, fig.layout, {responsive: true});
-
         const container = document.getElementById('world-container');
-        if(window.ResizeObserver){
+
+        // Set a neutral font color that works in both light and dark modes
+        const fontColor = '#808080'; // Neutral gray
+        fig.layout.font.color = fontColor;
+
+        // Render the chart
+        Plotly.newPlot(chartEl, fig.data, fig.layout, { responsive: true });
+
+        // Resize observer for responsiveness
+        if (window.ResizeObserver) {
             const ro = new ResizeObserver(() => Plotly.Plots.resize(chartEl));
             ro.observe(container);
         } else {
@@ -311,6 +321,6 @@ Analytics
     })();
 </script>
 
-    {% endif %}
+{% endif %}
 
 {% endblock %}

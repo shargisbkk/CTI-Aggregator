@@ -77,7 +77,7 @@
 
                         <!-- Feed URL -->
                         <td>
-                            <a href="{{ feed.url }}" target="_blank">
+                            <a href="{{ feed.url }}" target="_blank" onclick="event.preventDefault();" class="text-decoration-none">
                                 {{ feed.url }}
                             </a>
                         </td>
