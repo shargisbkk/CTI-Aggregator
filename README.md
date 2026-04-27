@@ -19,4 +19,4 @@ Upon entering these, you will be dropped to the home page. Currently, you have 0
 From there, just hit Update All Feeds, and then wait for them to populate.
 
 # Next Steps
-You can then go to the Analysis page and look over the data, or alter your sources on the admin page from there! If you would like to add new sources, please refer to the [Documentation](CITATION NEEDED) for more assistance, or put in an issue within this repo. Thanks for using the CTI Aggregator!
+You can then go to the Analysis page and look over the data, or alter your sources on the admin page from there! If you would like to add new sources, please refer to the [Setup Guide](docs/CTI_Setup_Guide.pdf) and [User Guide](docs/CTI_User_Guide.pdf) for more assistance, or put in an issue within this repo. Thanks for using the CTI Aggregator!
