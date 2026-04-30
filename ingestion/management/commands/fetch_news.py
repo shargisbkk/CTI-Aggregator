@@ -5,6 +5,7 @@ from datetime import timedelta
 
 import feedparser
 from django.core.management.base import BaseCommand
+from django.db import transaction
 from django.db.models import Func
 from django.utils import timezone
 from email.utils import parsedate_to_datetime
@@ -46,11 +47,16 @@ class Command(BaseCommand):
             "--top", type=int, default=3,
             help="Number of top CVEs to fetch articles for (default: 3).",
         )
+        parser.add_argument(
+            "--articles", type=int, default=3,
+            help="Max number of articles to save per CVE (default: 3).",
+        )
 
     def handle(self, *args, **opts):
         days = opts["days"]
         top_n = opts["top"]
-        max_articles = 3
+        # let the scheduler/admin choose how many articles to keep per CVE
+        max_articles = opts["articles"]
         freshness_days = 30
 
         cve_ids = self._get_top_cves(days, top_n)
@@ -63,8 +69,8 @@ class Command(BaseCommand):
         cutoff = timezone.now() - timedelta(days=freshness_days)
         total_saved = 0
 
-        #clean slate every run so the widget only ever shows the current top picks
-        ThreatArticle.objects.all().delete()
+        # build the new article list first so we do not wipe the dashboard if fetching fails
+        new_articles = []
 
         for cve_id in cve_ids:
             url = GOOGLE_NEWS_URL.format(query=cve_id)
@@ -116,17 +122,22 @@ class Command(BaseCommand):
             ).first()
 
             for title, link, pub_date in matched:
-                ThreatArticle.objects.create(
+                new_articles.append(ThreatArticle(
                     url=link,
                     title=title,
                     source_name="Google News",
                     matched_label=cve_id,
                     matched_indicator=indicator,
                     published_at=pub_date,
-                )
+                ))
                 total_saved += 1
 
             logger.info(f"{cve_id}: {len(matched)} recent articles saved")
+
+        # replace the old widget articles only after the new set is ready
+        with transaction.atomic():
+            ThreatArticle.objects.all().delete()
+            ThreatArticle.objects.bulk_create(new_articles, ignore_conflicts=True)
 
         logger.info(f"Done. {total_saved} articles saved.")
 
