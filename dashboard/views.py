@@ -46,26 +46,20 @@ def home(request):
         last_updated=Max("last_pulled")
     )["last_updated"]
 
-    # CVE news: only show CVEs whose articles are within the freshness window
+    #cve news: fetch_news wipes and refills the table each run, so we can trust everything in here
     cve_news = []
-    fresh_cutoff = timezone.now() - timedelta(days=30)
     cve_labels = (
         ThreatArticle.objects
-        .filter(published_at__gte=fresh_cutoff)
         .values("matched_label")
-        .annotate(
-            article_count=Count("id"),
-            newest_article=Max("published_at"),
-        )
-        .order_by("-newest_article")[:8]
+        .annotate(newest_article=Max("published_at"))
+        .order_by("-newest_article")
     )
     for row in cve_labels:
         cve_id = row["matched_label"]
         articles = ThreatArticle.objects.filter(
             matched_label=cve_id,
-            published_at__gte=fresh_cutoff,
-        ).order_by("-published_at")[:2]
-        # Pull the IOC's labels for context
+        ).order_by("-published_at")
+        #pull the indicator's labels for context
         ioc = IndicatorOfCompromise.objects.filter(
             ioc_type="cve", ioc_value=cve_id.lower()
         ).first()

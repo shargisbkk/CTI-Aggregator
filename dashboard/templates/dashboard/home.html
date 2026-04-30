@@ -1,4 +1,5 @@
 {% extends "dashboard/base.html" %}
+{% load humanize %}
 {% block title %}Dashboard{% endblock %}
 
 {% block content %}
@@ -55,21 +56,24 @@
                                     {{ cve.cve_id }}
                                 </a>
                                 {% for label in cve.labels %}
-                                    <span class="badge label-chip" style="font-size: 0.7rem;">{{ label|truncatechars:22 }}</span>
+                                    <a href="{% url 'dashboard:dashboard-indicators' %}?label={{ label|urlencode }}"
+                                       class="badge label-chip text-decoration-none"
+                                       style="font-size: 0.7rem;"
+                                       title="Search indicators tagged {{ label }}">{{ label|truncatechars:22 }}</a>
                                 {% endfor %}
                             </div>
 
                             {% for article in cve.articles %}
-                                <div class="ms-1 {% if not forloop.last %}mb-3{% endif %}">
+                                <div class="ms-1 {% if not forloop.last %}mb-2{% endif %}">
                                     <a href="{{ article.url }}"
                                        target="_blank"
                                        rel="noopener"
-                                       class="cve-article-link d-block mb-1"
+                                       class="cve-article-link d-block"
                                        style="font-size: 0.85rem; line-height: 1.3;">
                                         {{ article.title|truncatewords:14 }}
                                     </a>
                                     {% if article.published_at %}
-                                        <span class="cve-article-time">{{ article.published_at|date:"M d, Y" }}</span>
+                                        <span class="cve-article-time d-block">{{ article.published_at|naturaltime }}</span>
                                     {% endif %}
                                 </div>
                             {% endfor %}

@@ -5,7 +5,7 @@ from datetime import timedelta
 
 import feedparser
 from django.core.management.base import BaseCommand
-from django.db import connection
+from django.db.models import Func
 from django.utils import timezone
 from email.utils import parsedate_to_datetime
 
@@ -39,33 +39,32 @@ class Command(BaseCommand):
 
     def add_arguments(self, parser):
         parser.add_argument(
-            "--days", type=int, default=7,
-            help="Look back this many days for the most frequent CVEs (default: 7).",
+            "--days", type=int, default=14,
+            help="Look back this many days for newly-seen CVEs (default: 14).",
         )
         parser.add_argument(
             "--top", type=int, default=3,
             help="Number of top CVEs to fetch articles for (default: 3).",
         )
-        parser.add_argument(
-            "--articles", type=int, default=3,
-            help="Max number of articles to save per CVE (default: 3).",
-        )
 
     def handle(self, *args, **opts):
         days = opts["days"]
         top_n = opts["top"]
-        max_articles = opts["articles"]
+        max_articles = 3
         freshness_days = 30
 
         cve_ids = self._get_top_cves(days, top_n)
         if not cve_ids:
-            logger.warning(f"No CVEs ingested in the last {days} days.")
+            logger.warning(f"No CVEs first seen in the last {days} days.")
             return
 
         logger.info(f"Top {len(cve_ids)} CVEs from last {days} days: {', '.join(cve_ids)}")
 
         cutoff = timezone.now() - timedelta(days=freshness_days)
         total_saved = 0
+
+        #clean slate every run so the widget only ever shows the current top picks
+        ThreatArticle.objects.all().delete()
 
         for cve_id in cve_ids:
             url = GOOGLE_NEWS_URL.format(query=cve_id)
@@ -100,26 +99,23 @@ class Command(BaseCommand):
                 link = entry.get("link", "")[:700]
                 if not link:
                     continue
-                matched.append((entry, title, link, pub_date))
+                matched.append((title, link, pub_date))
 
-            # Sort by published date descending, keep only top N
+            #newest first, then keep the top few
             matched.sort(
-                key=lambda m: m[3] or timezone.datetime.min.replace(
+                key=lambda m: m[2] or timezone.datetime.min.replace(
                     tzinfo=timezone.utc
                 ),
                 reverse=True,
             )
             matched = matched[:max_articles]
 
-            # Wipe old articles for this CVE so the table stays fresh
-            ThreatArticle.objects.filter(matched_label=cve_id).delete()
-
-            # Look up the indicator once so new rows get the FK set for cascade delete
+            #grab the matching indicator so cascade delete works later
             indicator = IndicatorOfCompromise.objects.filter(
                 ioc_type="cve", ioc_value=cve_id.lower()
             ).first()
 
-            for entry, title, link, pub_date in matched:
+            for title, link, pub_date in matched:
                 ThreatArticle.objects.create(
                     url=link,
                     title=title,
@@ -132,21 +128,17 @@ class Command(BaseCommand):
 
             logger.info(f"{cve_id}: {len(matched)} recent articles saved")
 
-        # Cap the table at the freshness window so the widget never carries stale rows
-        purged = ThreatArticle.objects.filter(published_at__lt=cutoff).delete()[0]
-        logger.info(f"Done. {total_saved} articles saved, {purged} stale purged.")
+        logger.info(f"Done. {total_saved} articles saved.")
 
     def _get_top_cves(self, days, limit):
-        """Return the CVEs that appear most frequently in the last N days."""
-        with connection.cursor() as cur:
-            # Tie-break by recency for stable ordering when CVEs share the same count
-            cur.execute("""
-                SELECT UPPER(ioc_value), COUNT(*) AS cnt, MAX(ingested_at) AS recent
-                FROM indicators_of_compromise
-                WHERE ioc_type = 'cve'
-                  AND ingested_at >= NOW() - INTERVAL '%s days'
-                GROUP BY UPPER(ioc_value)
-                ORDER BY cnt DESC, recent DESC
-                LIMIT %s
-            """, [days, limit])
-            return [row[0] for row in cur.fetchall()]
+        """Return the most newsworthy CVEs in the last N days."""
+        #more sources reporting it wins, then newest first
+        cutoff = timezone.now() - timedelta(days=days)
+        rows = (
+            IndicatorOfCompromise.objects
+            .filter(ioc_type="cve", first_seen__gte=cutoff)
+            .annotate(source_count=Func("sources", function="jsonb_array_length"))
+            .order_by("-source_count", "-first_seen")
+            .values_list("ioc_value", flat=True)[:limit]
+        )
+        return [v.upper() for v in rows]
